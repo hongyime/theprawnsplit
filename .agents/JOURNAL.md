@@ -42,3 +42,4 @@
 - 2026-08-21: Phase 5 lifecycle keeps archive/unarchive as explicit append-only events; archive copy states that relay retention is outside app control and no relay data is deleted.
 - 2026-08-21: `settled` remains a computed ACTIVE view over folded canonical balances; archive summaries read the active `GroupArchived` event instead of creating another lifecycle state.
 - 2026-08-21: Custom relay settings are local `StoredMeta` preferences, not ledger events or exports, so relay routing can vary by device without affecting convergence.
+- 2026-08-21: Phase 5 multi-payer entry uses the existing v1 `Financials.payers[]` field and validates total equality before appending, avoiding any log migration.

@@ -27,10 +27,14 @@ export function makeEvent<T extends Event["t"]>(
   } as Extract<Event, { t: T }>;
 }
 
-export function makeExpenseFinancials(total: bigint, payerPid: string, shares: { pid: string; minor: bigint }[]): Financials {
+export function makeExpenseFinancials(
+  total: bigint,
+  payers: string | { pid: string; minor: bigint }[],
+  shares: { pid: string; minor: bigint }[],
+): Financials {
   return {
     minor: total,
-    payers: [{ pid: payerPid, minor: total }],
+    payers: typeof payers === "string" ? [{ pid: payers, minor: total }] : payers,
     shares,
   };
 }

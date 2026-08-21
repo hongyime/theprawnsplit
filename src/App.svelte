@@ -55,6 +55,7 @@
   import { expenseHistoryRows } from "@/lib/expense-history";
   import { frozenViewPolicy } from "@/lib/freeze-policy";
   import { archiveConfirmationText, isSettledViewPredicate, latestArchiveEvent, unarchiveConfirmationText } from "@/lib/lifecycle";
+  import { buildPayerPreview, type PayerMode } from "@/lib/payers";
   import { findParticipantNameMatch, groupParticipantsForClaim, type ParticipantNameMatch } from "@/lib/participants";
   import { normalizeRelaySettings, parseNostrRelayText, relaySettingsTargetCount, type RelaySettings } from "@/lib/relay-settings";
   import { reattestationStatus } from "@/lib/reattestation";
@@ -70,6 +71,8 @@
   let error = "";
   let participantName = "";
   let payerPid = "";
+  let payerMode: PayerMode = "single";
+  let payerAmounts: Record<string, string> = {};
   let expenseDesc = "";
   let expenseTotal = "";
   let splitMode: SplitMode = "equal";
@@ -115,15 +118,17 @@
     ["possible-duplicate-participants", "distinct-participants-merged", "contested-participant-claim"].includes(anomaly.code),
   );
   $: selectedParticipants = participants.filter((p) => selectedPids[p.pid]);
+  $: participantPids = participants.map((participant) => participant.pid);
   $: suggestedSettlements = state ? greedySettlement(state.balances) : [];
   $: sharePreview = buildSharePreview();
+  $: payerPreview = buildPayerPreview(parseMinor(expenseTotal), payerMode, payerPid, payerAmounts, participantPids);
   $: localClaimPids = new Set(group?.identities.map((identity) => identity.pid) ?? []);
   $: hasLocalClaim = localClaimPids.size > 0;
   $: unconfirmedCount = counts.local + counts.published;
   $: manualFallbackDue = Boolean(group?.meta.unsyncedSince && Date.now() - group.meta.unsyncedSince > 600_000);
   $: joinBlocked = Boolean(group && !group.events.some((event) => event.t === "GroupCreated"));
   $: recoveryActive = Boolean(joiningFromLink && joinBlocked);
-  $: canSaveExpense = Boolean(!archived && hasLocalClaim && payerPid && expenseDesc.trim() && parseMinor(expenseTotal) !== null && sharePreview.ok);
+  $: canSaveExpense = Boolean(!archived && hasLocalClaim && expenseDesc.trim() && parseMinor(expenseTotal) !== null && sharePreview.ok && payerPreview.ok);
   $: storageLabel = persistedStorage === null ? "storage unknown" : persistedStorage ? "storage protected" : "storage best effort";
   $: syncLabel = unconfirmedCount === 0 ? "sync current" : `${unconfirmedCount} unsynced`;
   $: archived = isGroupArchived();
@@ -173,6 +178,9 @@
     }
     selectedPids = nextSelected;
     payerPid ||= [...state.participants.keys()][0] ?? "";
+    for (const participant of state.participants.values()) {
+      if (payerAmounts[participant.pid] === undefined) payerAmounts[participant.pid] = "";
+    }
   }
 
   async function refreshCounts(): Promise<void> {
@@ -450,8 +458,21 @@
     );
   }
 
+  function changePayerMode(nextMode: PayerMode): void {
+    payerMode = nextMode;
+    if (nextMode === "multiple") {
+      const total = parseMinor(expenseTotal);
+      if (total !== null && payerPid) payerAmounts = { ...payerAmounts, [payerPid]: (Number(total) / 100).toFixed(2) };
+    }
+  }
+
+  function payerSummary(payers: { pid: string; minor: bigint }[]): string {
+    if (payers.length <= 1) return `${participantLabel(payers[0]?.pid ?? "")} paid`;
+    return payers.map((payer) => `${participantLabel(payer.pid)} ${formatMinor(payer.minor, group?.currency ?? "USD")}`).join(" · ");
+  }
+
   async function addExpense(): Promise<void> {
-    if (!group || !sharePreview.ok || !payerPid || archived) return;
+    if (!group || !sharePreview.ok || !payerPreview.ok || archived) return;
     const total = parseMinor(expenseTotal);
     if (total === null) return;
     const wasFirstExpense = expenses.length === 0;
@@ -459,7 +480,7 @@
     const dates = defaultExpenseDate();
     const event = makeEvent(f, "ExpenseAdded", {
       xid: crypto.randomUUID(),
-      financials: makeExpenseFinancials(total, payerPid, sharePreview.shares),
+      financials: makeExpenseFinancials(total, payerPreview.payers, sharePreview.shares),
       desc: expenseDesc.trim(),
       ...dates,
     });
@@ -470,6 +491,7 @@
     }
     expenseDesc = "";
     expenseTotal = "";
+    payerAmounts = {};
   }
 
   async function voidExpense(xid: string): Promise<void> {
@@ -1190,9 +1212,24 @@
         <div class="form-grid">
           <input bind:value={expenseDesc} placeholder="Description" />
           <input bind:value={expenseTotal} inputmode="decimal" placeholder="Total" />
-          <select bind:value={payerPid}>
-            {#each participants as participant}<option value={participant.pid}>{participant.name} paid</option>{/each}
-          </select>
+          <div class="segmented payer-mode" aria-label="Payer mode">
+            <button type="button" class:active={payerMode === "single"} on:click={() => changePayerMode("single")}>one paid</button>
+            <button type="button" class:active={payerMode === "multiple"} on:click={() => changePayerMode("multiple")}>many paid</button>
+          </div>
+          {#if payerMode === "single"}
+            <select bind:value={payerPid}>
+              {#each participants as participant}<option value={participant.pid}>{participant.name} paid</option>{/each}
+            </select>
+          {:else}
+            <div class="split-table payer-table">
+              {#each participants as participant}
+                <label>
+                  <span>{participant.name}</span>
+                  <input bind:value={payerAmounts[participant.pid]} inputmode="decimal" placeholder="0.00" />
+                </label>
+              {/each}
+            </div>
+          {/if}
           <div class="segmented">
             {#each ["equal", "exact", "shares", "percentage"] as mode}
               <button type="button" class:active={splitMode === mode} on:click={() => changeSplitMode(mode as SplitMode)}>{mode}</button>
@@ -1219,6 +1256,7 @@
           </div>
         {/if}
         {#if archived}<p class="hint">Archived trips are read-only.</p>{:else if !hasLocalClaim}<p class="hint">Viewing is enabled. Expense creation requires claiming one participant on this device.</p>{/if}
+        {#if !payerPreview.ok}<p class="hint">{payerPreview.message}</p>{/if}
         {#if !sharePreview.ok}<p class="hint">{sharePreview.message}</p>{:else if sharePreview.remainderPid}<p class="hint">Rounding remainder goes to {participantLabel(sharePreview.remainderPid)}.</p>{/if}
         <button type="button" disabled={!canSaveExpense} on:click={addExpense}><Plus size={17} /> Save expense</button>
       </article>
@@ -1279,6 +1317,7 @@
           <div>
             <strong>{expense.desc}</strong>
             <span>{expense.date}</span>
+            <span class="payer-summary">{payerSummary(expense.financials.payers)}</span>
             {#if expense.financialHistory.length > 1}
               <details class="expense-history">
                 <summary>{expense.financialHistory.length - 1} correction{expense.financialHistory.length === 2 ? "" : "s"}</summary>

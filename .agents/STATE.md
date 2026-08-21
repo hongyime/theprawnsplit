@@ -166,9 +166,12 @@ Progress:
 - Started Phase 5 custom-relay configuration UI. Relay preferences are device-local
   metadata, normalize operated endpoint/Nostr relay URLs, and feed sync relay creation
   without writing relay configuration into shared ledger events.
+- Started Phase 5 multi-payer UI. Expense entry can now emit the existing v1
+  `Financials.payers[]` schema from either one payer or exact paid amounts from multiple
+  people, with validation that payer amounts sum to the total.
 
 Next step:
-- Latest pushed commit before this slice is `4201c35` on `main`.
+- Latest pushed commit before this slice is `47dd81a` on `main`.
 - GitHub/Vercel automatic production deployment for `cd21de2` completed Ready on
   2026-08-21.
 - Remaining deployment work: configure Vercel env vars and verify custom-domain runtime.
@@ -280,6 +283,9 @@ Notes:
   protected-string scan, and `git diff --check` passed.
 - Latest verification on 2026-08-21 after Phase 5 custom relay settings slice: `npm run
   build` passed with 41 core tests and 38 root tests; root `npm audit --json`,
+  protected-string scan, and `git diff --check` passed.
+- Latest verification on 2026-08-21 after Phase 5 multi-payer UI slice: `npm run build`
+  passed with 41 core tests and 41 root tests; root `npm audit --json`,
   protected-string scan, and `git diff --check` passed.
 - Vercel checks on 2026-08-21 show the project exists but direct deployment creation was
   quota-blocked.

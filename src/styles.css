@@ -580,6 +580,10 @@ button.secondary {
   gap: 0.35rem;
 }
 
+.segmented.payer-mode {
+  grid-template-columns: repeat(2, 1fr);
+}
+
 .segmented button {
   min-width: 0;
   background: #eef6f3;
@@ -595,6 +599,10 @@ button.secondary {
   margin: 0.8rem 0;
   display: grid;
   gap: 0.45rem;
+}
+
+.payer-table {
+  margin-top: 0;
 }
 
 .split-table label {
@@ -671,6 +679,11 @@ button.secondary {
 
 .expense-history {
   margin-top: 0.15rem;
+}
+
+.payer-summary {
+  color: #607068;
+  font-size: 0.84rem;
 }
 
 .expense-history summary {

@@ -99,3 +99,4 @@
 - 2026-08-22: Sync status copy treats "ready" as a confirmed-state word: usable offline with unconfirmed local/published events must say changes are unconfirmed or unsynced, and newer-schema quarantine takes precedence.
 - 2026-08-22: Empty trip UX must expose both next moves immediately: adding people and sharing the trip file are co-primary empty-state actions, with add focused into the existing participant input.
 - 2026-08-22: Currency is onboarding metadata, not an onboarding screen: new local groups infer a three-letter currency immediately and emit `GroupCreated`; users may edit currency later from the main UI.
+- 2026-08-22: Split-mode preservation treats equal split share weights as user intent: Equal -> Shares writes `1` for each included participant, while Exact/Percentage transitions derive display inputs from the current computed amounts.

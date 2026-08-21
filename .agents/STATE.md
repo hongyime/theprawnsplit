@@ -549,6 +549,10 @@ Notes:
   local group immediately with inferred currency and a `GroupCreated` event instead of a
   setup currency step. Latest verification on 2026-08-22 passed with `npm run build`
   (48 core tests, 107 root tests).
+- Fixed and pinned REQ-MON-06 split-mode preservation. Equal -> Shares now pre-fills
+  one share per included participant instead of rounded minor-unit amounts, and
+  amount-to-percentage transitions remain populated through a tested helper. Latest
+  verification on 2026-08-22 passed with `npm run build` (48 core tests, 109 root tests).
 - Vercel checks on 2026-08-21 show the current `main` production deployment is Ready
   and has the requested aliases attached. Vercel env listing still shows no env vars
   configured, so the operated relay runtime remains unconfigured.

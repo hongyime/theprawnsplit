@@ -55,7 +55,7 @@
   import { signClaim } from "@/crypto/claim";
   import { config } from "@/config";
   import { defaultExpenseDate, defaultParticipant, makeEvent, makeExpenseFinancials, type EventFactory } from "@/lib/events";
-  import { formatMinor, formatMinorInput, formatPercentageInput, parseMinor, parsePercentageBasisPoints, parseShareWeight, type SplitMode } from "@/lib/money";
+  import { formatMinor, formatMinorInput, parseMinor, parsePercentageBasisPoints, parseShareWeight, type SplitMode } from "@/lib/money";
   import { isArchivedEventLog } from "@/lib/archive";
   import { createDeviceLinkRequest, linkPayload, parseDeviceLinkRequest, type DeviceLinkRequest } from "@/lib/device-link";
   import { expenseDisplayRows } from "@/lib/expense-display";
@@ -79,6 +79,7 @@
   import { normalizeRelaySettings, parseNostrRelayText, relaySettingsTargetCount, type RelaySettings } from "@/lib/relay-settings";
   import { reattestationStatus } from "@/lib/reattestation";
   import { canVoidRecordedSettlement, settlementClaimView } from "@/lib/settlement-history";
+  import { preserveSplitInputs } from "@/lib/split-preservation";
   import { applySubgroupSelection, deleteSubgroupPreset, upsertSubgroupPreset } from "@/lib/subgroups";
   import { isEventCoveredByEveryKnownDevice } from "@/lib/sync-coverage";
   import { syncSurfaceLabels } from "@/lib/sync-labels";
@@ -518,6 +519,7 @@
 
   function changeSplitMode(nextMode: SplitMode): void {
     if (archived) return;
+    const fromMode = splitMode;
     const preview = sharePreview;
     const total = parseMinor(expenseTotal);
     splitMode = nextMode;
@@ -528,9 +530,10 @@
       }
       return;
     }
-    exactShares = Object.fromEntries(preview.shares.map((share) => [share.pid, formatMinorInput(share.minor)]));
-    shareWeights = Object.fromEntries(preview.shares.map((share) => [share.pid, share.minor > 0n ? share.minor.toString() : "0"]));
-    percentages = Object.fromEntries(preview.shares.map((share) => [share.pid, formatPercentageInput(share.minor, total)]));
+    const preserved = preserveSplitInputs({ fromMode, toMode: nextMode, preview, selectedPids: selectedPidList(), total });
+    exactShares = preserved.exactShares;
+    shareWeights = preserved.shareWeights;
+    percentages = preserved.percentages;
   }
 
   function changePayerMode(nextMode: PayerMode): void {

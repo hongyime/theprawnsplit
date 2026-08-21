@@ -16,10 +16,24 @@ describe("expense history rows", () => {
     const rows = expenseHistoryRows({
       financials: active,
       financialHistory: [original, active, superseded],
+      activeFinancialIndex: 1,
     });
 
     expect(rows.map((row) => row.label)).toEqual(["Original", "Correction 1", "Correction 2"]);
     expect(rows.map((row) => row.financials.minor)).toEqual([100n, 140n, 120n]);
     expect(rows.map((row) => row.active)).toEqual([false, true, false]);
+  });
+
+  it("marks only the folded active correction when values are duplicated", () => {
+    const original = money(100n);
+    const duplicate = money(120n);
+
+    const rows = expenseHistoryRows({
+      financials: duplicate,
+      financialHistory: [original, duplicate, duplicate],
+      activeFinancialIndex: 2,
+    });
+
+    expect(rows.map((row) => row.active)).toEqual([false, false, true]);
   });
 });

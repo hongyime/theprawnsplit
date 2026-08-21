@@ -110,6 +110,7 @@ describe("REQ-MON-15/REQ-SYN-12 fold", () => {
     } as never);
     const state = fold([editB, added, editA], { supportedVersion: 1 });
     expect(state.expenses.get("x1")?.financialHistory.map((f) => f.minor)).toEqual([100n, 120n, 140n]);
+    expect(state.expenses.get("x1")?.activeFinancialIndex).toBe(2);
   });
 
   it("does not let a causally older financial edit overwrite a newer one by HLC skew", () => {
@@ -145,6 +146,7 @@ describe("REQ-MON-15/REQ-SYN-12 fold", () => {
 
     expect(state.expenses.get("x1")?.financials.minor).toBe(140n);
     expect(state.expenses.get("x1")?.financialHistory.map((f) => f.minor)).toEqual([100n, 140n, 120n]);
+    expect(state.expenses.get("x1")?.activeFinancialIndex).toBe(1);
   });
 
   it("produces canonical bytes independent of delivery order", () => {

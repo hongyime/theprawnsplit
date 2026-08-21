@@ -93,6 +93,7 @@ export interface ExpenseState {
   desc: string;
   date: string;
   financialHistory: Financials[];
+  activeFinancialIndex: number;
 }
 
 export interface SettlementState {

@@ -217,6 +217,7 @@ export function fold(events: Event[], opts: FoldOptions, ctx?: VerificationConte
         desc: event.desc,
         date: event.date,
         financialHistory: [event.financials],
+        activeFinancialIndex: 0,
       });
       expenseFinancialEvents.set(event.xid, event);
     }
@@ -233,6 +234,7 @@ export function fold(events: Event[], opts: FoldOptions, ctx?: VerificationConte
         const winningEvent = financialWinner(expenseFinancialEvents.get(event.xid) ?? event, event);
         expenseFinancialEvents.set(event.xid, winningEvent);
         next.financials = winningEvent === event ? event.financials : existing.financials;
+        next.activeFinancialIndex = winningEvent === event ? next.financialHistory.length - 1 : existing.activeFinancialIndex;
       }
       if (event.meta?.desc !== undefined) next.desc = event.meta.desc;
       if (event.meta?.date !== undefined) next.date = event.meta.date;

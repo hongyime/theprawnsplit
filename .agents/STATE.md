@@ -495,6 +495,11 @@ Notes:
   literal-payee self-claims and authorised delegated keys count. Latest verification on
   2026-08-22 passed with `npm run build` (44 core tests, 93 root tests), root `npm
   audit --json`, protected-string scan, and `git diff --check`.
+- Tightened REQ-MON-17 expense correction presentation by carrying the winning
+  financial-history index through folded state, so duplicate-value corrections cannot make
+  multiple history rows appear active. Latest verification on 2026-08-22 passed with `npm
+  run build` (44 core tests, 94 root tests), root `npm audit --json`,
+  protected-string scan, and `git diff --check`.
 - Vercel checks on 2026-08-21 show the current `main` production deployment is Ready
   and has the requested aliases attached. Vercel env listing still shows no env vars
   configured, so the operated relay runtime remains unconfigured.

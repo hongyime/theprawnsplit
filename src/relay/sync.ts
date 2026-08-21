@@ -226,7 +226,7 @@ export async function syncOnce(groupId: string, relayOverride?: Relay[]): Promis
         }
       }),
     );
-    const ok = acks.some((ack) => "ack" in ack && (ack.ack.ok || isDuplicateRelayAck(ack.ack.reason)));
+    const ok = acks.filter((ack) => "ack" in ack && (ack.ack.ok || isDuplicateRelayAck(ack.ack.reason))).length;
     for (const ack of acks) {
       if ("reason" in ack) {
         const reason = ack.reason instanceof Error ? ack.reason.message : String(ack.reason);
@@ -238,7 +238,7 @@ export async function syncOnce(groupId: string, relayOverride?: Relay[]): Promis
         if (diagnostic.severity !== "info") result.errors.push(ack.ack.reason);
       }
     }
-    if (ok) {
+    if (publishQuorumReached(ok)) {
       await markSnapshotPublished(groupId, snapshotSeq);
       result.snapshotsPublished = 1;
     }

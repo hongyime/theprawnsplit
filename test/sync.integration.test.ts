@@ -317,6 +317,25 @@ describe("Phase 2 sync integration", () => {
     expect(snapshots[0]).toMatchObject({ type: "snapshot", seq: 100, vv: { [group.deviceId]: 100 } });
   }, 20_000);
 
+  it("does not mark snapshots published before the configured acknowledgement quorum", async () => {
+    const relays = [new MemoryRelay("alive", true), new MemoryRelay("down", false)];
+
+    await resetRepositoryForTests("prawn-snapshot-quorum");
+    const group = await ensureGroup();
+    const events = participantEvents(group.deviceId, group.nextCounter, 100);
+    const withEvents = await appendEvents(group.groupId, events);
+    await markEvents(group.groupId, withEvents.events.map((event) => event.id), "confirmed");
+
+    const result = await syncOnce(group.groupId, relays);
+    const afterSync = await readGroup(group.groupId);
+
+    expect(result.snapshotsPublished).toBe(0);
+    expect(afterSync.meta.lastSnapshotSeq).toBeUndefined();
+    expect(result.diagnostics).toEqual(
+      expect.arrayContaining([expect.objectContaining({ relay: "down", operation: "snapshot" })]),
+    );
+  }, 20_000);
+
   it("uses snapshot-only bootstrap for transport vectors without creating semantic state", async () => {
     const secret = createGroupSecret();
     const key = await groupKey(secret);

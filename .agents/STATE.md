@@ -706,6 +706,11 @@ Notes:
   existing default. Latest verification on 2026-08-22 passed with `npm run build` (52
   core tests, 142 root tests), root `npm audit --json`, protected-string scan, and `git
   diff --check`.
+- Hardened REQ-SYN-05/14 snapshot publish quorum handling. Advisory snapshots now require
+  the same configured acknowledgement quorum before `lastSnapshotSeq` is advanced, so a
+  single transient relay ACK does not suppress later snapshot retries. Latest verification
+  on 2026-08-22 passed with `npm run build` (52 core tests, 143 root tests), root
+  `npm audit --json`, protected-string scan, and `git diff --check`.
 - Vercel checks on 2026-08-21 show the current `main` production deployment is Ready
   and has the requested aliases attached. Vercel env listing still shows no env vars
   configured, so the operated relay runtime remains unconfigured.

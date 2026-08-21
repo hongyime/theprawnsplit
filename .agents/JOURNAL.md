@@ -129,3 +129,4 @@
 - 2026-08-22: Client runtime config and `.env.example` must stay in lockstep; every `VITE_*` key read by `src/config.ts` belongs in the committed sample.
 - 2026-08-22: Server runtime keys read by `api/relay.ts` must stay documented in `.env.example` without being mirrored as public `VITE_*` client values.
 - 2026-08-22: Publish quorum is runtime policy: `syncOnce()` must honor `VITE_ACK_QUORUM`/`config.ackQuorum` rather than baking in the default of two acknowledgements.
+- 2026-08-22: Snapshot publication uses the same configured relay acknowledgement quorum as raw event publication before advancing `lastSnapshotSeq`.

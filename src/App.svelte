@@ -52,6 +52,7 @@
   import { isArchivedEventLog } from "@/lib/archive";
   import { createDeviceLinkRequest, linkPayload, parseDeviceLinkRequest, type DeviceLinkRequest } from "@/lib/device-link";
   import { expenseHistoryRows } from "@/lib/expense-history";
+  import { frozenViewPolicy } from "@/lib/freeze-policy";
   import { findParticipantNameMatch, groupParticipantsForClaim, type ParticipantNameMatch } from "@/lib/participants";
   import { reattestationStatus } from "@/lib/reattestation";
   import { canVoidRecordedSettlement, settlementClaimView } from "@/lib/settlement-history";
@@ -118,6 +119,7 @@
   $: storageLabel = persistedStorage === null ? "storage unknown" : persistedStorage ? "storage protected" : "storage best effort";
   $: syncLabel = unconfirmedCount === 0 ? "sync current" : `${unconfirmedCount} unsynced`;
   $: archived = isGroupArchived();
+  $: frozenPolicy = frozenViewPolicy(state);
   $: showInstallHint = !isStandalone && !isDesktop && isOnline && !archived;
   $: participantNameMatch = findParticipantNameMatch(participantName, participants);
   $: participantClaimGroups = groupParticipantsForClaim(participants);
@@ -487,7 +489,7 @@
   }
 
   async function recordSettlement(from: string, to: string, amount: string): Promise<void> {
-    if (archived) return;
+    if (archived || !frozenPolicy.allowSettlementActions) return;
     const minor = parseMinor(amount);
     if (!minor || !from || !to || from === to) return;
     const f = factory();
@@ -500,7 +502,7 @@
   }
 
   async function confirmSettlement(sid: string): Promise<void> {
-    if (!group || archived) return;
+    if (!group || archived || !frozenPolicy.allowSettlementActions) return;
     const settlement = state?.settlements.get(sid);
     if (!settlement) return;
     const identity = localIdentityForPid(settlement.to);
@@ -511,7 +513,7 @@
   }
 
   async function disputeSettlement(sid: string): Promise<void> {
-    if (!group || archived) return;
+    if (!group || archived || !frozenPolicy.allowSettlementActions) return;
     const note = window.prompt("Dispute note", "Payment not received");
     if (note === null) return;
     const f = factory();
@@ -520,7 +522,7 @@
   }
 
   async function voidSettlement(sid: string): Promise<void> {
-    if (!group || archived || !canVoidRecordedSettlement(group.events, sid, group.deviceId)) return;
+    if (!group || archived || !frozenPolicy.allowSettlementActions || !canVoidRecordedSettlement(group.events, sid, group.deviceId)) return;
     const f = factory();
     await commit([makeEvent(f, "SettlementVoided", { sid })], f);
   }
@@ -846,7 +848,7 @@
 
     {#if error}<p class="error">{error}</p>{/if}
     {#if archived}<p class="warning">This trip is archived. The ledger remains readable and exportable.</p>{/if}
-    {#if state.frozen}<p class="warning">A newer ledger event was retained but excluded. Balances are not authoritative until the app is updated.</p>{/if}
+    {#if frozenPolicy.message}<p class="warning">{frozenPolicy.message}</p>{/if}
     {#if manualFallbackDue}<p class="warning">Relay confirmation is still pending. Export the ledger or copy the join link to share manually.</p>{/if}
     {#if showPinLinkPrompt}
       <section class="prompt-banner">
@@ -1050,12 +1052,16 @@
 
       <article class="panel balances">
         <h2><WalletCards size={18} /> Balances</h2>
-        {#each balances as [pid, minor]}
-          <div class:positive={minor > 0n} class:negative={minor < 0n} class="balance-row">
-            <span>{participantLabel(pid)}</span>
-            <strong>{formatMinor(minor, group.currency)}</strong>
-          </div>
-        {/each}
+        {#if frozenPolicy.displayBalances}
+          {#each balances as [pid, minor]}
+            <div class:positive={minor > 0n} class:negative={minor < 0n} class="balance-row">
+              <span>{participantLabel(pid)}</span>
+              <strong>{formatMinor(minor, group.currency)}</strong>
+            </div>
+          {/each}
+        {:else}
+          <p class="warning compact-warning">Balances hidden until this app supports every retained event.</p>
+        {/if}
       </article>
 
       <article class="panel expense">
@@ -1098,18 +1104,22 @@
 
       <article class="panel settlements">
         <h2><RefreshCcw size={18} /> Settle</h2>
-        {#each suggestedSettlements as transfer}
-          <button type="button" class="settle-suggestion" disabled={archived} on:click={() => recordSettlement(transfer.from, transfer.to, String(Number(transfer.minor) / 100))}>
-            {participantLabel(transfer.from)} pays {participantLabel(transfer.to)} {formatMinor(transfer.minor, group.currency)}
-          </button>
-        {/each}
-        <div class="form-grid">
-          <select bind:value={settleFrom}><option value="">From</option>{#each participants as p}<option value={p.pid}>{p.name}</option>{/each}</select>
-          <select bind:value={settleTo}><option value="">To</option>{#each participants as p}<option value={p.pid}>{p.name}</option>{/each}</select>
-          <input bind:value={settleAmount} inputmode="decimal" placeholder="Amount" />
-          <button type="button" disabled={archived} on:click={() => recordSettlement(settleFrom, settleTo, settleAmount)}>Record</button>
-        </div>
-        {#if settlements.length}
+        {#if !frozenPolicy.allowSettlementActions}
+          <p class="warning compact-warning">Settlement is frozen until the newer retained event can be folded.</p>
+        {:else}
+          {#each suggestedSettlements as transfer}
+            <button type="button" class="settle-suggestion" disabled={archived} on:click={() => recordSettlement(transfer.from, transfer.to, String(Number(transfer.minor) / 100))}>
+              {participantLabel(transfer.from)} pays {participantLabel(transfer.to)} {formatMinor(transfer.minor, group.currency)}
+            </button>
+          {/each}
+          <div class="form-grid">
+            <select bind:value={settleFrom}><option value="">From</option>{#each participants as p}<option value={p.pid}>{p.name}</option>{/each}</select>
+            <select bind:value={settleTo}><option value="">To</option>{#each participants as p}<option value={p.pid}>{p.name}</option>{/each}</select>
+            <input bind:value={settleAmount} inputmode="decimal" placeholder="Amount" />
+            <button type="button" disabled={archived} on:click={() => recordSettlement(settleFrom, settleTo, settleAmount)}>Record</button>
+          </div>
+        {/if}
+        {#if settlements.length && frozenPolicy.allowSettlementActions}
           <div class="settlement-list">
             {#each settlements as settlement}
               {@const claims = settlementClaimView(group.events, settlement.sid)}

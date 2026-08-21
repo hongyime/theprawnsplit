@@ -674,6 +674,10 @@ button.secondary {
   color: #9a3412;
 }
 
+.compact-warning {
+  margin: 0.35rem 0 0;
+}
+
 @media (max-width: 900px) {
   .topbar,
   .header-actions,

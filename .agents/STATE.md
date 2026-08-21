@@ -155,9 +155,12 @@ Progress:
 - Added REQ-SEC-06 re-attestation threshold display. Contested recovered-device banners
   now show the majority threshold, current attestation count, and the two-peer small-group
   caveat from Q14.
+- Started REQ-SYN-22 frozen UI enforcement. When newer schema events are quarantined,
+  the app now hides balances and freezes settlement controls instead of displaying
+  non-authoritative money state.
 
 Next step:
-- Latest pushed commit before this slice is `4d30458` on `main`.
+- Latest pushed commit before this slice is `9cc9807` on `main`.
 - GitHub/Vercel automatic production deployment for `cd21de2` completed Ready on
   2026-08-21.
 - Remaining deployment work: configure Vercel env vars and verify custom-domain runtime.
@@ -257,6 +260,9 @@ Notes:
   vulnerabilities.
 - Latest verification on 2026-08-21 after REQ-SEC-06 re-attestation threshold UI: `npm
   run build` passed with 41 core tests and 28 root tests, and root `npm audit --json`
+  reports zero vulnerabilities.
+- Latest verification on 2026-08-21 after REQ-SYN-22 frozen UI enforcement: `npm run
+  build` passed with 41 core tests and 30 root tests, and root `npm audit --json`
   reports zero vulnerabilities.
 - Vercel checks on 2026-08-21 show the project exists but direct deployment creation was
   quota-blocked.

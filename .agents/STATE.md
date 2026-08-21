@@ -874,3 +874,9 @@ Notes:
   and save for the common case. Verification on 2026-08-22 passed with focused `npx
   vitest run test/common-expense-ui.test.ts`, `npm run build` (64 core tests, 162 root
   tests), root `npm audit --json`, protected-string scan, and `git diff --check`.
+- Added REQ-ID-08/09/10 participant-claim UI boundary coverage so joiners see
+  unclaimed people first, claimed people collapsed, create-new last with duplicate
+  interruption, and a provenance-rich claim confirmation modal. Focused verification on
+  2026-08-22 passed with `npx vitest run test/participant-claim-ui.test.ts`; full
+  verification passed with `npm run build` (64 core tests, 164 root tests), root `npm
+  audit --json`, protected-string scan, and `git diff --check`.

@@ -471,6 +471,11 @@ Notes:
   disputed genesis claim through an append-only `EventVoided`. Latest verification on
   2026-08-21 passed with `npm run build` (43 core tests, 89 root tests), root
   `npm audit --json`, protected-string scan, and `git diff --check`.
+- Hardened REQ-SEC-02/Q13 device-link artifacts. Device pairing requests now require a
+  lowercase 64-hex group tag and lowercase 128-bit hex nonce at both creation and import,
+  preserving the signed link payload's replay boundary. Latest verification on 2026-08-21
+  passed with `npm run build` (43 core tests, 90 root tests), root `npm audit --json`,
+  protected-string scan, and `git diff --check`.
 - Vercel checks on 2026-08-21 show the current `main` production deployment is Ready
   and has the requested aliases attached. Vercel env listing still shows no env vars
   configured, so the operated relay runtime remains unconfigured.

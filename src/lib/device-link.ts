@@ -1,5 +1,8 @@
 import type { StoredIdentity } from "@/db/repo";
 
+const GROUP_TAG_RE = /^[0-9a-f]{64}$/;
+const NONCE_RE = /^[0-9a-f]{32}$/;
+
 export interface DeviceLinkRequest {
   type: "DeviceLinkRequest";
   version: 1;
@@ -20,6 +23,8 @@ export function createDeviceLinkRequest(input: {
   nonce?: string;
   createdAt?: number;
 }): DeviceLinkRequest {
+  const nonce = input.nonce ?? crypto.randomUUID().replaceAll("-", "");
+  assertDeviceLinkFields(input.tagHex, nonce);
   return {
     type: "DeviceLinkRequest",
     version: 1,
@@ -28,7 +33,7 @@ export function createDeviceLinkRequest(input: {
     newDevice: input.deviceId,
     newClaimPk: input.identity.claimPk,
     alg: input.identity.alg,
-    nonce: input.nonce ?? crypto.randomUUID().replaceAll("-", ""),
+    nonce,
     createdAt: input.createdAt ?? Date.now(),
   };
 }
@@ -52,6 +57,7 @@ export function parseDeviceLinkRequest(text: string): DeviceLinkRequest {
     throw new Error("Unsupported device link request");
   }
   if (parsed.alg !== "ed25519" && parsed.alg !== "ecdsa-p256") throw new Error("Unsupported device link algorithm");
+  assertDeviceLinkFields(parsed.tagHex, parsed.nonce);
   return {
     type: "DeviceLinkRequest",
     version: 1,
@@ -63,4 +69,9 @@ export function parseDeviceLinkRequest(text: string): DeviceLinkRequest {
     nonce: parsed.nonce,
     createdAt: parsed.createdAt ?? Date.now(),
   };
+}
+
+function assertDeviceLinkFields(tagHex: string, nonce: string): void {
+  if (!GROUP_TAG_RE.test(tagHex)) throw new Error("Device link tag must be lowercase 64-hex");
+  if (!NONCE_RE.test(nonce)) throw new Error("Device link nonce must be lowercase 128-bit hex");
 }

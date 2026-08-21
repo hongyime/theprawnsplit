@@ -12,6 +12,7 @@
     Users,
     WalletCards,
     Archive,
+    GitMerge,
   } from "@lucide/svelte";
   import { allocate, fold, greedySettlement, type Event, type State } from "@theprawnsplit/core";
   import {
@@ -92,6 +93,10 @@
   $: balances = state && group ? [...state.balances.entries()].sort(([a], [b]) => participantLabel(a).localeCompare(participantLabel(b))) : [];
   $: expenses = state ? [...state.expenses.values()].sort((a, b) => b.date.localeCompare(a.date)) : [];
   $: settlements = state ? [...state.settlements.values()] : [];
+  $: anomalies = state ? state.anomalies : [];
+  $: reconciliationAnomalies = anomalies.filter((anomaly) =>
+    ["possible-duplicate-participants", "distinct-participants-merged"].includes(anomaly.code),
+  );
   $: selectedParticipants = participants.filter((p) => selectedPids[p.pid]);
   $: suggestedSettlements = state ? greedySettlement(state.balances) : [];
   $: sharePreview = buildSharePreview();
@@ -193,6 +198,24 @@
       ],
       f,
     );
+  }
+
+  async function mergeParticipants(from: string, into: string): Promise<void> {
+    if (!group || archived || from === into) return;
+    const f = factory();
+    await commit([makeEvent(f, "ParticipantMerged", { from, into })], f);
+  }
+
+  async function markParticipantsDistinct(a: string, b: string): Promise<void> {
+    if (!group || archived || a === b) return;
+    const f = factory();
+    await commit([makeEvent(f, "ParticipantsMarkedDistinct", { a, b })], f);
+  }
+
+  async function voidEvent(targetId: string): Promise<void> {
+    if (!group || archived) return;
+    const f = factory();
+    await commit([makeEvent(f, "EventVoided", { targetId })], f);
   }
 
   function participantLabel(pid: string): string {
@@ -702,6 +725,41 @@
         <span>Claim a person before adding expenses.</span>
       {/if}
     </section>
+
+    {#if reconciliationAnomalies.length}
+      <section class="reconcile-panel" aria-label="Reconciliation issues">
+        <h2><GitMerge size={18} /> Reconcile People</h2>
+        {#each reconciliationAnomalies as anomaly}
+          <div class="reconcile-row">
+            <div>
+              {#if anomaly.code === "possible-duplicate-participants" && anomaly.pid && anomaly.relatedPid}
+                <strong>{participantLabel(anomaly.pid)} may be the same as {participantLabel(anomaly.relatedPid)}</strong>
+                <span>Resolve the duplicate hint without changing balances automatically.</span>
+              {:else if anomaly.code === "distinct-participants-merged"}
+                <strong>People marked distinct are currently merged</strong>
+                <span>{anomaly.message}</span>
+              {:else}
+                <strong>{anomaly.code}</strong>
+                <span>{anomaly.message}</span>
+              {/if}
+            </div>
+            <div class="reconcile-actions">
+              {#if anomaly.code === "possible-duplicate-participants" && anomaly.pid && anomaly.relatedPid}
+                <button type="button" disabled={archived} on:click={() => mergeParticipants(anomaly.relatedPid!, anomaly.pid!)}>Merge</button>
+                <button type="button" class="secondary" disabled={archived} on:click={() => markParticipantsDistinct(anomaly.pid!, anomaly.relatedPid!)}>Not same</button>
+              {:else if anomaly.code === "distinct-participants-merged"}
+                {#if anomaly.relatedEventId}
+                  <button type="button" disabled={archived} on:click={() => voidEvent(anomaly.relatedEventId!)}>Undo merge</button>
+                {/if}
+                {#if anomaly.eventId}
+                  <button type="button" class="secondary" disabled={archived} on:click={() => voidEvent(anomaly.eventId!)}>Remove mark</button>
+                {/if}
+              {/if}
+            </div>
+          </div>
+        {/each}
+      </section>
+    {/if}
 
     <section class="grid">
       <article class="panel roster">

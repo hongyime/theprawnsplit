@@ -133,3 +133,4 @@
 - 2026-08-22: REQ-MON-15 property coverage asserts zero-sum balances at every valid event prefix, not only after the full generated log.
 - 2026-08-22: REQ-SYN-12/REQ-ID-13 property coverage treats participant merges as order-independent and duplicate-insensitive.
 - 2026-08-22: §9.11 property coverage asserts DeviceLinked authorised-key delegation converges regardless of relay arrival order.
+- 2026-08-22: REQ-MON-19 property coverage asserts EventVoided cascades remove an expense and all edits regardless of delivery order.

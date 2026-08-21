@@ -150,4 +150,49 @@ describe("REQ-SYN-12 property convergence", () => {
       { seed: Number(process.env.FAST_CHECK_SEED ?? 20260822), numRuns: 50, verbose: true },
     );
   }, 20_000);
+
+  it("keeps void cascades stable across delivery order", () => {
+    fc.assert(
+      fc.property(
+        fc.record({
+          original: fc.integer({ min: 1, max: 1000 }),
+          edits: fc.array(fc.integer({ min: 1, max: 1000 }), { minLength: 1, maxLength: 8 }),
+        }),
+        ({ original, edits }) => {
+          const add = base("ExpenseAdded", {
+            id: "expense-add",
+            hlc: hlc(3),
+            xid: "x-voided",
+            financials: financials(BigInt(original), [["alice", BigInt(original)]], [["bob", BigInt(original)]]),
+            desc: "Voided expense",
+            at: 1,
+            date: "2026-08-22",
+          } as never);
+          const events: Event[] = [
+            base("ParticipantAdded", { id: "participant-alice", hlc: hlc(1), pid: "alice", name: "Alice" } as never),
+            base("ParticipantAdded", { id: "participant-bob", hlc: hlc(2), pid: "bob", name: "Bob" } as never),
+            add,
+            ...edits.map((amount, index) =>
+              base("ExpenseEdited", {
+                id: `expense-edit-${index}`,
+                hlc: hlc(4 + index),
+                xid: "x-voided",
+                financials: financials(BigInt(amount), [["alice", BigInt(amount)]], [["bob", BigInt(amount)]]),
+              } as never),
+            ),
+            base("EventVoided", { id: "expense-void", hlc: hlc(100), targetId: add.id } as never),
+          ];
+
+          for (let seed = 1; seed <= 20; seed += 1) {
+            const state = fold(shuffleWithSeed(events, seed), { supportedVersion: 1 });
+            expect(state.expenses.has("x-voided")).toBe(false);
+            expect([...state.balances.values()].reduce((sum, minor) => sum + minor, 0n)).toBe(0n);
+            expect(state.balances.get("alice")).toBe(0n);
+            expect(state.balances.get("bob")).toBe(0n);
+          }
+        },
+      ),
+      { seed: Number(process.env.FAST_CHECK_SEED ?? 20260822), numRuns: 75, verbose: true },
+    );
+  }, 20_000);
 });

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { classifyRelayIssue, isDuplicateRelayAck, relayIssueCode } from "@/relay/diagnostics";
+import { classifyRelayIssue, isDuplicateRelayAck, relayBackoffMs, relayIssueCode } from "@/relay/diagnostics";
 
 describe("relay diagnostics", () => {
   it("parses NIP-01 OK prefixes", () => {
@@ -16,19 +16,30 @@ describe("relay diagnostics", () => {
   it("acts on duplicate as publish success", () => {
     const diagnostic = classifyRelayIssue({ relay: "nostr", operation: "publish", reason: "duplicate: already saved" });
     expect(isDuplicateRelayAck(diagnostic.reason)).toBe(true);
-    expect(diagnostic).toMatchObject({ code: "duplicate", severity: "info" });
+    expect(diagnostic).toMatchObject({ code: "duplicate", severity: "info", actionKind: "treat-as-success" });
     expect(diagnostic.action).toContain("publish success");
   });
 
   it("surfaces retryable and relay-drop failures distinctly", () => {
     expect(classifyRelayIssue({ relay: "nostr", operation: "publish", reason: "rate-limited: slow down" })).toMatchObject({
       code: "rate-limited",
-      action: "retry later",
+      actionKind: "backoff-relay",
+      retryAfterMs: 10_000,
+    });
+    expect(classifyRelayIssue({ relay: "nostr", operation: "publish", reason: "auth-required: sign in" })).toMatchObject({
+      code: "auth-required",
+      actionKind: "drop-relay",
+      severity: "warn",
     });
     expect(classifyRelayIssue({ relay: "nostr", operation: "publish", reason: "invalid: bad event" })).toMatchObject({
       code: "invalid",
       severity: "error",
+      actionKind: "drop-relay",
       action: "drop relay and surface diagnostic",
     });
+  });
+
+  it("computes bounded exponential backoff for retryable relay failures", () => {
+    expect([0, 1, 2, 5, 9].map(relayBackoffMs)).toEqual([10_000, 20_000, 40_000, 320_000, 320_000]);
   });
 });

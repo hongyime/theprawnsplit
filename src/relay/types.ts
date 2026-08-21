@@ -11,6 +11,7 @@ export interface AckResult {
 }
 
 export type RelayIssueCode = "duplicate" | "rate-limited" | "auth-required" | "blocked" | "invalid" | "pow" | "error" | "timeout" | "unknown";
+export type RelayActionKind = "treat-as-success" | "backoff-relay" | "drop-relay" | "retry-relay";
 
 export interface RelayDiagnostic {
   relay: string;
@@ -18,7 +19,9 @@ export interface RelayDiagnostic {
   code: RelayIssueCode;
   severity: "info" | "warn" | "error";
   reason: string;
+  actionKind: RelayActionKind;
   action: string;
+  retryAfterMs?: number;
 }
 
 export interface Relay {

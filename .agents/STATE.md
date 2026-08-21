@@ -219,6 +219,9 @@ Progress:
 - Added REQ-SYN-10 delivery-coverage surfacing. Expense rows now say "everyone has
   this" only when every known device's latest version vector covers the relevant expense
   event; otherwise they show that it is not yet on every known device.
+- Hardened REQ-SYN-11 relay OK failure policy. Relay diagnostics now carry structured
+  action kinds for duplicate-as-success, retry/backoff, permanent drop, and retryable
+  unknown failures, with bounded exponential backoff timing for retryable relay failures.
 
 Next step:
 - Automatic production deploy for current `main` commit `805e6e9` is Ready on
@@ -407,6 +410,9 @@ Notes:
   audit --json`, protected-string scan, and `git diff --check` passed.
 - Latest verification on 2026-08-21 after REQ-SYN-10 delivery coverage surfacing: `npm
   run build` passed with 43 core tests and 73 root tests; root `npm audit --json`,
+  protected-string scan, and `git diff --check` passed.
+- Latest verification on 2026-08-21 after REQ-SYN-11 relay policy hardening: `npm run
+  build` passed with 43 core tests and 74 root tests; root `npm audit --json`,
   protected-string scan, and `git diff --check` passed.
 - Vercel checks on 2026-08-21 show the current `main` production deployment is Ready
   and has the requested aliases attached. Vercel env listing still shows no env vars

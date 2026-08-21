@@ -70,3 +70,4 @@
 - 2026-08-21: `unsyncedSince` is an outbox-level clock, not a per-event confirmation flag; it clears only when no local or published outbound events remain.
 - 2026-08-21: Snapshot bootstrap remains transport-only: `VV_snap` may advance the transport vector on an empty joined device, but snapshot `state` is never installed as semantic ledger state.
 - 2026-08-21: The "everyone has this" label is a version-vector proof over every known device's latest event, not a synonym for the local outbox being empty.
+- 2026-08-21: Relay OK failure handling exposes structured policy: duplicates are success, rate limits/timeouts back off that relay, auth/blocked/invalid/pow/error drop the relay, and unknown failures stay retryable.

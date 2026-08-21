@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { canonicalStateBytes } from "../src/canonical";
 import { fold } from "../src/fold";
 import { authorisedKeys } from "../src/identity";
+import { admitTransportEvents } from "../src/transport";
 import type { Event } from "../src/types";
 import { base, financials, groupTag, hlc, resetIds, sig, verifier } from "./helpers";
 
@@ -310,6 +311,57 @@ describe("REQ-SYN-12 property convergence", () => {
             expect(expense?.financialHistory).toEqual([added, editA, editB]);
             expect(expense?.activeFinancialIndex).toBe(2);
           }
+        },
+      ),
+      { seed: Number(process.env.FAST_CHECK_SEED ?? 20260822), numRuns: 75, verbose: true },
+    );
+  }, 20_000);
+
+  it("keeps per-author caps from changing state derived from admitted events", () => {
+    fc.assert(
+      fc.property(
+        fc.record({
+          cap: fc.integer({ min: 1, max: 8 }),
+          surplus: fc.integer({ min: 1, max: 8 }),
+          peerCount: fc.integer({ min: 1, max: 8 }),
+        }),
+        ({ cap, surplus, peerCount }) => {
+          const participants: Event[] = [
+            base("ParticipantAdded", { id: "participant-alice", hlc: hlc(1), pid: "alice", name: "Alice" } as never),
+            base("ParticipantAdded", { id: "participant-bob", hlc: hlc(2), pid: "bob", name: "Bob" } as never),
+          ];
+          const expense = (dev: string, ctr: number): Event =>
+            base("ExpenseAdded", {
+              id: `${dev}:${ctr}`,
+              dev,
+              hlc: hlc(10 + ctr, ctr, dev),
+              xid: `${dev}-${ctr}`,
+              financials: financials(1n, [["alice", 1n]], [["bob", 1n]]),
+              desc: `${dev}-${ctr}`,
+              at: ctr,
+              date: "2026-08-22",
+            } as never);
+          const throwaway = Array.from({ length: cap + surplus }, (_, index) => expense("throwaway", index + 1));
+          const peers = Array.from({ length: peerCount }, (_, index) => expense(`peer-${index}`, 1));
+          const incoming = [...throwaway, ...peers];
+
+          const result = admitTransportEvents(incoming, participants, {}, {
+            now: 10_000,
+            supportedVersion: 1,
+            maxFutureDriftMs: 120_000,
+            capUnknownAuthor: cap,
+            capKnownAuthor: 1000,
+            capGroupTotal: 10_000,
+            bufferMaxEvents: 500,
+          });
+          const expectedAdmitted = [...throwaway.slice(0, cap), ...peers];
+          const actualState = canonicalStateBytes(fold([...participants, ...result.admitted], { supportedVersion: 1 }));
+          const expectedState = canonicalStateBytes(fold([...participants, ...expectedAdmitted], { supportedVersion: 1 }));
+
+          expect(result.admitted.map((event) => event.id)).toEqual(expectedAdmitted.map((event) => event.id));
+          expect(result.dropped.map((drop) => drop.event.id)).toEqual(throwaway.slice(cap).map((event) => event.id));
+          expect(result.discardVector.throwaway).toBe(cap + surplus);
+          expect(actualState).toBe(expectedState);
         },
       ),
       { seed: Number(process.env.FAST_CHECK_SEED ?? 20260822), numRuns: 75, verbose: true },

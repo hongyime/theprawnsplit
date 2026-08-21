@@ -414,6 +414,11 @@ Notes:
 - Latest verification on 2026-08-21 after REQ-SYN-11 relay policy hardening: `npm run
   build` passed with 43 core tests and 74 root tests; root `npm audit --json`,
   protected-string scan, and `git diff --check` passed.
+- Added platform-boundary regression coverage for REQ-PLT-05/REQ-UX-05: runtime
+  source is scanned to keep ledger data out of browser key-value stores and to prevent
+  telemetry, analytics, push, or background-sync APIs from entering the app shell.
+  Latest verification on 2026-08-21 passed with `npm run build` (43 core tests, 76
+  root tests), root `npm audit --json`, protected-string scan, and `git diff --check`.
 - Vercel checks on 2026-08-21 show the current `main` production deployment is Ready
   and has the requested aliases attached. Vercel env listing still shows no env vars
   configured, so the operated relay runtime remains unconfigured.

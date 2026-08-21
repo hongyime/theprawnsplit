@@ -148,6 +148,14 @@ export interface DeviceIdentityBackup {
   exportedAt: number;
 }
 
+export interface TripLedgerDelta {
+  type: "TripLedgerDelta";
+  version: 1;
+  group: Pick<StoredGroup, "groupId" | "name" | "currency" | "createdAt" | "tagHex">;
+  events: Event[];
+  exportedAt: number;
+}
+
 export interface JoinSeed {
   secretB64: string;
   tagHex: string;
@@ -376,6 +384,22 @@ export function createIdentityBackup(group: GroupRecord): DeviceIdentityBackup {
   };
 }
 
+export function createDelta(group: GroupRecord, events: Event[]): TripLedgerDelta {
+  return {
+    type: "TripLedgerDelta",
+    version: 1,
+    group: {
+      groupId: group.groupId,
+      name: group.name,
+      currency: group.currency,
+      createdAt: group.createdAt,
+      tagHex: group.tagHex,
+    },
+    events,
+    exportedAt: Date.now(),
+  };
+}
+
 export function createJoinSeed(group: GroupRecord): JoinSeed {
   return {
     secretB64: group.secretB64,
@@ -385,11 +409,11 @@ export function createJoinSeed(group: GroupRecord): JoinSeed {
   };
 }
 
-export function stringifyExport(exported: TripLedgerExport | DeviceIdentityBackup): string {
+export function stringifyExport(exported: TripLedgerExport | DeviceIdentityBackup | TripLedgerDelta): string {
   return JSON.stringify(exported, bigintReplacer, 2);
 }
 
-export type ImportArtifact = TripLedgerExport | DeviceIdentityBackup;
+export type ImportArtifact = TripLedgerExport | DeviceIdentityBackup | TripLedgerDelta;
 
 export function parseExport(text: string): ImportArtifact {
   return JSON.parse(text, bigintReviver) as ImportArtifact;
@@ -408,6 +432,17 @@ export async function restoreIdentityBackup(backup: DeviceIdentityBackup): Promi
     await tx.objectStore("identity").put({ ...identity, groupId: group.groupId });
   }
   await tx.done;
+  return readGroup(group.groupId);
+}
+
+export async function applyDelta(delta: TripLedgerDelta): Promise<GroupRecord> {
+  if (delta.type !== "TripLedgerDelta" || delta.version !== 1) throw new Error("Unsupported delta");
+  const database = await db();
+  const groups = await database.getAll("groups");
+  const group = groups.find((candidate) => candidate.tagHex === delta.group.tagHex || candidate.groupId === delta.group.groupId);
+  if (!group) throw new Error("Open the matching join link or import the full TripLedgerExport before applying a delta");
+  if (group.tagHex !== delta.group.tagHex) throw new Error("Delta does not match this trip");
+  await upsertRemoteEvents(group.groupId, delta.events);
   return readGroup(group.groupId);
 }
 

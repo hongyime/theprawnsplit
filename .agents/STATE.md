@@ -204,6 +204,9 @@ Progress:
 - Hardened REQ-DUR-08 pin-link prompt persistence. Created, joined, and restored groups
   now seed normalized durability metadata immediately, and repository coverage proves
   the pin-link prompt survives app-launch bookkeeping until explicitly handled.
+- Added REQ-SYN-13 Web Share delta fallback. The app can package pending outbound events
+  as a `TripLedgerDelta`, share it through Web Share with JSON download fallback, and
+  import that delta into a matching joined trip without exposing identity or group secrets.
 
 Next step:
 - Automatic production deploy for current `main` commit `805e6e9` is Ready on
@@ -377,6 +380,9 @@ Notes:
   protected-string scan, and `git diff --check` passed.
 - Latest verification on 2026-08-21 after REQ-DUR-08 pin-link metadata hardening: `npm
   run build` passed with 43 core tests and 67 root tests; root `npm audit --json`,
+  protected-string scan, and `git diff --check` passed.
+- Latest verification on 2026-08-21 after REQ-SYN-13 Web Share delta fallback: `npm
+  run build` passed with 43 core tests and 68 root tests; root `npm audit --json`,
   protected-string scan, and `git diff --check` passed.
 - Vercel checks on 2026-08-21 show the current `main` production deployment is Ready
   and has the requested aliases attached. Vercel env listing still shows no env vars

@@ -1,9 +1,13 @@
 import "fake-indexeddb/auto";
 import { describe, expect, it } from "vitest";
 import {
+  applyDelta,
+  createDelta,
   createExport,
   createIdentityBackup,
+  createJoinSeed,
   ensureGroup,
+  readGroup,
   replaceFromExport,
   resetRepositoryForTests,
   restoreIdentityBackup,
@@ -75,6 +79,33 @@ describe("export artifact split", () => {
     expect(json).not.toContain("custom-relay.example");
     expect(json).not.toContain("custom-nostr.example");
     expect(json).not.toContain("Private subgroup");
+  });
+
+  it("keeps TripLedgerDelta shareable and applies it to a matching joined trip", async () => {
+    const source = groupWithIdentity();
+    const delta = createDelta(source, source.events);
+    const json = stringifyExport(delta);
+
+    expect(delta.type).toBe("TripLedgerDelta");
+    expect("identities" in delta).toBe(false);
+    expect("secretB64" in delta.group).toBe(false);
+    expect(json).not.toContain("claimSk");
+    expect(json).not.toContain("private-d");
+    expect(json).not.toContain("secret-material");
+    expect(json).not.toContain("nostr-secret");
+
+    await resetRepositoryForTests(`delta-import-${crypto.randomUUID()}`);
+    const joined = await ensureGroup({
+      ...createJoinSeed(source),
+      secretB64: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+    });
+    expect(joined.events).toHaveLength(0);
+    const restored = await applyDelta(delta);
+    expect(restored.groupId).toBe(joined.groupId);
+    expect(restored.events.map((event) => event.id)).toEqual(["d_test:1"]);
+
+    const reread = await readGroup(joined.groupId);
+    expect(reread.events.map((event) => event.id)).toEqual(["d_test:1"]);
   });
 
   it("keeps DeviceIdentityBackup separate and explicitly credential-bearing", () => {

@@ -13,17 +13,21 @@
     WalletCards,
     Archive,
     GitMerge,
+    Share2,
     Settings,
   } from "@lucide/svelte";
   import { allocate, eventSortKey, fold, greedySettlement, type Event, type Financials, type VerificationContext, type State } from "@theprawnsplit/core";
   import {
     appendEvents,
+    applyDelta,
+    createDelta,
     createExport,
     createIdentityBackup,
     createJoinSeed,
     ensureClaimIdentity,
     ensureGroup,
     parseExport,
+    pendingOutboundEvents,
     recordAppLaunch,
     replaceFromExport,
     restoreIdentityBackup,
@@ -624,6 +628,46 @@
     if (reason) void markExportPromptHandled(reason);
   }
 
+  function downloadJsonFile(filename: string, contents: string): void {
+    const blob = new Blob([contents], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  async function shareDelta(): Promise<void> {
+    if (!group) return;
+    const events = await pendingOutboundEvents(group.groupId);
+    if (events.length === 0) {
+      syncStatus = "No unsynced events to share.";
+      return;
+    }
+    const filename = `${group.name || "trip"}-delta.json`;
+    const contents = stringifyExport(createDelta(group, events));
+    const file = new File([contents], filename, { type: "application/json" });
+    const shareData: ShareData = {
+      title: `${group.name || "Trip"} ledger delta`,
+      text: "Import this TripLedgerDelta in ThePrawnSplit.",
+      files: [file],
+    };
+    try {
+      if (navigator.share && (!navigator.canShare || navigator.canShare(shareData))) {
+        await navigator.share(shareData);
+        syncStatus = "Ledger delta shared.";
+      } else {
+        downloadJsonFile(filename, contents);
+        syncStatus = "Ledger delta downloaded.";
+      }
+    } catch (err) {
+      if (err instanceof DOMException && err.name === "AbortError") return;
+      downloadJsonFile(filename, contents);
+      syncStatus = "Ledger delta downloaded.";
+    }
+  }
+
   function downloadIdentityBackup(): boolean {
     if (!group || group.identities.length === 0) return false;
     const ok = window.confirm("This file contains your claim signing key. Anyone with it can impersonate your device for this trip.");
@@ -720,8 +764,13 @@
         await acceptDeviceLinkRequest(parseDeviceLinkRequest(text));
       } else {
         const artifact = parseExport(text);
-        group = artifact.type === "TripLedgerExport" ? await replaceFromExport(artifact) : await restoreIdentityBackup(artifact);
-        syncStatus = artifact.type === "DeviceIdentityBackup" ? "Identity backup restored." : syncStatus;
+        group =
+          artifact.type === "TripLedgerExport"
+            ? await replaceFromExport(artifact)
+            : artifact.type === "DeviceIdentityBackup"
+              ? await restoreIdentityBackup(artifact)
+              : await applyDelta(artifact);
+        syncStatus = artifact.type === "DeviceIdentityBackup" ? "Identity backup restored." : artifact.type === "TripLedgerDelta" ? "Ledger delta imported." : syncStatus;
       }
       resetRelaySettingsForm();
       importText = "";
@@ -1041,6 +1090,7 @@
         <input class="currency" value={group.currency} aria-label="Currency" disabled={!groupProfileEditable} on:change={(e) => setCurrency((e.currentTarget as HTMLInputElement).value)} />
         <button type="button" disabled={syncing} on:click={runSync} title="Sync now"><RefreshCcw size={18} /> {syncing ? "Syncing" : "Sync"}</button>
         <button type="button" on:click={copyJoinLink} title="Copy join link"><Link size={18} /> Link</button>
+        <button type="button" on:click={shareDelta} title="Share unsynced delta"><Share2 size={18} /> Share</button>
         <button type="button" on:click={() => downloadExport()} title="Export ledger"><Download size={18} /> Export</button>
         {#if archived}
           <button type="button" on:click={unarchiveGroup} title="Unarchive trip"><RefreshCcw size={18} /> Unarchive</button>
@@ -1074,7 +1124,7 @@
       </section>
     {/if}
     {#if frozenPolicy.message}<p class="warning">{frozenPolicy.message}</p>{/if}
-    {#if manualFallbackDue}<p class="warning">Relay confirmation is still pending. Export the ledger or copy the join link to share manually.</p>{/if}
+    {#if manualFallbackDue}<p class="warning">Relay confirmation is still pending. Share a delta, export the ledger, or copy the join link manually.</p>{/if}
     {#if showPinLinkPrompt}
       <section class="prompt-banner">
         <div>

@@ -880,3 +880,10 @@ Notes:
   2026-08-22 passed with `npx vitest run test/participant-claim-ui.test.ts`; full
   verification passed with `npm run build` (64 core tests, 164 root tests), root `npm
   audit --json`, protected-string scan, and `git diff --check`.
+- Added REQ-SET-01/02/04/06/07/08/09 settlement UI boundary coverage so the Svelte
+  panel stays wired to greedy suggestions, ledger-only records, visible
+  pending/cash/disputed/contested states, uncontested payee confirmation, side-by-side
+  disputes, and payer-only void actions. Focused verification on 2026-08-22 passed with
+  `npx vitest run test/settlement-ui.test.ts`; full verification passed with `npm run
+  build` (64 core tests, 165 root tests), root `npm audit --json`, protected-string
+  scan, and `git diff --check`.

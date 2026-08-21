@@ -161,3 +161,4 @@
 - 2026-08-22: REQ-ID-02 coverage distinguishes group identity from local device identity: opening a join seed must generate a new local device UUID, not inherit the creator's device ID.
 - 2026-08-22: REQ-UX-01 coverage treats paid-by-self equal split as the default expense path; advanced payer/split controls must remain opt-in.
 - 2026-08-22: REQ-ID-08/09/10 coverage treats participant claiming as a join-time decision boundary: claim existing shadows before creating new people, and confirm claims with provenance and balance context.
+- 2026-08-22: REQ-SET UI coverage treats settlement controls as append-only ledger actions, not payment rails: confirmation is payee-authority gated, disputes stay visible, and void remains tied to the recording device.

@@ -366,6 +366,9 @@ Notes:
 - Latest verification on 2026-08-21 after operated relay API coverage: `npm run
   build` passed with 43 core tests and 65 root tests; root `npm audit --json`,
   protected-string scan, and `git diff --check` passed.
+- Latest verification on 2026-08-21 after identity-backup prompt hardening: `npm run
+  build` passed with 43 core tests and 66 root tests; root `npm audit --json`,
+  protected-string scan, and `git diff --check` passed.
 - Vercel checks on 2026-08-21 show the current `main` production deployment is Ready
   and has the requested aliases attached. Vercel env listing still shows no env vars
   configured, so the operated relay runtime remains unconfigured.

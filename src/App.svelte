@@ -40,6 +40,7 @@
     installPromptLevel,
     normalizeDurabilityPromptState,
     shouldPromptFirstZeroExport,
+    shouldPromptIdentityBackup,
     shouldPromptPinLink,
     shouldPromptSevenDayExport,
     type DurabilityPromptState,
@@ -111,6 +112,7 @@
   let isOnline = navigator.onLine;
   let activeInstallLevel: InstallPromptLevel | null = null;
   let showPinLinkPrompt = false;
+  let showIdentityBackupPrompt = false;
   let activeExportPrompt: ExportPromptReason | null = null;
   let launchDurability: DurabilityPromptState | null = null;
   let recoveryMode: "first-join" | "evicted" = "first-join";
@@ -622,10 +624,10 @@
     if (reason) void markExportPromptHandled(reason);
   }
 
-  function downloadIdentityBackup(): void {
-    if (!group || group.identities.length === 0) return;
+  function downloadIdentityBackup(): boolean {
+    if (!group || group.identities.length === 0) return false;
     const ok = window.confirm("This file contains your claim signing key. Anyone with it can impersonate your device for this trip.");
-    if (!ok) return;
+    if (!ok) return false;
     const blob = new Blob([stringifyExport(createIdentityBackup(group))], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -633,6 +635,7 @@
     a.download = `${group.name || "trip"}-identity-backup.json`;
     a.click();
     URL.revokeObjectURL(url);
+    return true;
   }
 
   async function archiveGroup(): Promise<void> {
@@ -931,6 +934,7 @@
       await patchDurability((durability) => ({ ...durability, installModalShownSession: durability.sessionCount }));
     }
     showPinLinkPrompt = shouldPromptPinLink(current);
+    showIdentityBackupPrompt = shouldPromptIdentityBackup(current, hasLocalClaim);
     activeExportPrompt = shouldPromptFirstZeroExport(current, allBalancesZero())
       ? "first-zero"
       : shouldPromptSevenDayExport(returnWindow, persistedStorage, Date.now())
@@ -951,6 +955,16 @@
     showPinLinkPrompt = false;
     await patchDurability((durability) => ({ ...durability, pinLinkPromptedAt: Date.now() }));
     await refreshDurabilityPrompts();
+  }
+
+  async function markIdentityBackupPromptHandled(): Promise<void> {
+    showIdentityBackupPrompt = false;
+    await patchDurability((durability) => ({ ...durability, identityBackupPromptedAt: Date.now() }));
+    await refreshDurabilityPrompts();
+  }
+
+  async function downloadPromptIdentityBackup(): Promise<void> {
+    if (downloadIdentityBackup()) await markIdentityBackupPromptHandled();
   }
 
   async function markExportPromptHandled(reason: ExportPromptReason): Promise<void> {
@@ -1073,6 +1087,18 @@
         </div>
       </section>
     {/if}
+    {#if showIdentityBackupPrompt && hasLocalClaim}
+      <section class="prompt-banner important">
+        <div>
+          <strong>Back up this device identity</strong>
+          <p>This file is separate from the shareable trip export and restores settlement authority if this browser loses storage.</p>
+        </div>
+        <div class="prompt-actions">
+          <button type="button" on:click={downloadPromptIdentityBackup}><KeyRound size={17} /> Identity backup</button>
+          <button type="button" class="secondary" on:click={markIdentityBackupPromptHandled}>Later</button>
+        </div>
+      </section>
+    {/if}
     {#if activeExportPrompt}
       <section class="prompt-banner important">
         <div>
@@ -1125,7 +1151,7 @@
         <span class:ok={unconfirmedCount === 0} class:warn={unconfirmedCount > 0}>{syncLabel}</span>
       </span>
       {#if hasLocalClaim}
-        <button type="button" on:click={downloadIdentityBackup}><KeyRound size={17} /> Identity backup</button>
+        <button type="button" on:click={() => { if (downloadIdentityBackup()) void markIdentityBackupPromptHandled(); }}><KeyRound size={17} /> Identity backup</button>
       {:else}
         <span>Claim a person before adding expenses.</span>
       {/if}

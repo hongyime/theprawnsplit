@@ -4,6 +4,7 @@ import {
   emptyDurabilityPromptState,
   installPromptLevel,
   shouldPromptFirstZeroExport,
+  shouldPromptIdentityBackup,
   shouldPromptPinLink,
   shouldPromptSevenDayExport,
   type InstallPromptInput,
@@ -49,6 +50,12 @@ describe("durability prompt policy", () => {
   it("shows the pin-link prompt only until it is marked handled", () => {
     expect(shouldPromptPinLink(emptyDurabilityPromptState())).toBe(true);
     expect(shouldPromptPinLink({ ...emptyDurabilityPromptState(), pinLinkPromptedAt: now })).toBe(false);
+  });
+
+  it("shows the identity-backup prompt only after a local claim until handled", () => {
+    expect(shouldPromptIdentityBackup(emptyDurabilityPromptState(), false)).toBe(false);
+    expect(shouldPromptIdentityBackup(emptyDurabilityPromptState(), true)).toBe(true);
+    expect(shouldPromptIdentityBackup({ ...emptyDurabilityPromptState(), identityBackupPromptedAt: now }, true)).toBe(false);
   });
 
   it("allows export prompts only for first-zero and seven-day-unprotected returns", () => {

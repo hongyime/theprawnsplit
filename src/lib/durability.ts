@@ -9,6 +9,7 @@ export interface DurabilityPromptState {
   retiredInstallLevels: InstallPromptLevel[];
   installModalShownSession?: number | undefined;
   pinLinkPromptedAt?: number | undefined;
+  identityBackupPromptedAt?: number | undefined;
   hadNonZeroBalance?: boolean | undefined;
   firstZeroExportPromptedAt?: number | undefined;
   sevenDayExportPromptedAt?: number | undefined;
@@ -40,6 +41,7 @@ export function normalizeDurabilityPromptState(state?: Partial<DurabilityPromptS
     retiredInstallLevels: state?.retiredInstallLevels ?? [],
     installModalShownSession: state?.installModalShownSession,
     pinLinkPromptedAt: state?.pinLinkPromptedAt,
+    identityBackupPromptedAt: state?.identityBackupPromptedAt,
     hadNonZeroBalance: state?.hadNonZeroBalance,
     firstZeroExportPromptedAt: state?.firstZeroExportPromptedAt,
     sevenDayExportPromptedAt: state?.sevenDayExportPromptedAt,
@@ -80,6 +82,10 @@ export function dismissInstallPrompt(state: DurabilityPromptState, level: Instal
 
 export function shouldPromptPinLink(state: DurabilityPromptState): boolean {
   return state.pinLinkPromptedAt === undefined;
+}
+
+export function shouldPromptIdentityBackup(state: DurabilityPromptState, hasLocalClaim: boolean): boolean {
+  return hasLocalClaim && state.identityBackupPromptedAt === undefined;
 }
 
 export function shouldPromptFirstZeroExport(state: DurabilityPromptState, allBalancesZero: boolean): boolean {

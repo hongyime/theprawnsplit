@@ -50,6 +50,7 @@
   import { defaultExpenseDate, defaultParticipant, makeEvent, makeExpenseFinancials, type EventFactory } from "@/lib/events";
   import { formatMinor, parseMinor, type SplitMode } from "@/lib/money";
   import { isArchivedEventLog } from "@/lib/archive";
+  import { findParticipantNameMatch, type ParticipantNameMatch } from "@/lib/participants";
   import { buildVerificationContext } from "@/lib/verification";
   import { syncOnce } from "@/relay/sync";
   import type { SyncResult } from "@/relay/types";
@@ -90,6 +91,7 @@
   let activeExportPrompt: ExportPromptReason | null = null;
   let launchDurability: DurabilityPromptState | null = null;
   let recoveryMode: "first-join" | "evicted" = "first-join";
+  let claimCandidatePid = "";
 
   $: participants = state ? [...state.participants.values()].sort((a, b) => a.name.localeCompare(b.name)) : [];
   $: balances = state && group ? [...state.balances.entries()].sort(([a], [b]) => participantLabel(a).localeCompare(participantLabel(b))) : [];
@@ -113,6 +115,8 @@
   $: syncLabel = unconfirmedCount === 0 ? "sync current" : `${unconfirmedCount} unsynced`;
   $: archived = isGroupArchived();
   $: showInstallHint = !isStandalone && !isDesktop && isOnline && !archived;
+  $: participantNameMatch = findParticipantNameMatch(participantName, participants);
+  $: claimCandidate = claimCandidatePid ? participants.find((participant) => participant.pid === claimCandidatePid) : undefined;
 
   async function load(): Promise<void> {
     loading = true;
@@ -174,9 +178,25 @@
   async function addParticipant(): Promise<void> {
     const name = participantName.trim();
     if (!name || !group || joinBlocked || archived) return;
+    const match = findParticipantNameMatch(name, participants);
+    if (match) {
+      selectedPids = { ...selectedPids, [match.pid]: true };
+      error = `${match.name} already exists. Claim that person or resolve the duplicate before adding another record.`;
+      return;
+    }
     const f = factory();
     await commit([defaultParticipant(f, name)], f);
     participantName = "";
+  }
+
+  function requestClaimParticipant(pid: string): void {
+    if (!group || localClaimPids.has(pid) || archived) return;
+    const participant = participants.find((p) => p.pid === pid);
+    if (!participant || participant.devices.length > 0) {
+      error = "This participant already has a claiming device. Phase 2 does not self-authorise extra devices.";
+      return;
+    }
+    claimCandidatePid = pid;
   }
 
   async function claimParticipant(pid: string): Promise<void> {
@@ -184,6 +204,7 @@
     const participant = participants.find((p) => p.pid === pid);
     if (!participant || participant.devices.length > 0) {
       error = "This participant already has a claiming device. Phase 2 does not self-authorise extra devices.";
+      claimCandidatePid = "";
       return;
     }
     const identity = await ensureClaimIdentity(group, pid);
@@ -201,6 +222,7 @@
       ],
       f,
     );
+    claimCandidatePid = "";
   }
 
   async function mergeParticipants(from: string, into: string): Promise<void> {
@@ -223,6 +245,47 @@
 
   function participantClaimEvent(eventId?: string): Extract<Event, { t: "ParticipantClaimed" }> | undefined {
     return group?.events.find((event): event is Extract<Event, { t: "ParticipantClaimed" }> => event.t === "ParticipantClaimed" && event.id === eventId);
+  }
+
+  function participantAddedEvent(pid: string): Extract<Event, { t: "ParticipantAdded" }> | undefined {
+    return group?.events.find((event): event is Extract<Event, { t: "ParticipantAdded" }> => event.t === "ParticipantAdded" && event.pid === pid);
+  }
+
+  function firstParticipantClaim(pid: string): Extract<Event, { t: "ParticipantClaimed" }> | undefined {
+    return group?.events.find((event): event is Extract<Event, { t: "ParticipantClaimed" }> => event.t === "ParticipantClaimed" && event.pid === pid);
+  }
+
+  function formatEventTime(wall?: number): string {
+    if (!wall) return "unknown time";
+    return new Date(wall).toLocaleString([], { dateStyle: "medium", timeStyle: "short" });
+  }
+
+  function shortDevice(deviceId?: string): string {
+    if (!deviceId) return "unknown device";
+    if (deviceId === group?.deviceId) return "this device";
+    return `device ${deviceId.slice(0, 8)}`;
+  }
+
+  function participantClaimAttribution(pid: string): string {
+    const claim = firstParticipantClaim(pid);
+    if (!claim) return "Not claimed yet";
+    return `Claimed by ${shortDevice(claim.deviceId)} on ${formatEventTime(claim.hlc.wall)}`;
+  }
+
+  function participantAddAttribution(pid: string): string {
+    const added = participantAddedEvent(pid);
+    if (!added) return "Added by unknown device";
+    return `Added by ${shortDevice(added.dev)} on ${formatEventTime(added.hlc.wall)}`;
+  }
+
+  function claimBalance(pid: string): string {
+    return formatMinor(state?.balances.get(pid) ?? 0n, group?.currency ?? "USD");
+  }
+
+  function matchText(match: ParticipantNameMatch): string {
+    if (match.kind === "exact") return `${match.name} already exists.`;
+    if (match.kind === "prefix") return `${match.name} looks like the same person.`;
+    return `${match.name} is within two edits of this name.`;
   }
 
   function localPeerIdentityFor(pid: string) {
@@ -827,6 +890,9 @@
           <input bind:value={participantName} placeholder="Add shadow participant" />
           <button type="submit" disabled={joinBlocked || archived}><Plus size={17} /> Add</button>
         </form>
+        {#if participantNameMatch}
+          <p class="hint duplicate-hint">{matchText(participantNameMatch)} Select the existing person before creating a new one.</p>
+        {/if}
         {#if participants.length === 0}
           <div class="empty">
             {#if recoveryActive}
@@ -841,13 +907,19 @@
           <ul class="people-list">
             {#each participants as participant}
               <li>
-                <label><input type="checkbox" bind:checked={selectedPids[participant.pid]} /> {participant.name}</label>
+                <label>
+                  <input type="checkbox" bind:checked={selectedPids[participant.pid]} />
+                  <span>
+                    <strong>{participant.name}</strong>
+                    <small>{participant.devices.length ? participantClaimAttribution(participant.pid) : participantAddAttribution(participant.pid)}</small>
+                  </span>
+                </label>
                 <span class="person-actions">
                   {participant.devices.length ? `${participant.devices.length} device` : "shadow"}
                   {#if localClaimPids.has(participant.pid)}
                     <span>you</span>
                   {:else if participant.devices.length === 0 && !archived}
-                    <button type="button" on:click={() => claimParticipant(participant.pid)} title="Claim participant"><KeyRound size={15} /> Claim</button>
+                    <button type="button" on:click={() => requestClaimParticipant(participant.pid)} title="Claim participant"><KeyRound size={15} /> Claim</button>
                   {/if}
                 </span>
               </li>
@@ -960,6 +1032,31 @@
       <textarea bind:value={importText} placeholder="Paste a TripLedgerExport or DeviceIdentityBackup JSON file here"></textarea>
       <button type="button" disabled={!importText.trim()} on:click={importExport}>Import</button>
     </section>
+    {#if claimCandidate}
+      <div class="modal-backdrop" role="presentation">
+        <div class="modal" role="dialog" aria-modal="true" aria-label="Claim participant">
+          <h2>Claim {claimCandidate.name}</h2>
+          <dl class="claim-details">
+            <div>
+              <dt>Added</dt>
+              <dd>{participantAddAttribution(claimCandidate.pid)}</dd>
+            </div>
+            <div>
+              <dt>Current balance</dt>
+              <dd>{claimBalance(claimCandidate.pid)}</dd>
+            </div>
+            <div>
+              <dt>This device</dt>
+              <dd>{shortDevice(group.deviceId)} will be able to confirm settlements for {claimCandidate.name}.</dd>
+            </div>
+          </dl>
+          <div class="prompt-actions">
+            <button type="button" class="secondary" on:click={() => (claimCandidatePid = "")}>Cancel</button>
+            <button type="button" on:click={() => claimParticipant(claimCandidate.pid)}><KeyRound size={16} /> Claim</button>
+          </div>
+        </div>
+      </div>
+    {/if}
     {#if activeInstallLevel && activeInstallLevel >= 3}
       <div class="modal-backdrop" role="presentation">
         <div class="modal" role="dialog" aria-modal="true" aria-label="Protect this trip">

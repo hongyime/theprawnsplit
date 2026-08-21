@@ -328,6 +328,29 @@ button.secondary {
   margin-top: 1rem;
 }
 
+.claim-details {
+  display: grid;
+  gap: 0.65rem;
+  margin: 0.9rem 0 0;
+}
+
+.claim-details div {
+  display: grid;
+  gap: 0.15rem;
+  padding-top: 0.55rem;
+  border-top: 1px solid #edf1ee;
+}
+
+.claim-details dt {
+  color: #607068;
+  font-size: 0.82rem;
+}
+
+.claim-details dd {
+  margin: 0;
+  color: #1f2933;
+}
+
 .currency {
   width: 5.5rem;
   text-transform: uppercase;
@@ -375,6 +398,22 @@ button.secondary {
   display: flex;
   align-items: center;
   gap: 0.45rem;
+  min-width: 0;
+}
+
+.people-list label span {
+  display: grid;
+  gap: 0.15rem;
+  min-width: 0;
+}
+
+.people-list label small {
+  color: #607068;
+  font-size: 0.78rem;
+}
+
+.duplicate-hint {
+  margin: 0.55rem 0 0;
 }
 
 .person-actions {

@@ -669,6 +669,11 @@ Notes:
   offline cache. Latest verification on 2026-08-22 passed with `npm run build` (51 core
   tests, 135 root tests), root `npm audit --json`, protected-string scan, and `git diff
   --check`.
+- Bumped the service-worker cache namespace after the cache-boundary change, so existing
+  installs delete the old broad `theprawnsplit-v1` cache on activation instead of keeping
+  previously cached dynamic relay responses. Latest verification on 2026-08-22 passed
+  with `npm run build` (51 core tests, 135 root tests), root `npm audit --json`,
+  protected-string scan, and `git diff --check`.
 - Vercel checks on 2026-08-21 show the current `main` production deployment is Ready
   and has the requested aliases attached. Vercel env listing still shows no env vars
   configured, so the operated relay runtime remains unconfigured.

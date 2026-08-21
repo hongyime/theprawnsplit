@@ -1,4 +1,4 @@
-const CACHE_NAME = "theprawnsplit-v1";
+const CACHE_NAME = "theprawnsplit-v2";
 const APP_SHELL = ["/", "/manifest.webmanifest", "/icons/icon.svg"];
 const CACHEABLE_PREFIXES = ["/assets/", "/icons/"];
 

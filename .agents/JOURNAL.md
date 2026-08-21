@@ -97,3 +97,4 @@
 - 2026-08-22: Expense ledger display treats `date` as the calendar-day source of truth; UTC `at` remains audit/order metadata and must not be used to derive the shown day.
 - 2026-08-22: DeviceIdentityBackup is a credential export, not a sharing artifact: UI copy must say it grants impersonation power, and its actions stay download-only rather than using share-sheet/manual sharing handlers.
 - 2026-08-22: Sync status copy treats "ready" as a confirmed-state word: usable offline with unconfirmed local/published events must say changes are unconfirmed or unsynced, and newer-schema quarantine takes precedence.
+- 2026-08-22: Empty trip UX must expose both next moves immediately: adding people and sharing the trip file are co-primary empty-state actions, with add focused into the existing participant input.

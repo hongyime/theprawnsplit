@@ -783,6 +783,13 @@ button.secondary {
   padding: 1rem;
 }
 
+.empty-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  margin-top: 0.75rem;
+}
+
 .error,
 .warning {
   border-radius: 8px;

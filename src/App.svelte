@@ -136,6 +136,7 @@
   let relayNostrText = "";
   let relaySettingsError = "";
   let subgroupName = "";
+  let participantNameInput: HTMLInputElement | undefined;
 
   $: participants = state ? [...state.participants.values()].sort((a, b) => a.name.localeCompare(b.name)) : [];
   $: balances = state && group ? [...state.balances.entries()].sort(([a], [b]) => participantLabel(a).localeCompare(participantLabel(b))) : [];
@@ -1341,7 +1342,10 @@
               <button type="button" disabled={syncing} on:click={runSync}><RefreshCcw size={17} /> Retry sync</button>
             {:else}
               <p>Add people to start a trip ledger.</p>
-              <button type="button" on:click={() => downloadExport()}><Download size={17} /> Share trip file</button>
+              <div class="empty-actions">
+                <button type="button" on:click={() => participantNameInput?.focus()}><Users size={17} /> Add people</button>
+                <button type="button" on:click={() => downloadExport()}><Download size={17} /> Share trip file</button>
+              </div>
             {/if}
           </div>
         {:else}
@@ -1414,7 +1418,7 @@
           {/if}
         {/if}
         <form class="row create-person" on:submit|preventDefault={addParticipant}>
-          <input bind:value={participantName} placeholder="Add shadow participant" disabled={archived} />
+          <input bind:this={participantNameInput} bind:value={participantName} placeholder="Add shadow participant" disabled={archived} />
           <button type="submit" disabled={joinBlocked || archived}><Plus size={17} /> Add</button>
         </form>
         {#if participantNameMatch}

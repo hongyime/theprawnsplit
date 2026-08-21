@@ -540,6 +540,10 @@ Notes:
   published events remain unconfirmed, and prioritizes update-required copy for
   quarantined schema events. Latest verification on 2026-08-22 passed with
   `npm run build` (48 core tests, 104 root tests).
+- Hardened REQ-UX-04 empty state. Before participants exist, the People panel now offers
+  both primary actions: Add people, which focuses the participant input, and Share trip
+  file. Latest verification on 2026-08-22 passed with `npm run build` (48 core tests,
+  105 root tests).
 - Vercel checks on 2026-08-21 show the current `main` production deployment is Ready
   and has the requested aliases attached. Vercel env listing still shows no env vars
   configured, so the operated relay runtime remains unconfigured.

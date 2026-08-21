@@ -93,4 +93,12 @@ describe("platform boundaries", () => {
     expect(relaySource).toContain("process.env.UPSTASH_REDIS_REST_TOKEN");
     expect(relaySource).not.toContain("import.meta.env");
   });
+
+  it("keeps the operated relay blind to ledger payloads", () => {
+    const relaySource = readFileSync(join(process.cwd(), "api", "relay.ts"), "utf8");
+
+    expect(relaySource).not.toMatch(/@theprawnsplit\/core|src\/db|@\/db|src\/crypto\/envelope|@\/crypto\/envelope/);
+    expect(relaySource).not.toMatch(/\b(?:decryptEnvelope|encryptEnvelope|decryptEvents|encryptEvents|fold|canonicalState)\b/);
+    expect(relaySource).not.toMatch(/\b(?:Event|ParticipantAdded|ExpenseAdded|SettlementRecorded|DeviceIdentityBackup|TripLedgerExport)\b/);
+  });
 });

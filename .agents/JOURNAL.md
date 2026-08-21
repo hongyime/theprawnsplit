@@ -115,3 +115,4 @@
 - 2026-08-22: Claim verification must never assume a default signature algorithm; settlement confirmation checks use only alg values recovered from key-bearing ledger events.
 - 2026-08-22: Nostr signatures remain transport attribution only; ledger authorization code must not inspect Nostr pubkeys, relay classes, or nostr-tools outputs.
 - 2026-08-22: Upstash relay credentials are server-only: client code may use public VITE configuration, but Redis URL/token must stay out of src and be read only via api/relay process.env.
+- 2026-08-22: The operated relay remains blind append/read storage; api/relay must not import ledger core, repository code, envelope crypto, or ledger event/domain types.

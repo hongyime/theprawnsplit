@@ -14,11 +14,12 @@ export function makeEvent<T extends Event["t"]>(
   factory: EventFactory,
   t: T,
   payload: Omit<Extract<Event, { t: T }>, "t" | "v" | "id" | "hlc" | "dev">,
+  version = 1,
 ): Extract<Event, { t: T }> {
   const counter = factory.nextCounter;
   factory.nextCounter += 1;
   return {
-    v: 1,
+    v: version,
     id: `${factory.deviceId}:${counter}`,
     hlc: makeHlc(factory.deviceId, counter),
     dev: factory.deviceId,

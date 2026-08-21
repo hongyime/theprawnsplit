@@ -30,6 +30,30 @@ describe("REQ-MON-15/REQ-SYN-12 fold", () => {
     expect(state.frozen).toBe(true);
   });
 
+  it("folds v2 rate-bearing financials only when schema v2 is supported", () => {
+    const expense = base("ExpenseAdded", {
+      id: "eur-lunch",
+      v: 2,
+      xid: "x1",
+      financials: {
+        ...financials(1080n, [["alice", 1080n]], [["alice", 540n], ["bob", 540n]]),
+        rate: { currency: "EUR", toBase: 1.08 },
+      },
+      desc: "Lunch",
+      at: 1,
+      date: "2026-08-21",
+    } as never);
+
+    const oldDevice = fold([expense], { supportedVersion: 1 });
+    expect(oldDevice.quarantined).toEqual(["eur-lunch"]);
+    expect(oldDevice.frozen).toBe(true);
+
+    const currentDevice = fold([expense], { supportedVersion: 2 });
+    expect(currentDevice.expenses.get("x1")?.financials.rate).toEqual({ currency: "EUR", toBase: 1.08 });
+    expect(currentDevice.balances.get("alice")).toBe(540n);
+    expect(currentDevice.balances.get("bob")).toBe(-540n);
+  });
+
   it("void cascade removes edited expenses from balances", () => {
     const added = base("ExpenseAdded", {
       id: "add-x",

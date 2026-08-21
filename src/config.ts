@@ -8,7 +8,7 @@ export const config = {
     .map((relay) => relay.trim())
     .filter(Boolean),
   relayEndpoint: String(import.meta.env.VITE_RELAY_ENDPOINT ?? "/api/relay"),
-  schemaVersion: Number(import.meta.env.VITE_SCHEMA_VERSION ?? 1),
+  schemaVersion: Number(import.meta.env.VITE_SCHEMA_VERSION ?? 2),
   pollActiveMs: Number(import.meta.env.VITE_POLL_ACTIVE_MS ?? 10_000),
   pollIdleMs: Number(import.meta.env.VITE_POLL_IDLE_MS ?? 120_000),
   idleAfterMs: Number(import.meta.env.VITE_IDLE_AFTER_MS ?? 120_000),

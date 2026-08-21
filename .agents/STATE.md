@@ -172,9 +172,12 @@ Progress:
 - Started participant deactivation UI. `ParticipantDeactivated` is exposed as a roster
   hide/restore action that only changes default new-expense split selection; folded
   balances and settlements remain unchanged.
+- Started REQ-MON-08 multi-currency entry. The app can create v2 rate-bearing expenses
+  by converting an entered foreign total to group base minor units and freezing
+  `Financials.rate` in the expense event.
 
 Next step:
-- Latest pushed commit before this slice is `bf7f740` on `main`.
+- Latest pushed commit before this slice is `c4fd943` on `main`.
 - GitHub/Vercel automatic production deployment for `cd21de2` completed Ready on
   2026-08-21.
 - Remaining deployment work: configure Vercel env vars and verify custom-domain runtime.
@@ -292,6 +295,9 @@ Notes:
   protected-string scan, and `git diff --check` passed.
 - Latest verification on 2026-08-21 after participant deactivation UI slice: `npm run
   build` passed with 42 core tests and 42 root tests; root `npm audit --json`,
+  protected-string scan, and `git diff --check` passed.
+- Latest verification on 2026-08-21 after REQ-MON-08 multi-currency entry slice: `npm
+  run build` passed with 43 core tests and 45 root tests; root `npm audit --json`,
   protected-string scan, and `git diff --check` passed.
 - Vercel checks on 2026-08-21 show the project exists but direct deployment creation was
   quota-blocked.

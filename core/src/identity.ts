@@ -1,4 +1,4 @@
-import type { Event, VerificationContext } from "./types";
+import type { Anomaly, Event, VerificationContext } from "./types";
 import { eventSortKey } from "./types";
 
 class DSU {
@@ -66,13 +66,8 @@ export function authorisedKeys(events: Event[], pid: string, ctx: VerificationCo
   const ordered = [...events].filter((event) => !voided.has(event.id)).sort(eventSortKey);
   const keys = new Map<string, "ed25519" | "ecdsa-p256">();
 
-  for (const event of ordered) {
-    if (event.t !== "ParticipantClaimed" || event.pid !== pid) continue;
-    const payload = `${ctx.groupTag}:${event.pid}:${event.deviceId}:${event.claimPk}`;
-    if (ctx.verifySignature({ payload, signature: event.sig, publicKey: event.claimPk, alg: event.alg })) {
-      keys.set(event.claimPk, event.alg);
-    }
-  }
+  const genesis = firstValidClaim(ordered, pid, ctx);
+  if (genesis) keys.set(genesis.claimPk, genesis.alg);
 
   let changed = true;
   while (changed) {
@@ -122,13 +117,8 @@ function authorisedKeysWithoutReattestation(
   ctx: VerificationContext,
 ): Map<string, "ed25519" | "ecdsa-p256"> {
   const keys = new Map<string, "ed25519" | "ecdsa-p256">();
-  for (const event of events) {
-    if (event.t !== "ParticipantClaimed" || event.pid !== pid) continue;
-    const payload = `${ctx.groupTag}:${event.pid}:${event.deviceId}:${event.claimPk}`;
-    if (ctx.verifySignature({ payload, signature: event.sig, publicKey: event.claimPk, alg: event.alg })) {
-      keys.set(event.claimPk, event.alg);
-    }
-  }
+  const genesis = firstValidClaim(events, pid, ctx);
+  if (genesis) keys.set(genesis.claimPk, genesis.alg);
   let changed = true;
   while (changed) {
     changed = false;
@@ -148,9 +138,86 @@ function authorisedKeysWithoutReattestation(
 export function verifyConfirmation(events: Event[], sid: string, claimSig: string, ctx: VerificationContext): boolean {
   const settlement = events.find((event) => event.t === "SettlementRecorded" && event.sid === sid);
   if (!settlement || settlement.t !== "SettlementRecorded") return false;
+  if (contestedClaimPids(events, ctx).has(settlement.to)) return false;
   const keySet = authorisedKeys(events, settlement.to, ctx);
   const keyAlgs = [...keySet].map((publicKey) => ({ publicKey, alg: findAlg(events, publicKey) ?? "ed25519" }));
   return verifiesWithAny(ctx, `${ctx.groupTag}:confirm:${sid}`, claimSig, keyAlgs);
+}
+
+export function claimAnomalies(events: Event[], ctx: VerificationContext): Anomaly[] {
+  const voided = voidedEventIds(events);
+  const ordered = [...events].filter((event) => !voided.has(event.id)).sort(eventSortKey);
+  const validClaims = ordered.filter((event) => event.t === "ParticipantClaimed" && validSelfClaim(event, ctx));
+  const anomalies: Anomaly[] = [];
+
+  const claimsByPid = new Map<string, typeof validClaims>();
+  const pidsByDevice = new Map<string, Set<string>>();
+  for (const claim of validClaims) {
+    claimsByPid.set(claim.pid, [...(claimsByPid.get(claim.pid) ?? []), claim]);
+    if (!pidsByDevice.has(claim.deviceId)) pidsByDevice.set(claim.deviceId, new Set());
+    pidsByDevice.get(claim.deviceId)!.add(claim.pid);
+  }
+
+  for (const [pid, claims] of claimsByPid) {
+    const genesis = claims[0];
+    if (!genesis) continue;
+    const delegated = authorisedKeysWithoutReattestation(ordered, pid, ctx);
+    for (const claim of claims.slice(1)) {
+      if (!delegated.has(claim.claimPk)) {
+        anomalies.push({
+          code: "contested-participant-claim",
+          pid,
+          eventId: claim.id,
+          relatedEventId: genesis.id,
+          message: "Participant has an additional claim without DeviceLinked or peer re-attestation authority",
+        });
+      }
+    }
+  }
+
+  for (const [deviceId, pids] of pidsByDevice) {
+    if (pids.size <= 1) continue;
+    for (const pid of [...pids].sort()) {
+      const claim = validClaims.find((event) => event.pid === pid && event.deviceId === deviceId);
+      if (!claim) continue;
+      anomalies.push({
+        code: "device-claims-multiple-participants",
+        pid,
+        eventId: claim.id,
+        message: `Device ${deviceId} claims multiple participants`,
+      });
+    }
+  }
+
+  return anomalies.sort((a, b) =>
+    a.code.localeCompare(b.code) ||
+    (a.pid ?? "").localeCompare(b.pid ?? "") ||
+    (a.eventId ?? "").localeCompare(b.eventId ?? "") ||
+    (a.relatedEventId ?? "").localeCompare(b.relatedEventId ?? ""),
+  );
+}
+
+export function contestedClaimPids(events: Event[], ctx: VerificationContext): Set<string> {
+  return new Set(claimAnomalies(events, ctx).flatMap((anomaly) => (anomaly.pid ? [anomaly.pid] : [])));
+}
+
+function validSelfClaim(
+  event: Event,
+  ctx: VerificationContext,
+): event is Extract<Event, { t: "ParticipantClaimed" }> {
+  if (event.t !== "ParticipantClaimed") return false;
+  const payload = `${ctx.groupTag}:${event.pid}:${event.deviceId}:${event.claimPk}`;
+  return ctx.verifySignature({ payload, signature: event.sig, publicKey: event.claimPk, alg: event.alg });
+}
+
+function firstValidClaim(
+  events: Event[],
+  pid: string,
+  ctx: VerificationContext,
+): Extract<Event, { t: "ParticipantClaimed" }> | undefined {
+  return [...events].sort(eventSortKey).find((event) => event.t === "ParticipantClaimed" && event.pid === pid && validSelfClaim(event, ctx)) as
+    | Extract<Event, { t: "ParticipantClaimed" }>
+    | undefined;
 }
 
 function findAlg(events: Event[], publicKey: string): "ed25519" | "ecdsa-p256" | undefined {

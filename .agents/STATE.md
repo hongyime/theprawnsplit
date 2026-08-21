@@ -91,6 +91,14 @@ Progress:
   polling while archived.
 - Added a pure archive lifecycle helper/test so archived/read-only/polling decisions are
   based on the ordered event log.
+- Started Phase 4 trust work in the pure core. Settlement authority now comes only from
+  the first valid participant claim plus `DeviceLinked`/threshold `ClaimReattested`
+  keys; unpaired second claims surface `contested-participant-claim`, one device claiming
+  multiple participants surfaces `device-claims-multiple-participants`, and contested
+  claims cannot clear settlement pending state.
+- Added adversarial Phase 4 tests for forged/unpaired second-device claims, valid
+  `DeviceLinked` confirmation, one device claiming two participants, and contested
+  settlement confirmation staying pending in folded state.
 
 Next step:
 - Commit and push `main` when ready; GitHub push is expected to trigger Vercel deployment.
@@ -138,6 +146,9 @@ Notes:
 - Latest verification on 2026-08-21 after minimal archive flow: `npm run build` passed
   locally with 23 core tests and 10 root tests; root `npm audit --json` reports zero
   vulnerabilities.
+- Latest verification on 2026-08-21 after Phase 4 trust core slice: `npm run build`
+  passed locally with 27 core tests and 10 root tests; root `npm audit --json` reports
+  zero vulnerabilities.
 - Vercel checks on 2026-08-21 show the project exists but direct deployment creation was
   quota-blocked.
 - Retried a production Vercel CLI deploy on 2026-08-21; it is still blocked with

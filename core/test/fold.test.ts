@@ -83,4 +83,18 @@ describe("REQ-MON-15/REQ-SYN-12 fold", () => {
     const b = canonicalStateBytes(fold([...events].reverse(), { supportedVersion: 1 }, verifier));
     expect(b).toBe(a);
   });
+
+  it("keeps contested settlement confirmations pending in folded state", () => {
+    const events = [
+      claim("alice", "phone", "alice-key"),
+      claim("alice", "tablet", "tablet-key"),
+      base("SettlementRecorded", { sid: "s1", from: "bob", to: "alice", minor: 100n } as never),
+      confirm("s1", "tablet-key"),
+    ];
+    const state = fold(events, { supportedVersion: 1 }, verifier);
+
+    expect(state.anomalies.map((anomaly) => anomaly.code)).toContain("contested-participant-claim");
+    expect(state.settlements.get("s1")?.pending).toBe(true);
+    expect(state.settlements.get("s1")?.confirmed).toBe(false);
+  });
 });

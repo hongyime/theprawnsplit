@@ -1,4 +1,4 @@
-import { buildDSU, verifyConfirmation, voidedEventIds } from "./identity";
+import { buildDSU, claimAnomalies, verifyConfirmation, voidedEventIds } from "./identity";
 import type {
   Anomaly,
   Event,
@@ -39,6 +39,7 @@ export function fold(events: Event[], opts: FoldOptions, ctx?: VerificationConte
   });
 
   const voided = voidedEventIds(supported);
+  if (ctx) anomalies.push(...claimAnomalies(supported, ctx));
   const expenseVoids = new Set<string>();
   const settlementVoids = new Set<string>();
   for (const event of supported) {

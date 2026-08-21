@@ -19,3 +19,4 @@
 - 2026-08-21: Phase 3 durability prompts are stored in IndexedDB metadata, not web storage; export prompt UI is limited to first-zero and seven-day-unprotected returns, while manual export remains a user action.
 - 2026-08-21: REQ-DUR-10 is handled as an explicit recovery-screen mode because an empty IndexedDB plus the same join link cannot prove prior local ownership automatically; the evicted mode promotes manual import.
 - 2026-08-21: Minimal archive support is allowed during Phase 3 only to satisfy the automatic export trigger and archived suppression rules; full Phase 5 archive summary/lifecycle remains separate.
+- 2026-08-21: Phase 4 trust model treats only the first valid self-claim as genesis authority; later devices must be delegated or re-attested, and contested claims cannot clear settlements.

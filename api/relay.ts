@@ -3,10 +3,17 @@ import { Redis } from "@upstash/redis";
 export const config = { runtime: "edge" };
 
 const TAG_RE = /^[0-9a-f]{64}$/;
+const WRITE_PROOF_RE = /^[0-9a-f]{64}$/;
 const MAX_BLOB = Number(process.env.RELAY_MAX_BLOB_BYTES ?? 131_072);
 const MAX_LIMIT = Number(process.env.RELAY_MAX_FETCH_LIMIT ?? 500);
 
 const streamKey = (tag: string): string => `ts:${tag}`;
+const proofKey = (tag: string): string => `tp:${tag}`;
+
+interface RelayStore {
+  get<TData>(key: string): Promise<TData | null>;
+  setnx<TData>(key: string, value: TData): Promise<number>;
+}
 
 function redis(): Redis {
   if (!process.env.UPSTASH_REDIS_REST_URL || !process.env.UPSTASH_REDIS_REST_TOKEN) {
@@ -22,6 +29,28 @@ const json = (body: unknown, status = 200): Response =>
   });
 
 const bad = (message: string, status = 400): Response => json({ error: message }, status);
+
+function bytesToHex(bytes: Uint8Array): string {
+  return [...bytes].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
+export function isValidWriteProof(writeProof: string): boolean {
+  return WRITE_PROOF_RE.test(writeProof);
+}
+
+export async function writeProofCommitment(writeProof: string): Promise<string> {
+  const input = new TextEncoder().encode(`relay-write-proof:${writeProof}`);
+  return bytesToHex(new Uint8Array(await crypto.subtle.digest("SHA-256", input)));
+}
+
+export async function verifyRelayWriteProof(store: RelayStore, tag: string, writeProof: string): Promise<boolean> {
+  if (!isValidWriteProof(writeProof)) return false;
+  const key = proofKey(tag);
+  const commitment = await writeProofCommitment(writeProof);
+  const claimed = await store.setnx(key, commitment);
+  if (claimed === 1) return true;
+  return (await store.get<string>(key)) === commitment;
+}
 
 function parseLimit(value: string | null): number {
   const parsed = Number(value ?? 100);
@@ -39,12 +68,14 @@ export default async function handler(req: Request): Promise<Response> {
       if (!TAG_RE.test(tag)) return bad("invalid tag");
       if (typeof body.blob !== "string" || body.blob.length === 0 || body.blob.length > MAX_BLOB) return bad("invalid blob");
       if (typeof body.author !== "string" || body.author.length === 0 || body.author.length > 128) return bad("invalid author");
-      if (typeof body.writeProof !== "string" || body.writeProof.length === 0 || body.writeProof.length > 256) return bad("invalid proof");
+      if (typeof body.writeProof !== "string" || !isValidWriteProof(body.writeProof)) return bad("invalid proof");
 
-      const cursor = await redis().xadd(streamKey(tag), "*", {
+      const store = redis();
+      if (!(await verifyRelayWriteProof(store, tag, body.writeProof))) return bad("invalid proof", 403);
+
+      const cursor = await store.xadd(streamKey(tag), "*", {
         blob: body.blob,
         author: body.author,
-        proofPrefix: body.writeProof.slice(0, 16),
       });
       return json({ cursor });
     }

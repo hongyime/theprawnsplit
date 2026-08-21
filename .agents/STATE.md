@@ -441,6 +441,11 @@ Notes:
   keeping the same generated cases and shuffle count. Latest verification on
   2026-08-21 passed with `npm run build` (43 core tests, 82 root tests), root
   `npm audit --json`, protected-string scan, and `git diff --check`.
+- Hardened REQ-PLT-08 operated relay write proof handling. `/api/relay` now requires a
+  64-hex write proof, stores only a SHA-256 proof commitment per tag, and rejects later
+  writes whose proof does not match the tag commitment before appending ciphertext.
+  Latest verification on 2026-08-21 passed with `npm run build` (43 core tests, 84 root
+  tests), root `npm audit --json`, protected-string scan, and `git diff --check`.
 - Vercel checks on 2026-08-21 show the current `main` production deployment is Ready
   and has the requested aliases attached. Vercel env listing still shows no env vars
   configured, so the operated relay runtime remains unconfigured.

@@ -561,6 +561,10 @@ Notes:
   the same tested command helper as the disabled button state, enforcing local claim,
   non-empty description, and valid amount/share/payer previews before appending. Latest
   verification on 2026-08-22 passed with `npm run build` (48 core tests, 111 root tests).
+- Added REQ-SET-02 platform-boundary coverage. Source-level tests now fail if app code
+  introduces payment processors or browser payment APIs, keeping settlements as
+  append-only ledger records instead of money movement. Latest verification on
+  2026-08-22 passed with `npm run build` (48 core tests, 112 root tests).
 - Vercel checks on 2026-08-21 show the current `main` production deployment is Ready
   and has the requested aliases attached. Vercel env listing still shows no env vars
   configured, so the operated relay runtime remains unconfigured.

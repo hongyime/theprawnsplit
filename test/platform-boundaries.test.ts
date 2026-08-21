@@ -35,4 +35,13 @@ describe("platform boundaries", () => {
     );
     expect(source).not.toMatch(/\.(?:sync|pushManager)\.(?:register|subscribe)\b/);
   });
+
+  it("keeps settlements as ledger records without payment rails", () => {
+    const source = readSources();
+
+    expect(source).not.toMatch(
+      /\b(?:Stripe|stripe|PayPal|paypal|Venmo|venmo|Plaid|plaid|CheckoutProvider|PaymentRequest|paymentRequest|PaymentResponse|navigator\.payments)\b/,
+    );
+    expect(source).not.toMatch(/\b(?:ApplePay|GooglePay|merchantAccount|bankAccount|routingNumber|cardNumber|iban|ach)\b/i);
+  });
 });

@@ -183,9 +183,12 @@ Progress:
 - Hardened REQ-MON-08 multi-currency conversion. Foreign-currency base minor units are
   now computed from the decimal rate text with `BigInt` rational arithmetic instead of
   floating-point rounding, and the money lint gate covers the helper.
+- Added a testable Phase 5 archive transition plan. The UI now executes a pure
+  `download-export` then `append-archive-event` action list, with copied outstanding
+  transfers feeding the `GroupArchived` event.
 
 Next step:
-- Latest pushed commit before this slice is `d7c2d3f` on `main`.
+- Latest pushed commit before this slice is `36c4a0d` on `main`.
 - GitHub/Vercel automatic production deployment for `cd21de2` completed Ready on
   2026-08-21.
 - Remaining deployment work: configure Vercel env vars and verify custom-domain runtime.
@@ -316,6 +319,9 @@ Notes:
 - Latest verification on 2026-08-21 after multi-currency integer conversion hardening:
   `npm run build` passed with 43 core tests and 51 root tests; root `npm audit
   --json`, protected-string scan, and `git diff --check` passed.
+- Latest verification on 2026-08-21 after archive transition plan extraction: `npm run
+  build` passed with 43 core tests and 52 root tests; root `npm audit --json`,
+  protected-string scan, and `git diff --check` passed.
 - Vercel checks on 2026-08-21 show the project exists but direct deployment creation was
   quota-blocked.
 - Vercel automatic deploy on 2026-08-21 for `cd21de2` succeeded and reports Ready.

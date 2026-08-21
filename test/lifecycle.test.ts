@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Event } from "@theprawnsplit/core";
-import { archiveConfirmationText, isSettledViewPredicate, latestArchiveEvent, unarchiveConfirmationText } from "@/lib/lifecycle";
+import { archiveConfirmationText, createArchiveTransitionPlan, isSettledViewPredicate, latestArchiveEvent, unarchiveConfirmationText } from "@/lib/lifecycle";
 
 type ArchiveOutstanding = Extract<Event, { t: "GroupArchived" }>["outstanding"];
 
@@ -29,6 +29,15 @@ describe("lifecycle copy", () => {
   it("requires explicit unarchive confirmation copy", () => {
     expect(unarchiveConfirmationText()).toContain("Unarchive this trip?");
     expect(unarchiveConfirmationText()).toContain("editable again");
+  });
+
+  it("plans archive export before recording the archive event with copied outstanding balances", () => {
+    const outstanding = [{ from: "p_bob", to: "p_alice", minor: 1200n }];
+    const plan = createArchiveTransitionPlan(outstanding);
+    outstanding[0]!.minor = 1n;
+
+    expect(plan.actions).toEqual(["download-export", "append-archive-event"]);
+    expect(plan.outstanding).toEqual([{ from: "p_bob", to: "p_alice", minor: 1200n }]);
   });
 
   it("derives settled only for active groups whose canonical balances are zero", () => {

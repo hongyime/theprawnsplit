@@ -8,6 +8,11 @@ export interface OutstandingTransfer {
 
 export type ArchiveEvent = Extract<Event, { t: "GroupArchived" }>;
 
+export interface ArchiveTransitionPlan {
+  actions: readonly ["download-export", "append-archive-event"];
+  outstanding: OutstandingTransfer[];
+}
+
 export function isSettledViewPredicate(balances: Map<string, Money>, archived: boolean): boolean {
   return !archived && [...balances.values()].every((minor) => minor === 0n);
 }
@@ -19,6 +24,13 @@ export function latestArchiveEvent(events: Event[]): ArchiveEvent | undefined {
     if (event.t === "GroupUnarchived") latest = undefined;
   }
   return latest;
+}
+
+export function createArchiveTransitionPlan(outstanding: OutstandingTransfer[]): ArchiveTransitionPlan {
+  return {
+    actions: ["download-export", "append-archive-event"],
+    outstanding: outstanding.map((transfer) => ({ ...transfer })),
+  };
 }
 
 export function archiveConfirmationText(outstanding: string[]): string {

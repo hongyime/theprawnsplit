@@ -54,7 +54,7 @@
   import { createDeviceLinkRequest, linkPayload, parseDeviceLinkRequest, type DeviceLinkRequest } from "@/lib/device-link";
   import { expenseHistoryRows } from "@/lib/expense-history";
   import { frozenViewPolicy } from "@/lib/freeze-policy";
-  import { archiveConfirmationText, isSettledViewPredicate, latestArchiveEvent, unarchiveConfirmationText } from "@/lib/lifecycle";
+  import { archiveConfirmationText, createArchiveTransitionPlan, isSettledViewPredicate, latestArchiveEvent, unarchiveConfirmationText } from "@/lib/lifecycle";
   import { currencyAmountPreview, normalizeCurrency } from "@/lib/multicurrency";
   import { buildPayerPreview, type PayerMode } from "@/lib/payers";
   import { defaultSplitSelection, findParticipantNameMatch, groupParticipantsForClaim, type ParticipantNameMatch } from "@/lib/participants";
@@ -626,19 +626,25 @@
 
   async function archiveGroup(): Promise<void> {
     if (!group || archived) return;
-    const outstanding = suggestedSettlements.map((transfer) => `${participantLabel(transfer.from)} pays ${participantLabel(transfer.to)} ${formatMinor(transfer.minor, group!.currency)}`);
-    const ok = window.confirm(archiveConfirmationText(outstanding));
+    const plan = createArchiveTransitionPlan(suggestedSettlements);
+    const outstandingLabels = plan.outstanding.map((transfer) => `${participantLabel(transfer.from)} pays ${participantLabel(transfer.to)} ${formatMinor(transfer.minor, group!.currency)}`);
+    const ok = window.confirm(archiveConfirmationText(outstandingLabels));
     if (!ok) return;
-    downloadExport();
-    const f = factory();
-    await commit(
-      [
-        makeEvent(f, "GroupArchived", {
-          outstanding: suggestedSettlements.map((transfer) => ({ from: transfer.from, to: transfer.to, minor: transfer.minor })),
-        }),
-      ],
-      f,
-    );
+    for (const action of plan.actions) {
+      if (action === "download-export") {
+        downloadExport();
+      } else {
+        const f = factory();
+        await commit(
+          [
+            makeEvent(f, "GroupArchived", {
+              outstanding: plan.outstanding,
+            }),
+          ],
+          f,
+        );
+      }
+    }
   }
 
   async function unarchiveGroup(): Promise<void> {

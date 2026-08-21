@@ -135,3 +135,4 @@
 - 2026-08-22: §9.11 property coverage asserts DeviceLinked authorised-key delegation converges regardless of relay arrival order.
 - 2026-08-22: REQ-MON-19 property coverage asserts EventVoided cascades remove an expense and all edits regardless of delivery order.
 - 2026-08-22: REQ-MON-16 property coverage asserts expense edits resolve whole Financials structs, including payer rows, share rows, and rate.
+- 2026-08-22: REQ-MON-17 property coverage asserts superseded concurrent financial edits remain retrievable in expense history.

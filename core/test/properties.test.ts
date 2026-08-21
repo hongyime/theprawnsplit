@@ -258,4 +258,61 @@ describe("REQ-SYN-12 property convergence", () => {
       { seed: Number(process.env.FAST_CHECK_SEED ?? 20260822), numRuns: 75, verbose: true },
     );
   }, 20_000);
+
+  it("keeps superseded concurrent financial edits retrievable", () => {
+    fc.assert(
+      fc.property(
+        fc.record({
+          addedMinor: fc.integer({ min: 1, max: 1000 }),
+          editAMinor: fc.integer({ min: 1, max: 1000 }),
+          editBMinor: fc.integer({ min: 1, max: 1000 }),
+        }),
+        ({ addedMinor, editAMinor, editBMinor }) => {
+          const added = financials(BigInt(addedMinor), [["alice", BigInt(addedMinor)]], [["bob", BigInt(addedMinor)]]);
+          const editA = financials(BigInt(editAMinor), [["alice", BigInt(editAMinor)]], [["bob", BigInt(editAMinor)]]);
+          const editB = financials(BigInt(editBMinor), [["alice", BigInt(editBMinor)]], [["chris", BigInt(editBMinor)]]);
+          const events: Event[] = [
+            base("ParticipantAdded", { id: "participant-alice", hlc: hlc(1), pid: "alice", name: "Alice" } as never),
+            base("ParticipantAdded", { id: "participant-bob", hlc: hlc(2), pid: "bob", name: "Bob" } as never),
+            base("ParticipantAdded", { id: "participant-chris", hlc: hlc(3), pid: "chris", name: "Chris" } as never),
+            base("ExpenseAdded", {
+              id: "creator:1",
+              dev: "creator",
+              hlc: { wall: 4, ctr: 1, dev: "creator" },
+              vv: { creator: 1 },
+              xid: "x-concurrent",
+              financials: added,
+              desc: "Concurrent edit",
+              at: 1,
+              date: "2026-08-22",
+            } as never),
+            base("ExpenseEdited", {
+              id: "a:1",
+              dev: "a",
+              hlc: { wall: 5, ctr: 1, dev: "a" },
+              vv: { creator: 1, a: 1 },
+              xid: "x-concurrent",
+              financials: editA,
+            } as never),
+            base("ExpenseEdited", {
+              id: "b:1",
+              dev: "b",
+              hlc: { wall: 6, ctr: 1, dev: "b" },
+              vv: { creator: 1, b: 1 },
+              xid: "x-concurrent",
+              financials: editB,
+            } as never),
+          ];
+
+          for (let seed = 1; seed <= 20; seed += 1) {
+            const expense = fold(shuffleWithSeed(events, seed), { supportedVersion: 1 }).expenses.get("x-concurrent");
+            expect(expense?.financials).toEqual(editB);
+            expect(expense?.financialHistory).toEqual([added, editA, editB]);
+            expect(expense?.activeFinancialIndex).toBe(2);
+          }
+        },
+      ),
+      { seed: Number(process.env.FAST_CHECK_SEED ?? 20260822), numRuns: 75, verbose: true },
+    );
+  }, 20_000);
 });

@@ -737,6 +737,12 @@ Notes:
   deterministic delivery orders. Latest verification on 2026-08-22 passed with
   `npm run build` (57 core tests, 143 root tests), root `npm audit --json`,
   protected-string scan, and `git diff --check`.
+- Added REQ-MON-17/§16.2 concurrent financial edit coverage in the core property suite.
+  Generated concurrent `ExpenseEdited` events now assert the HLC winner stays active
+  while the superseded financial correction remains retrievable in `financialHistory`
+  across deterministic delivery orders. Latest verification on 2026-08-22 passed with
+  `npm run build` (58 core tests, 143 root tests), root `npm audit --json`,
+  protected-string scan, and `git diff --check`.
 - Vercel checks on 2026-08-21 show the current `main` production deployment is Ready
   and has the requested aliases attached. Vercel env listing still shows no env vars
   configured, so the operated relay runtime remains unconfigured.

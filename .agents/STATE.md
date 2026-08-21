@@ -131,9 +131,13 @@ Progress:
 - Added Phase 4 browser settlement verification. The app now precomputes WebCrypto claim
   signature checks into a synchronous fold verification context, folds app state with that
   context, and lets a locally claimed payee emit signed `SettlementConfirmed` events.
+- Added Phase 4 peer re-attestation workflow. Valid `ClaimReattested` authority now clears
+  the contested second-claim anomaly, restored devices can confirm settlements after peer
+  attestation, and the app surfaces re-attest/void-claim actions for contested recovered
+  devices when this browser holds another participant's identity.
 
 Next step:
-- Latest pushed commit before this slice is `3d0b1da` on `main`.
+- Latest pushed commit before this slice is `e85e82d` on `main`.
 - GitHub/Vercel automatic production deployment for `cd21de2` completed Ready on
   2026-08-21.
 - Remaining deployment work: configure Vercel env vars and verify custom-domain runtime.
@@ -210,6 +214,9 @@ Notes:
 - Latest verification on 2026-08-21 after browser settlement verification: `npm run
   build` passed with 40 core tests and 12 root tests, and root `npm audit --json`
   reports zero vulnerabilities.
+- Latest verification on 2026-08-21 after peer re-attestation workflow: `npm --prefix
+  core test` passed with 41 tests, `npm run build` passed with 41 core tests and 13
+  root tests, and root `npm audit --json` reports zero vulnerabilities.
 - Vercel checks on 2026-08-21 show the project exists but direct deployment creation was
   quota-blocked.
 - Vercel automatic deploy on 2026-08-21 for `cd21de2` succeeded and reports Ready.

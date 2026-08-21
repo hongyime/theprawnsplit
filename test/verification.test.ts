@@ -43,4 +43,55 @@ describe("app verification context", () => {
     expect(state.settlements.get("s1")?.confirmed).toBe(true);
     expect(state.settlements.get("s1")?.pending).toBe(false);
   });
+
+  it("lets a peer re-attest a recovered device with real signatures", async () => {
+    const oldKey = await mintClaimKey("ecdsa-p256");
+    const recoveredKey = await mintClaimKey("ecdsa-p256");
+    const peerKey = await mintClaimKey("ecdsa-p256");
+    const oldClaimSig = await signClaim(oldKey.privateJwk, oldKey.alg, `${groupTag}:alice:old-phone:${oldKey.publicKey}`);
+    const recoveredClaimSig = await signClaim(recoveredKey.privateJwk, recoveredKey.alg, `${groupTag}:alice:recovered-phone:${recoveredKey.publicKey}`);
+    const peerClaimSig = await signClaim(peerKey.privateJwk, peerKey.alg, `${groupTag}:bob:bob-phone:${peerKey.publicKey}`);
+    const reattestSig = await signClaim(peerKey.privateJwk, peerKey.alg, `${groupTag}:reattest:alice:recovered-phone:${recoveredKey.publicKey}`);
+    const confirmSig = await signClaim(recoveredKey.privateJwk, recoveredKey.alg, `${groupTag}:confirm:s1`);
+    const events: Event[] = [
+      event("ParticipantClaimed", "old-phone:1", {
+        pid: "alice",
+        deviceId: "old-phone",
+        claimPk: oldKey.publicKey,
+        alg: oldKey.alg,
+        sig: oldClaimSig,
+      }),
+      event("ParticipantClaimed", "recovered-phone:1", {
+        pid: "alice",
+        deviceId: "recovered-phone",
+        claimPk: recoveredKey.publicKey,
+        alg: recoveredKey.alg,
+        sig: recoveredClaimSig,
+      }),
+      event("ParticipantClaimed", "bob-phone:1", {
+        pid: "bob",
+        deviceId: "bob-phone",
+        claimPk: peerKey.publicKey,
+        alg: peerKey.alg,
+        sig: peerClaimSig,
+      }),
+      event("SettlementRecorded", "bob-phone:2", { sid: "s1", from: "bob", to: "alice", minor: 100n }),
+      event("ClaimReattested", "bob-phone:3", {
+        pid: "alice",
+        newDevice: "recovered-phone",
+        newClaimPk: recoveredKey.publicKey,
+        alg: recoveredKey.alg,
+        attestor: "bob",
+        sig: reattestSig,
+      }),
+      event("SettlementConfirmed", "recovered-phone:4", { sid: "s1", pid: "alice", claimSig: confirmSig }),
+    ];
+
+    const ctx = await buildVerificationContext({ tagHex: groupTag, events });
+    const state = fold(events, { supportedVersion: 1 }, ctx);
+
+    expect(state.anomalies.map((anomaly) => anomaly.code)).not.toContain("contested-participant-claim");
+    expect(state.settlements.get("s1")?.confirmed).toBe(true);
+    expect(state.settlements.get("s1")?.pending).toBe(false);
+  });
 });

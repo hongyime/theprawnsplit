@@ -192,8 +192,9 @@ export function claimAnomalies(events: Event[], ctx: VerificationContext): Anoma
     const genesis = claims[0];
     if (!genesis) continue;
     const delegated = authorisedKeysWithoutReattestation(ordered, pid, ctx);
+    const authorised = authorisedKeys(ordered, pid, ctx);
     for (const claim of claims.slice(1)) {
-      if (!delegated.has(claim.claimPk)) {
+      if (!delegated.has(claim.claimPk) && !authorised.has(claim.claimPk)) {
         anomalies.push({
           code: "contested-participant-claim",
           pid,

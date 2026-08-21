@@ -97,7 +97,7 @@
   $: settlements = state ? [...state.settlements.values()] : [];
   $: anomalies = state ? state.anomalies : [];
   $: reconciliationAnomalies = anomalies.filter((anomaly) =>
-    ["possible-duplicate-participants", "distinct-participants-merged"].includes(anomaly.code),
+    ["possible-duplicate-participants", "distinct-participants-merged", "contested-participant-claim"].includes(anomaly.code),
   );
   $: selectedParticipants = participants.filter((p) => selectedPids[p.pid]);
   $: suggestedSettlements = state ? greedySettlement(state.balances) : [];
@@ -219,6 +219,37 @@
     if (!group || archived) return;
     const f = factory();
     await commit([makeEvent(f, "EventVoided", { targetId })], f);
+  }
+
+  function participantClaimEvent(eventId?: string): Extract<Event, { t: "ParticipantClaimed" }> | undefined {
+    return group?.events.find((event): event is Extract<Event, { t: "ParticipantClaimed" }> => event.t === "ParticipantClaimed" && event.id === eventId);
+  }
+
+  function localPeerIdentityFor(pid: string) {
+    return group?.identities.find((identity) => identity.pid !== pid);
+  }
+
+  async function reattestClaim(eventId?: string): Promise<void> {
+    if (!group || archived) return;
+    const claim = participantClaimEvent(eventId);
+    if (!claim) return;
+    const attestor = localPeerIdentityFor(claim.pid);
+    if (!attestor) return;
+    const f = factory();
+    const sig = await signClaim(attestor.claimSkJwk, attestor.alg, `${group.tagHex}:reattest:${claim.pid}:${claim.deviceId}:${claim.claimPk}`);
+    await commit(
+      [
+        makeEvent(f, "ClaimReattested", {
+          pid: claim.pid,
+          newDevice: claim.deviceId,
+          newClaimPk: claim.claimPk,
+          alg: claim.alg,
+          attestor: attestor.pid,
+          sig,
+        }),
+      ],
+      f,
+    );
   }
 
   function participantLabel(pid: string): string {
@@ -756,6 +787,9 @@
               {:else if anomaly.code === "distinct-participants-merged"}
                 <strong>People marked distinct are currently merged</strong>
                 <span>{anomaly.message}</span>
+              {:else if anomaly.code === "contested-participant-claim" && anomaly.pid}
+                <strong>{participantLabel(anomaly.pid)} has an unverified recovered device</strong>
+                <span>{participantClaimEvent(anomaly.eventId)?.deviceId ?? "A device"} needs peer re-attestation before it can confirm settlements.</span>
               {:else}
                 <strong>{anomaly.code}</strong>
                 <span>{anomaly.message}</span>
@@ -771,6 +805,13 @@
                 {/if}
                 {#if anomaly.eventId}
                   <button type="button" class="secondary" disabled={archived} on:click={() => voidEvent(anomaly.eventId!)}>Remove mark</button>
+                {/if}
+              {:else if anomaly.code === "contested-participant-claim" && anomaly.pid}
+                {#if localPeerIdentityFor(anomaly.pid)}
+                  <button type="button" disabled={archived} on:click={() => reattestClaim(anomaly.eventId)}>Re-attest</button>
+                {/if}
+                {#if anomaly.eventId}
+                  <button type="button" class="secondary" disabled={archived} on:click={() => voidEvent(anomaly.eventId!)}>Void claim</button>
                 {/if}
               {/if}
             </div>

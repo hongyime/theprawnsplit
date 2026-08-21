@@ -30,3 +30,4 @@
 - 2026-08-21: Financial edit winners use version-vector causality before HLC tie-breaks, so clock-skewed older edits cannot overwrite known newer corrections.
 - 2026-08-21: Duplicate and marked-distinct reconciliation actions are append-only UI affordances over fold anomalies; the app never auto-merges or auto-splits participants.
 - 2026-08-21: Browser settlement confirmation uses a precomputed async WebCrypto verification cache so the pure fold can keep a synchronous verification boundary.
+- 2026-08-21: Peer re-attestation is treated as real claim authority for anomaly clearing; without this, recovered devices could gain keys but remain permanently contested.

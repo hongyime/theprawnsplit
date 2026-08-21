@@ -102,6 +102,29 @@ describe("REQ-ID-13/REQ-SEC-08 identity", () => {
     expect(verifyConfirmation([...events, tabletConfirm], "s1", tabletConfirm.claimSig, verifier)).toBe(true);
   });
 
+  it("allows ClaimReattested authority without raising a second-claim anomaly", () => {
+    const payload = `${groupTag}:reattest:alice:recovered:recovered-key`;
+    const events = [
+      claim("alice", "phone", "alice-key"),
+      claim("alice", "recovered", "recovered-key"),
+      claim("bob", "bob-phone", "bob-key"),
+      base("ClaimReattested", {
+        pid: "alice",
+        newDevice: "recovered",
+        newClaimPk: "recovered-key",
+        alg: "ed25519",
+        attestor: "bob",
+        sig: sig("bob-key", payload),
+      } as never),
+      base("SettlementRecorded", { sid: "s1", from: "bob", to: "alice", minor: 10n } as never),
+    ];
+    const recoveredConfirm = confirm("s1", "recovered-key");
+
+    expect(claimAnomalies(events, verifier).map((anomaly) => anomaly.code)).not.toContain("contested-participant-claim");
+    if (recoveredConfirm.t !== "SettlementConfirmed") throw new Error("test helper returned wrong event type");
+    expect(verifyConfirmation([...events, recoveredConfirm], "s1", recoveredConfirm.claimSig, verifier)).toBe(true);
+  });
+
   it("flags one device claiming two participants", () => {
     const anomalies = claimAnomalies([claim("alice", "phone", "alice-key"), claim("bob", "phone", "bob-key")], verifier);
     expect(anomalies.filter((anomaly) => anomaly.code === "device-claims-multiple-participants").map((anomaly) => anomaly.pid)).toEqual([

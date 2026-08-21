@@ -826,3 +826,8 @@ Notes:
   guidance. Verification on 2026-08-22 passed with focused `npx vitest run
   test/pwa-install.test.ts`, `npm run build` (64 core tests, 152 root tests), root
   `npm audit --json`, protected-string scan, and `git diff --check`.
+- Added REQ-PLT-03/04 service-worker boundary coverage so `public/sw.js` cannot
+  introduce Background Sync, Periodic Background Sync, push, or notification event
+  dependencies. Verification on 2026-08-22 passed with focused `npx vitest run
+  test/service-worker.test.ts`, `npm run build` (64 core tests, 153 root tests),
+  root `npm audit --json`, protected-string scan, and `git diff --check`.

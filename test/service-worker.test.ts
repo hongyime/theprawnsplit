@@ -13,4 +13,12 @@ describe("service worker cache boundary", () => {
     expect(source).toContain("if (!isCacheable(event.request)) return;");
     expect(source).not.toMatch(/event\.request\.method !== "GET"\) return;[\s\S]*?cache\.put\(event\.request/m);
   });
+
+  it("does not depend on background sync or push notification events", () => {
+    const source = readFileSync(join(process.cwd(), "public", "sw.js"), "utf8");
+
+    expect(source).not.toMatch(/\b(?:SyncManager|PeriodicSyncManager|PushManager|Notification)\b/);
+    expect(source).not.toMatch(/\b(?:sync|periodicsync|push|notificationclick)\b/);
+    expect(source).not.toMatch(/\.(?:sync|periodicSync|pushManager)\.(?:register|subscribe)\b/);
+  });
 });

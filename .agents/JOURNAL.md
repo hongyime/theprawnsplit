@@ -139,3 +139,4 @@
 - 2026-08-22: REQ-SYN-19/20 property coverage asserts per-author caps drop only the offending author's surplus and preserve admitted-state folding.
 - 2026-08-22: REQ-SYN-22 property coverage asserts quarantined unsupported-schema events still advance transport vectors while leaving balances unchanged.
 - 2026-08-22: REQ-ID-13 property coverage asserts DSU canonical roots converge across merge delivery order.
+- 2026-08-22: REQ-SYN-24 property coverage asserts future-drift events buffer without HLC mutation and admit at computed retry time.

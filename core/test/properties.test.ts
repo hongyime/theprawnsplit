@@ -450,4 +450,49 @@ describe("REQ-SYN-12 property convergence", () => {
       { seed: Number(process.env.FAST_CHECK_SEED ?? 20260822), numRuns: 75, verbose: true },
     );
   }, 20_000);
+
+  it("buffers future-drift events without mutation and admits them at retry time", () => {
+    fc.assert(
+      fc.property(
+        fc.record({
+          now: fc.integer({ min: 0, max: 1_000_000 }),
+          drift: fc.integer({ min: 120_001, max: 1_000_000 }),
+          counter: fc.integer({ min: 1, max: 1000 }),
+        }),
+        ({ now, drift, counter }) => {
+          const wall = now + drift;
+          const future = base("ExpenseAdded", {
+            id: `fast:${counter}`,
+            dev: "fast",
+            hlc: hlc(wall, counter, "fast"),
+            xid: "x-future-drift",
+            financials: financials(1n, [["alice", 1n]], [["bob", 1n]]),
+            desc: "Future drift",
+            at: wall,
+            date: "2026-08-22",
+          } as never);
+          const opts = {
+            supportedVersion: 1,
+            maxFutureDriftMs: 120_000,
+            capUnknownAuthor: 50,
+            capKnownAuthor: 1000,
+            capGroupTotal: 10_000,
+            bufferMaxEvents: 500,
+          };
+
+          const buffered = admitTransportEvents([future], [], {}, { ...opts, now });
+          const admitted = admitTransportEvents([future], [], {}, { ...opts, now: wall - opts.maxFutureDriftMs });
+
+          expect(buffered.admitted).toEqual([]);
+          expect(buffered.buffered).toEqual([{ event: future, retryAt: wall - opts.maxFutureDriftMs }]);
+          expect(buffered.transportVector.fast).toBe(counter);
+          expect(future.hlc.wall).toBe(wall);
+          expect(admitted.buffered).toEqual([]);
+          expect(admitted.admitted.map((event) => event.id)).toEqual([future.id]);
+          expect(admitted.transportVector.fast).toBe(counter);
+        },
+      ),
+      { seed: Number(process.env.FAST_CHECK_SEED ?? 20260822), numRuns: 75, verbose: true },
+    );
+  }, 20_000);
 });

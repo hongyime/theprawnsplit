@@ -4,6 +4,7 @@ import { createJoinSeed, ensureGroup, readGroup, recordAppLaunch, resetRepositor
 import {
   dismissInstallPrompt,
   emptyDurabilityPromptState,
+  exportPromptReason,
   installPromptLevel,
   shouldPromptFirstZeroExport,
   shouldPromptIdentityBackup,
@@ -95,5 +96,13 @@ describe("durability prompt policy", () => {
     expect(shouldPromptSevenDayExport(returnedAfterEightDays, false, now)).toBe(true);
     expect(shouldPromptSevenDayExport(returnedAfterEightDays, true, now)).toBe(false);
     expect(shouldPromptSevenDayExport({ ...returnedAfterEightDays, sevenDayExportPromptedAt: now }, false, now)).toBe(false);
+  });
+
+  it("selects no export prompt for launch, session, or timer-only state changes", () => {
+    expect(exportPromptReason({ ...emptyDurabilityPromptState(), sessionCount: 7 }, true, false, now)).toBeNull();
+    expect(exportPromptReason({ ...emptyDurabilityPromptState(), lastSeenAt: now }, true, false, now)).toBeNull();
+    expect(exportPromptReason({ ...emptyDurabilityPromptState(), lastSeenAt: now - 7 * 24 * 60 * 60 * 1000 }, true, false, now)).toBeNull();
+    expect(exportPromptReason({ ...emptyDurabilityPromptState(), hadNonZeroBalance: true }, true, false, now)).toBe("first-zero");
+    expect(exportPromptReason({ ...emptyDurabilityPromptState(), lastSeenAt: now - 8 * 24 * 60 * 60 * 1000 }, false, false, now)).toBe("seven-day");
   });
 });

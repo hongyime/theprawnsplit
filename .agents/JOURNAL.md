@@ -84,3 +84,4 @@
 - 2026-08-21: Genesis participant claims are TOFU, so roster copy must show who claimed, when, and the current balance, and peer challenge must be an append-only void of the claim event rather than a mutation.
 - 2026-08-21: DeviceLinkRequest artifacts must validate the replay-boundary fields before signing or import: lowercase 64-hex group tag and lowercase 128-bit hex nonce.
 - 2026-08-22: Claim-key algorithm agility depends on executable fallback coverage: Ed25519 feature detection may fail, and P-256 must remain the automatic minting fallback.
+- 2026-08-22: REQ-DUR-07 export prompts are a closed policy set: archive remains an automatic export path, while UI prompt selection must resolve only to first-zero, seven-day-unprotected return, or no prompt.

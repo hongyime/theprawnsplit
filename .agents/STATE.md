@@ -480,6 +480,11 @@ Notes:
   proving devices choose ECDSA P-256 when Ed25519 WebCrypto key generation is unavailable.
   Latest verification on 2026-08-22 passed with `npm run build` (43 core tests, 91 root
   tests), root `npm audit --json`, protected-string scan, and `git diff --check`.
+- Tightened REQ-DUR-07 export-prompt policy. The app now selects active export prompts
+  through a tested helper so launch/session/time-only state cannot introduce prompt
+  reasons outside first-zero and seven-day-unprotected return. Latest verification on
+  2026-08-22 passed with `npm run build` (43 core tests, 92 root tests), root `npm
+  audit --json`, protected-string scan, and `git diff --check`.
 - Vercel checks on 2026-08-21 show the current `main` production deployment is Ready
   and has the requested aliases attached. Vercel env listing still shows no env vars
   configured, so the operated relay runtime remains unconfigured.

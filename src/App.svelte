@@ -43,12 +43,11 @@
   } from "@/db/repo";
   import {
     dismissInstallPrompt,
+    exportPromptReason,
     installPromptLevel,
     normalizeDurabilityPromptState,
-    shouldPromptFirstZeroExport,
     shouldPromptIdentityBackup,
     shouldPromptPinLink,
-    shouldPromptSevenDayExport,
     type DurabilityPromptState,
     type ExportPromptReason,
     type InstallPromptLevel,
@@ -1011,11 +1010,7 @@
     }
     showPinLinkPrompt = shouldPromptPinLink(current);
     showIdentityBackupPrompt = shouldPromptIdentityBackup(current, hasLocalClaim);
-    activeExportPrompt = shouldPromptFirstZeroExport(current, allBalancesZero())
-      ? "first-zero"
-      : shouldPromptSevenDayExport(returnWindow, persistedStorage, Date.now())
-        ? "seven-day"
-        : null;
+    activeExportPrompt = exportPromptReason(returnWindow, allBalancesZero(), persistedStorage, Date.now());
   }
 
   async function dismissActiveInstallPrompt(): Promise<void> {

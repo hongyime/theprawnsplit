@@ -96,3 +96,14 @@ export function shouldPromptSevenDayExport(state: DurabilityPromptState, persist
   if (persisted !== false || state.lastSeenAt === undefined || state.sevenDayExportPromptedAt !== undefined) return false;
   return now - state.lastSeenAt > 7 * 24 * 60 * 60 * 1000;
 }
+
+export function exportPromptReason(
+  state: DurabilityPromptState,
+  allBalancesZero: boolean,
+  persisted: boolean | null,
+  now: number,
+): ExportPromptReason | null {
+  if (shouldPromptFirstZeroExport(state, allBalancesZero)) return "first-zero";
+  if (shouldPromptSevenDayExport(state, persisted, now)) return "seven-day";
+  return null;
+}

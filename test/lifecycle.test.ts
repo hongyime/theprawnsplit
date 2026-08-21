@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Event } from "@theprawnsplit/core";
-import { archiveConfirmationText, createArchiveTransitionPlan, isSettledViewPredicate, latestArchiveEvent, unarchiveConfirmationText } from "@/lib/lifecycle";
+import { archiveConfirmationText, canEditGroupProfile, createArchiveTransitionPlan, isSettledViewPredicate, latestArchiveEvent, unarchiveConfirmationText } from "@/lib/lifecycle";
 
 type ArchiveOutstanding = Extract<Event, { t: "GroupArchived" }>["outstanding"];
 
@@ -44,6 +44,11 @@ describe("lifecycle copy", () => {
     expect(isSettledViewPredicate(new Map([["p_alice", 0n], ["p_bob", 0n]]), false)).toBe(true);
     expect(isSettledViewPredicate(new Map([["p_alice", 1n], ["p_bob", -1n]]), false)).toBe(false);
     expect(isSettledViewPredicate(new Map([["p_alice", 0n], ["p_bob", 0n]]), true)).toBe(false);
+  });
+
+  it("locks profile edits while the group is archived", () => {
+    expect(canEditGroupProfile(false)).toBe(true);
+    expect(canEditGroupProfile(true)).toBe(false);
   });
 
   it("returns the archive event that currently controls archived display", () => {

@@ -17,6 +17,10 @@ export function isSettledViewPredicate(balances: Map<string, Money>, archived: b
   return !archived && [...balances.values()].every((minor) => minor === 0n);
 }
 
+export function canEditGroupProfile(archived: boolean): boolean {
+  return !archived;
+}
+
 export function latestArchiveEvent(events: Event[]): ArchiveEvent | undefined {
   let latest: ArchiveEvent | undefined;
   for (const event of [...events].sort(eventSortKey)) {

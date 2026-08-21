@@ -54,7 +54,7 @@
   import { createDeviceLinkRequest, linkPayload, parseDeviceLinkRequest, type DeviceLinkRequest } from "@/lib/device-link";
   import { expenseHistoryRows } from "@/lib/expense-history";
   import { frozenViewPolicy } from "@/lib/freeze-policy";
-  import { archiveConfirmationText, createArchiveTransitionPlan, isSettledViewPredicate, latestArchiveEvent, unarchiveConfirmationText } from "@/lib/lifecycle";
+  import { archiveConfirmationText, canEditGroupProfile, createArchiveTransitionPlan, isSettledViewPredicate, latestArchiveEvent, unarchiveConfirmationText } from "@/lib/lifecycle";
   import { currencyAmountPreview, normalizeCurrency } from "@/lib/multicurrency";
   import { buildPayerPreview, type PayerMode } from "@/lib/payers";
   import { defaultSplitSelection, findParticipantNameMatch, groupParticipantsForClaim, type ParticipantNameMatch } from "@/lib/participants";
@@ -143,6 +143,7 @@
   $: storageLabel = persistedStorage === null ? "storage unknown" : persistedStorage ? "storage protected" : "storage best effort";
   $: syncLabel = unconfirmedCount === 0 ? "sync current" : `${unconfirmedCount} unsynced`;
   $: archived = isGroupArchived();
+  $: groupProfileEditable = canEditGroupProfile(archived);
   $: settledView = state ? isSettledViewPredicate(state.balances, archived) : false;
   $: archiveSummary = group ? latestArchiveEvent(group.events) : undefined;
   $: frozenPolicy = frozenViewPolicy(state);
@@ -723,13 +724,13 @@
   }
 
   async function renameGroup(name: string): Promise<void> {
-    if (!group) return;
+    if (!group || !groupProfileEditable) return;
     group = { ...group, name };
     await saveGroup(group);
   }
 
   async function setCurrency(currency: string): Promise<void> {
-    if (!group) return;
+    if (!group || !groupProfileEditable) return;
     group = { ...group, currency: normalizeCurrency(currency) };
     expenseCurrency ||= group.currency;
     await saveGroup(group);
@@ -995,12 +996,12 @@
   <main class="app-shell">
     <header class="topbar">
       <div>
-        <input class="title-input" value={group.name} aria-label="Trip name" on:change={(e) => renameGroup((e.currentTarget as HTMLInputElement).value)} />
+        <input class="title-input" value={group.name} aria-label="Trip name" disabled={!groupProfileEditable} on:change={(e) => renameGroup((e.currentTarget as HTMLInputElement).value)} />
         <div class="subtle">No accounts · {unconfirmedCount} unconfirmed · {state.quarantined.length ? "update required" : "ready offline"}</div>
         {#if showInstallHint}<div class="subtle">On iOS, use Share then Add to Home Screen for offline launch.</div>{/if}
       </div>
       <div class="header-actions">
-        <input class="currency" value={group.currency} aria-label="Currency" on:change={(e) => setCurrency((e.currentTarget as HTMLInputElement).value)} />
+        <input class="currency" value={group.currency} aria-label="Currency" disabled={!groupProfileEditable} on:change={(e) => setCurrency((e.currentTarget as HTMLInputElement).value)} />
         <button type="button" disabled={syncing} on:click={runSync} title="Sync now"><RefreshCcw size={18} /> {syncing ? "Syncing" : "Sync"}</button>
         <button type="button" on:click={copyJoinLink} title="Copy join link"><Link size={18} /> Link</button>
         <button type="button" on:click={() => downloadExport()} title="Export ledger"><Download size={18} /> Export</button>

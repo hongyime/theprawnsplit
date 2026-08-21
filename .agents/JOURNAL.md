@@ -153,3 +153,4 @@
 - 2026-08-22: REQ-PLT-02 installability coverage treats the linked Web App Manifest, app-shell caching, standalone detection, and iOS Add-to-Home-Screen guidance as one PWA boundary.
 - 2026-08-22: REQ-PLT-03/04 coverage must inspect `public/sw.js`; a client-source-only scan would miss forbidden Background Sync or push dependencies in the actual service worker.
 - 2026-08-22: REQ-DUR-01 coverage treats the placement of `navigator.storage.persist()` as a UI workflow invariant: first saved expense only, not launch, polling, or prompt timers.
+- 2026-08-22: REQ-ID-11/REQ-DUR-06 coverage treats missing `GroupCreated` on a linked join as a recovery block: sync first, show recovery UI, and block participant creation until data arrives.

@@ -837,3 +837,9 @@ Notes:
   focused `npx vitest run test/storage-persistence-ui.test.ts`, `npm run build` (64
   core tests, 154 root tests), root `npm audit --json`, protected-string scan, and
   `git diff --check`.
+- Added REQ-ID-11/REQ-DUR-06 join recovery boundary coverage so linked joins with no
+  recovered `GroupCreated` attempt sync before showing an empty ledger and cannot create
+  participants until recovery succeeds. Verification on 2026-08-22 passed with focused
+  `npx vitest run test/join-recovery-boundary.test.ts`, `npm run build` (64 core
+  tests, 155 root tests), root `npm audit --json`, protected-string scan, and
+  `git diff --check`.

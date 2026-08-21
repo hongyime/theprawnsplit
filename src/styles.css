@@ -406,6 +406,21 @@ button.secondary {
   color: #0f5132;
 }
 
+.settlement-list {
+  margin-top: 0.75rem;
+  display: grid;
+  gap: 0.35rem;
+}
+
+.settlement-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding-top: 0.45rem;
+  border-top: 1px solid #edf1ee;
+  font-size: 0.9rem;
+}
+
 .ledger,
 .import-panel {
   margin-top: 12px;

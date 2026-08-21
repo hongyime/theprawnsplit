@@ -111,6 +111,21 @@ export function authorisedKeys(events: Event[], pid: string, ctx: VerificationCo
   return new Set([...keys.keys()].sort());
 }
 
+export function authorisedDevices(events: Event[], pid: string, ctx: VerificationContext): Set<string> {
+  const voided = voidedEventIds(events);
+  const ordered = [...events].filter((event) => !voided.has(event.id)).sort(eventSortKey);
+  const keys = authorisedKeys(ordered, pid, ctx);
+  const devices = new Set<string>();
+
+  for (const event of ordered) {
+    if (event.t === "ParticipantClaimed" && event.pid === pid && keys.has(event.claimPk)) devices.add(event.deviceId);
+    if (event.t === "DeviceLinked" && event.pid === pid && keys.has(event.newClaimPk)) devices.add(event.newDevice);
+    if (event.t === "ClaimReattested" && event.pid === pid && keys.has(event.newClaimPk)) devices.add(event.newDevice);
+  }
+
+  return new Set([...devices].sort());
+}
+
 function authorisedKeysWithoutReattestation(
   events: Event[],
   pid: string,

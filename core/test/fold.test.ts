@@ -98,6 +98,50 @@ describe("REQ-MON-15/REQ-SYN-12 fold", () => {
     expect(state.settlements.get("s1")?.confirmed).toBe(false);
   });
 
+  it("marks settlements recorded by an uncontested payee device born confirmed", () => {
+    const state = fold(
+      [
+        claim("alice", "alice-phone", "alice-key"),
+        base("SettlementRecorded", { sid: "s1", from: "bob", to: "alice", minor: 100n, dev: "alice-phone" } as never),
+      ],
+      { supportedVersion: 1 },
+      verifier,
+    );
+
+    expect(state.settlements.get("s1")?.confirmed).toBe(true);
+    expect(state.settlements.get("s1")?.pending).toBe(false);
+    expect(state.settlements.get("s1")?.cashUnconfirmable).toBe(false);
+  });
+
+  it("marks settlements to shadow payees cash-unconfirmable without pending nag state", () => {
+    const state = fold(
+      [base("ParticipantAdded", { pid: "shadow", name: "Shadow" } as never), base("SettlementRecorded", { sid: "s1", from: "bob", to: "shadow", minor: 100n } as never)],
+      { supportedVersion: 1 },
+      verifier,
+    );
+
+    expect(state.settlements.get("s1")?.confirmed).toBe(false);
+    expect(state.settlements.get("s1")?.pending).toBe(false);
+    expect(state.settlements.get("s1")?.cashUnconfirmable).toBe(true);
+  });
+
+  it("displays disputes without reversing settlement balances", () => {
+    const state = fold(
+      [
+        claim("alice", "alice-phone", "alice-key"),
+        base("SettlementRecorded", { sid: "s1", from: "bob", to: "alice", minor: 100n } as never),
+        base("SettlementDisputed", { sid: "s1", note: "Cash was not received" } as never),
+      ],
+      { supportedVersion: 1 },
+      verifier,
+    );
+
+    expect(state.settlements.get("s1")?.disputed).toBe(true);
+    expect(state.settlements.get("s1")?.pending).toBe(true);
+    expect(state.balances.get("alice")).toBe(100n);
+    expect(state.balances.get("bob")).toBe(-100n);
+  });
+
   it("surfaces duplicate participant names unless marked distinct", () => {
     const aliceA = base("ParticipantAdded", { pid: "alice-a", name: "Dave" } as never);
     const aliceB = base("ParticipantAdded", { pid: "alice-b", name: " dave " } as never);

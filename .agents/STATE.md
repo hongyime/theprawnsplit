@@ -103,6 +103,10 @@ Progress:
   participant hints, lets `ParticipantsMarkedDistinct` suppress only the duplicate scanner,
   keeps it out of union-find, surfaces `distinct-participants-merged` contradictions with
   the merge edge involved, and preserves EventVoided-as-merge-undo behavior.
+- Added Phase 4 settlement status semantics. The core fold now marks settlements recorded
+  by an uncontested payee device as born confirmed, marks settlements to shadow payees as
+  `cashUnconfirmable` without pending nag state, keeps disputes visible without reversing
+  balances, and exposes settlement status rows in the app UI.
 
 Next step:
 - Commit and push `main` when ready; GitHub push is expected to trigger Vercel deployment.
@@ -155,6 +159,9 @@ Notes:
   zero vulnerabilities.
 - Latest verification on 2026-08-21 after duplicate/merge fold slice: `npm run build`
   passed locally with 30 core tests and 10 root tests; root `npm audit --json` reports
+  zero vulnerabilities.
+- Latest verification on 2026-08-21 after settlement status slice: `npm run build`
+  passed locally with 33 core tests and 10 root tests; root `npm audit --json` reports
   zero vulnerabilities.
 - Vercel checks on 2026-08-21 show the project exists but direct deployment creation was
   quota-blocked.

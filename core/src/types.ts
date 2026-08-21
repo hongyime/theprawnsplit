@@ -103,6 +103,7 @@ export interface SettlementState {
   confirmed: boolean;
   disputed: boolean;
   pending: boolean;
+  cashUnconfirmable: boolean;
 }
 
 export interface Anomaly {

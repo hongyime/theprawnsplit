@@ -797,7 +797,18 @@
           <input bind:value={settleAmount} inputmode="decimal" placeholder="Amount" />
           <button type="button" disabled={archived} on:click={() => recordSettlement(settleFrom, settleTo, settleAmount)}>Record</button>
         </div>
-        {#if settlements.length}<p class="hint">{settlements.length} settlement event{settlements.length === 1 ? "" : "s"} recorded.</p>{/if}
+        {#if settlements.length}
+          <div class="settlement-list">
+            {#each settlements as settlement}
+              <div class="settlement-row">
+                <span>{participantLabel(settlement.from)} paid {participantLabel(settlement.to)} {formatMinor(settlement.minor, group.currency)}</span>
+                <strong class:positive={settlement.confirmed} class:negative={settlement.disputed}>
+                  {settlement.disputed ? "disputed" : settlement.confirmed ? "confirmed" : settlement.cashUnconfirmable ? "cash" : "pending"}
+                </strong>
+              </div>
+            {/each}
+          </div>
+        {/if}
       </article>
     </section>
 

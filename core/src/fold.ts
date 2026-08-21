@@ -1,4 +1,4 @@
-import { buildDSU, claimAnomalies, verifyConfirmation, voidedEventIds } from "./identity";
+import { authorisedDevices, buildDSU, claimAnomalies, contestedClaimPids, verifyConfirmation, voidedEventIds } from "./identity";
 import type {
   Anomaly,
   Event,
@@ -79,6 +79,7 @@ export function fold(events: Event[], opts: FoldOptions, ctx?: VerificationConte
 
   const voided = voidedEventIds(supported);
   if (ctx) anomalies.push(...claimAnomalies(supported, ctx));
+  const contestedPids = ctx ? contestedClaimPids(supported, ctx) : new Set<string>();
   const mergeEdges = activeMergeEdges(supported);
   const markedDistinct = new Map<string, { eventId: string; a: string; b: string }>();
   const expenseVoids = new Set<string>();
@@ -166,14 +167,18 @@ export function fold(events: Event[], opts: FoldOptions, ctx?: VerificationConte
       expenses.set(event.xid, next);
     }
     if (event.t === "SettlementRecorded" && !settlementVoids.has(event.sid)) {
+      const payeeDevices = ctx ? authorisedDevices(supported, event.to, ctx) : new Set<string>();
+      const bornConfirmed = ctx ? payeeDevices.has(event.dev) && !contestedPids.has(event.to) : false;
+      const cashUnconfirmable = ctx ? payeeDevices.size === 0 : false;
       settlements.set(event.sid, {
         sid: event.sid,
         from: event.from,
         to: event.to,
         minor: event.minor,
-        confirmed: false,
+        confirmed: bornConfirmed,
         disputed: false,
-        pending: true,
+        pending: !bornConfirmed && !cashUnconfirmable,
+        cashUnconfirmable,
       });
     }
     if (event.t === "SettlementConfirmed") {

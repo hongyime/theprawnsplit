@@ -72,3 +72,4 @@
 - 2026-08-21: The "everyone has this" label is a version-vector proof over every known device's latest event, not a synonym for the local outbox being empty.
 - 2026-08-21: Relay OK failure handling exposes structured policy: duplicates are success, rate limits/timeouts back off that relay, auth/blocked/invalid/pow/error drop the relay, and unknown failures stay retryable.
 - 2026-08-21: Platform-boundary coverage is a runtime-source regression test: the PWA may register its offline shell service worker, but ledger storage must stay out of browser key-value stores and telemetry/push/background-sync APIs must stay absent.
+- 2026-08-21: Publish quorum applies before local outbound events advance to `published`; a one-relay read-back is not enough to clear local unsynced state, while rows already marked `published` may still confirm from later read-back.

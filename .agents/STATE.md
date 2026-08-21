@@ -419,6 +419,11 @@ Notes:
   telemetry, analytics, push, or background-sync APIs from entering the app shell.
   Latest verification on 2026-08-21 passed with `npm run build` (43 core tests, 76
   root tests), root `npm audit --json`, protected-string scan, and `git diff --check`.
+- Fixed REQ-SYN-05/15/16 publish quorum semantics. Local outbound events now remain
+  local when fewer than two relay acknowledgements are received, even if one relay echoes
+  them back; already-published events can still confirm from later read-back. Latest
+  verification on 2026-08-21 passed with `npm run build` (43 core tests, 78 root tests),
+  root `npm audit --json`, protected-string scan, and `git diff --check`.
 - Vercel checks on 2026-08-21 show the current `main` production deployment is Ready
   and has the requested aliases attached. Vercel env listing still shows no env vars
   configured, so the operated relay runtime remains unconfigured.

@@ -477,10 +477,14 @@ export async function unsyncedEvents(groupId: string): Promise<Event[]> {
 }
 
 export async function pendingOutboundEvents(groupId: string): Promise<Event[]> {
+  return (await pendingOutboundEventRows(groupId)).map((row) => row.event);
+}
+
+export async function pendingOutboundEventRows(groupId: string): Promise<{ event: Event; syncState: StoredEvent["syncState"] }[]> {
   const database = await db();
   const local = await database.getAllFromIndex("events", "bySync", [groupId, "local"]);
   const published = await database.getAllFromIndex("events", "bySync", [groupId, "published"]);
-  return [...local, ...published].map((row) => decodeEvent(row.eventJson));
+  return [...local, ...published].map((row) => ({ event: decodeEvent(row.eventJson), syncState: row.syncState }));
 }
 
 export async function syncCounts(groupId: string): Promise<SyncCounts> {

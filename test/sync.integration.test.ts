@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { canonicalStateBytes, fold, type Event } from "@theprawnsplit/core";
 import { decryptEnvelope, encryptEnvelope, encryptEvents, type RelayEnvelope } from "@/crypto/envelope";
 import { createGroupSecret, groupKey, groupTag, secretToBase64 } from "@/crypto/group";
-import { appendEvents, createJoinSeed, ensureGroup, readGroup, resetRepositoryForTests } from "@/db/repo";
+import { appendEvents, createJoinSeed, ensureGroup, markEvents, readGroup, resetRepositoryForTests, syncCounts } from "@/db/repo";
 import { defaultParticipant, makeEvent, makeExpenseFinancials, type EventFactory } from "@/lib/events";
 import { syncOnce } from "@/relay/sync";
 import type { AckResult, Relay, RelayEntry } from "@/relay/types";
@@ -151,6 +151,37 @@ describe("Phase 2 sync integration", () => {
       canonicalStateBytes(fold((await readGroup(groupA.groupId).catch(() => syncedA)).events, { supportedVersion: 1 })),
     );
     expect(recovered.meta.versionVector[groupA.deviceId]).toBeGreaterThanOrEqual(4);
+  });
+
+  it("keeps local outbound events pending when publish quorum is unreachable", async () => {
+    await resetRepositoryForTests("prawn-no-publish-quorum");
+    const group = await ensureGroup();
+    const participant = defaultParticipant({ deviceId: group.deviceId, nextCounter: group.nextCounter }, "Alice");
+    await appendEvents(group.groupId, [participant]);
+
+    const relays = [new MemoryRelay("alive", true), new MemoryRelay("down", false)];
+    const result = await syncOnce(group.groupId, relays);
+
+    expect(result).toMatchObject({ published: 0, confirmed: 0 });
+    expect(result.errors).toContain("relay quorum not reached (1/2 acknowledgements)");
+    expect(await syncCounts(group.groupId)).toEqual({ local: 2, published: 0, confirmed: 0 });
+    expect((await readGroup(group.groupId)).meta.unsyncedSince).toBeDefined();
+  });
+
+  it("confirms already-published events from read-back without requiring a fresh publish quorum", async () => {
+    await resetRepositoryForTests("prawn-published-readback");
+    const group = await ensureGroup();
+    const participant = defaultParticipant({ deviceId: group.deviceId, nextCounter: group.nextCounter }, "Alice");
+    const withParticipant = await appendEvents(group.groupId, [participant]);
+    await markEvents(group.groupId, withParticipant.events.map((event) => event.id), "published");
+
+    const relays = [new MemoryRelay("alive", true), new MemoryRelay("down", false)];
+    const result = await syncOnce(group.groupId, relays);
+
+    expect(result).toMatchObject({ published: 0, confirmed: 2 });
+    expect(result.errors).not.toContain("relay quorum not reached (1/2 acknowledgements)");
+    expect(await syncCounts(group.groupId)).toEqual({ local: 0, published: 0, confirmed: 2 });
+    expect((await readGroup(group.groupId)).meta.unsyncedSince).toBeUndefined();
   });
 
   it("uses snapshot-only bootstrap for transport vectors without creating semantic state", async () => {

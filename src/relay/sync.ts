@@ -6,7 +6,7 @@ import {
   getGroupCrypto,
   markSnapshotPublished,
   markEvents,
-  pendingOutboundEvents,
+  pendingOutboundEventRows,
   putBufferedEvents,
   readGroup,
   removeBufferedEvents,
@@ -22,6 +22,8 @@ import { HttpRelay } from "./http";
 import { NostrRelay } from "./nostr";
 import { classifyRelayIssue, isDuplicateRelayAck } from "./diagnostics";
 import type { Relay, SyncResult } from "./types";
+
+const PUBLISH_QUORUM_ACKS = 2;
 
 export function createRelays(group: GroupRecord): Relay[] {
   const relaySettings = normalizeRelaySettings(group.meta.relaySettings, {
@@ -43,8 +45,10 @@ export async function syncOnce(groupId: string, relayOverride?: Relay[]): Promis
   if (!relayOverride) await saveMeta(group.meta);
   const { secret, key } = await getGroupCrypto(group);
   const writeProof = await relayWriteProof(secret, group.tagHex);
-  const local = await pendingOutboundEvents(groupId);
-  const batch = local.slice(0, config.batchMaxEvents);
+  const outbound = await pendingOutboundEventRows(groupId);
+  const batchRows = outbound.slice(0, config.batchMaxEvents);
+  const localBatchRows = batchRows.filter((row) => row.syncState === "local");
+  const batch = batchRows.map((row) => row.event);
   const result: SyncResult = {
     published: 0,
     confirmed: 0,
@@ -80,9 +84,12 @@ export async function syncOnce(groupId: string, relayOverride?: Relay[]): Promis
         if (diagnostic.severity !== "info") result.errors.push(ack.ack.reason);
       }
     }
-    if (ok > 0) {
-      await markEvents(groupId, batch.map((event) => event.id), "published");
-      result.published = batch.length;
+    const publishQuorumMet = ok >= PUBLISH_QUORUM_ACKS;
+    if (publishQuorumMet) {
+      await markEvents(groupId, localBatchRows.map((row) => row.event.id), "published");
+      result.published = localBatchRows.length;
+    } else if (localBatchRows.length > 0) {
+      result.errors.push(`relay quorum not reached (${ok}/${PUBLISH_QUORUM_ACKS} acknowledgements)`);
     }
   }
 
@@ -142,7 +149,10 @@ export async function syncOnce(groupId: string, relayOverride?: Relay[]): Promis
   result.buffered = transport.buffered.length;
   result.dropped = transport.dropped.length;
 
-  const confirmedIds = batch.map((event) => event.id).filter((id) => (readBackCounts.get(id) ?? 0) > 0);
+  const confirmedIds = batchRows
+    .filter((row) => row.syncState === "published" || (row.syncState === "local" && result.published > 0))
+    .map((row) => row.event.id)
+    .filter((id) => (readBackCounts.get(id) ?? 0) > 0);
   if (confirmedIds.length > 0) {
     await markEvents(groupId, confirmedIds, "confirmed");
     result.confirmed = confirmedIds.length;

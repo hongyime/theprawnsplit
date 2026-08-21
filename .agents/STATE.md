@@ -585,6 +585,11 @@ Notes:
   allocation while preserving the frozen `rate`, instead of collapsing multi-payer or
   multi-currency expenses into a single-payer base-currency shape. Latest verification on
   2026-08-22 passed with `npm run build` (48 core tests, 118 root tests).
+- Hardened REQ-MON-10/16 expense edit robustness for zero-value financial rows. The
+  edit rescale helper now falls back to equal weights only when all stored payer/share
+  rows are zero, preserving row shape and keeping imported zero-total expenses editable
+  instead of throwing in allocation. Latest verification on 2026-08-22 passed with `npm
+  run build` (48 core tests, 119 root tests).
 - Vercel checks on 2026-08-21 show the current `main` production deployment is Ready
   and has the requested aliases attached. Vercel env listing still shows no env vars
   configured, so the operated relay runtime remains unconfigured.

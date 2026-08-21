@@ -6,7 +6,8 @@ function rescaleRows(
   eventId: string,
 ): { pid: string; minor: bigint }[] {
   const pids = rows.map((row) => row.pid);
-  const weights = rows.map((row) => row.minor);
+  const storedWeights = rows.map((row) => row.minor);
+  const weights = storedWeights.some((minor) => minor > 0n) ? storedWeights : rows.map(() => 1n);
   return allocate(total, weights, eventId, pids).map((minor, index) => ({ pid: pids[index]!, minor }));
 }
 

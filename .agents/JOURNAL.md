@@ -107,3 +107,4 @@
 - 2026-08-22: Settlement confirmation eligibility mirrors core authority: a normal confirm action requires a local payee identity and no active payee claim anomaly before signing `SettlementConfirmed`.
 - 2026-08-22: The automatic archive export must represent the archived ledger: prepare one `GroupArchived` event, include it in the downloaded export view, then append that same event.
 - 2026-08-22: Expense total edits preserve the existing financial shape: payer rows, share rows, and frozen `rate` are rescaled atomically rather than rebuilt as a single-payer base-currency expense.
+- 2026-08-22: Zero-value stored financial rows are still editable ledger shape: edit rescaling uses equal fallback weights only when all existing row amounts are zero.

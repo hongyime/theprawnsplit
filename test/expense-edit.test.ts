@@ -59,4 +59,27 @@ describe("expense edit financials", () => {
     expect(financials.payers.map((payer) => payer.pid)).toEqual(["alice", "bob"]);
     expect(financials.shares.map((share) => share.pid)).toEqual(["alice", "bob", "chris"]);
   });
+
+  it("keeps all-zero imported financial rows editable", () => {
+    const financials = editFinancialsForTotal({
+      eventId: "phone:9",
+      nextMinor: 100n,
+      current: {
+        minor: 0n,
+        payers: [
+          { pid: "alice", minor: 0n },
+          { pid: "bob", minor: 0n },
+        ],
+        shares: [
+          { pid: "alice", minor: 0n },
+          { pid: "bob", minor: 0n },
+        ],
+      },
+    });
+
+    expect(financials.payers.reduce((sum, payer) => sum + payer.minor, 0n)).toBe(100n);
+    expect(financials.shares.reduce((sum, share) => sum + share.minor, 0n)).toBe(100n);
+    expect(financials.payers.map((payer) => payer.pid)).toEqual(["alice", "bob"]);
+    expect(financials.shares.map((share) => share.pid)).toEqual(["alice", "bob"]);
+  });
 });

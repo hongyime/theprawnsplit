@@ -4,8 +4,8 @@ export const config = { runtime: "edge" };
 
 const TAG_RE = /^[0-9a-f]{64}$/;
 const WRITE_PROOF_RE = /^[0-9a-f]{64}$/;
-const MAX_BLOB = Number(process.env.RELAY_MAX_BLOB_BYTES ?? 131_072);
-const MAX_LIMIT = Number(process.env.RELAY_MAX_FETCH_LIMIT ?? 500);
+const MAX_BLOB = parseRelayNumericLimit(process.env.RELAY_MAX_BLOB_BYTES, 131_072);
+const MAX_LIMIT = parseRelayNumericLimit(process.env.RELAY_MAX_FETCH_LIMIT, 500);
 
 const streamKey = (tag: string): string => `ts:${tag}`;
 const proofKey = (tag: string): string => `tp:${tag}`;
@@ -29,6 +29,12 @@ const json = (body: unknown, status = 200): Response =>
   });
 
 const bad = (message: string, status = 400): Response => json({ error: message }, status);
+
+export function parseRelayNumericLimit(value: string | undefined, fallback: number): number {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed < 1) return fallback;
+  return Math.floor(parsed);
+}
 
 function bytesToHex(bytes: Uint8Array): string {
   return [...bytes].map((byte) => byte.toString(16).padStart(2, "0")).join("");

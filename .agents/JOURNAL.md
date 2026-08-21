@@ -116,3 +116,4 @@
 - 2026-08-22: Nostr signatures remain transport attribution only; ledger authorization code must not inspect Nostr pubkeys, relay classes, or nostr-tools outputs.
 - 2026-08-22: Upstash relay credentials are server-only: client code may use public VITE configuration, but Redis URL/token must stay out of src and be read only via api/relay process.env.
 - 2026-08-22: The operated relay remains blind append/read storage; api/relay must not import ledger core, repository code, envelope crypto, or ledger event/domain types.
+- 2026-08-22: Operated relay runtime limits are defensive configuration: malformed, zero, or negative RELAY_MAX_* values fall back to documented defaults instead of producing NaN limits.

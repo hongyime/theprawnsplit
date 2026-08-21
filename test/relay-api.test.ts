@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
-import handler, { isValidWriteProof, verifyRelayWriteProof, writeProofCommitment } from "../api/relay";
+import handler, { isValidWriteProof, parseRelayNumericLimit, verifyRelayWriteProof, writeProofCommitment } from "../api/relay";
 
 const tag = "a".repeat(64);
 const proof = "b".repeat(64);
@@ -32,6 +32,14 @@ async function body(response: Response): Promise<{ error?: string }> {
 }
 
 describe("operated relay API", () => {
+  it("falls back from malformed relay runtime limits", () => {
+    expect(parseRelayNumericLimit(undefined, 500)).toBe(500);
+    expect(parseRelayNumericLimit("not-a-number", 500)).toBe(500);
+    expect(parseRelayNumericLimit("0", 500)).toBe(500);
+    expect(parseRelayNumericLimit("-1", 500)).toBe(500);
+    expect(parseRelayNumericLimit("42.9", 500)).toBe(42);
+  });
+
   it("rejects malformed relay requests before touching storage", async () => {
     const response = await handler(new Request("https://relay.test/api/relay?tag=bad", { method: "GET" }));
 

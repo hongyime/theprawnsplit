@@ -44,6 +44,18 @@ describe("REQ-ID-13/REQ-SEC-08 identity", () => {
     expect(verifyConfirmation([...events, aliceConfirm], "s1", aliceConfirm.claimSig, verifier)).toBe(true);
   });
 
+  it("requires the confirmation pid to match the literal settlement payee", () => {
+    const events = [
+      claim("alice", "phone", "alice-key"),
+      base("SettlementRecorded", { sid: "s1", from: "bob", to: "alice", minor: 10n } as never),
+    ];
+    const aliceConfirm = confirm("s1", "alice-key");
+    if (aliceConfirm.t !== "SettlementConfirmed") throw new Error("test helper returned wrong event type");
+
+    expect(verifyConfirmation([...events, aliceConfirm], "s1", aliceConfirm.claimSig, verifier, "alice")).toBe(true);
+    expect(verifyConfirmation([...events, aliceConfirm], "s1", aliceConfirm.claimSig, verifier, "mallory")).toBe(false);
+  });
+
   it("activates ClaimReattested only after enough single-attestor events accumulate", () => {
     const payloadA = `${groupTag}:reattest:lost:new-phone:lost-new`;
     const payloadB = `${groupTag}:reattest:lost:new-phone:lost-new`;

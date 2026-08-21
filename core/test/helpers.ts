@@ -68,10 +68,10 @@ export function link(pid: string, parentKey: string, newDevice: string, newKey: 
   } as never);
 }
 
-export function confirm(sid: string, key: string): Event {
+export function confirm(sid: string, key: string, pid = "unused"): Event {
   return base("SettlementConfirmed", {
     sid,
-    pid: "unused",
+    pid,
     claimSig: sig(key, `${groupTag}:confirm:${sid}`),
   } as never);
 }

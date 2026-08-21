@@ -162,7 +162,7 @@ describe("REQ-MON-15/REQ-SYN-12 fold", () => {
         date: "2026-08-21",
       } as never),
       base("SettlementRecorded", { sid: "s1", from: "bob", to: "alice", minor: 100n } as never),
-      confirm("s1", "alice-key"),
+      confirm("s1", "alice-key", "alice"),
     ];
     const a = canonicalStateBytes(fold(events, { supportedVersion: 1 }, verifier));
     const b = canonicalStateBytes(fold([...events].reverse(), { supportedVersion: 1 }, verifier));
@@ -174,7 +174,7 @@ describe("REQ-MON-15/REQ-SYN-12 fold", () => {
       claim("alice", "phone", "alice-key"),
       claim("alice", "tablet", "tablet-key"),
       base("SettlementRecorded", { sid: "s1", from: "bob", to: "alice", minor: 100n } as never),
-      confirm("s1", "tablet-key"),
+      confirm("s1", "tablet-key", "alice"),
     ];
     const state = fold(events, { supportedVersion: 1 }, verifier);
 
@@ -192,6 +192,26 @@ describe("REQ-MON-15/REQ-SYN-12 fold", () => {
         claim("alice", "tablet", "tablet-key"),
         base("SettlementRecorded", { sid: "s1", from: "bob", to: "alice", minor: 100n } as never),
         base("SettlementConfirmed", { sid: "s1", pid: "alice", claimSig: "not-a-valid-signature" } as never),
+      ],
+      { supportedVersion: 1 },
+      verifier,
+    );
+
+    expect(state.settlements.get("s1")?.pending).toBe(true);
+    expect(state.settlements.get("s1")?.confirmed).toBe(false);
+    expect(state.settlements.get("s1")?.contestedConfirmation).toBe(false);
+    expect(state.anomalies.map((anomaly) => anomaly.code)).not.toContain("contested-settlement-confirmation");
+  });
+
+  it("does not confirm or mark contested when confirmation pid names a different participant", () => {
+    const tabletConfirm = confirm("s1", "tablet-key");
+    if (tabletConfirm.t !== "SettlementConfirmed") throw new Error("test helper returned wrong event type");
+    const state = fold(
+      [
+        claim("alice", "phone", "alice-key"),
+        claim("alice", "tablet", "tablet-key"),
+        base("SettlementRecorded", { sid: "s1", from: "bob", to: "alice", minor: 100n } as never),
+        base("SettlementConfirmed", { sid: "s1", pid: "mallory", claimSig: tabletConfirm.claimSig } as never),
       ],
       { supportedVersion: 1 },
       verifier,

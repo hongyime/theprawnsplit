@@ -258,9 +258,9 @@ export function fold(events: Event[], opts: FoldOptions, ctx?: VerificationConte
     }
     if (event.t === "SettlementConfirmed") {
       const settlement = settlements.get(event.sid);
-      if (settlement && ctx && verifyConfirmation(supported, event.sid, event.claimSig, ctx)) {
+      if (settlement && ctx && verifyConfirmation(supported, event.sid, event.claimSig, ctx, event.pid)) {
         settlements.set(event.sid, { ...settlement, confirmed: true, pending: false });
-      } else if (settlement && ctx && contestedPids.has(settlement.to) && matchesPayeeClaimSignature(supported, event.sid, event.claimSig, ctx)) {
+      } else if (settlement && ctx && contestedPids.has(settlement.to) && matchesPayeeClaimSignature(supported, event.sid, event.claimSig, ctx, event.pid)) {
         settlements.set(event.sid, { ...settlement, contestedConfirmation: true, pending: true });
         anomalies.push({
           code: "contested-settlement-confirmation",

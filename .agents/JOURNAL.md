@@ -91,3 +91,4 @@
 - 2026-08-22: REQ-ID-17 contradiction repair must preserve the full merge path: anomalies keep all involved merge event ids so UI can offer one append-only undo per edge instead of hiding transitive repairs behind the first edge.
 - 2026-08-22: Relay diagnostics should expose operator-relevant timing, not just policy labels; backoff diagnostics include the concrete retry window in the UI action text.
 - 2026-08-22: Re-attestation display counts must use the same claimed-peer population as the threshold; matching events from shadow or unknown attestors are ignored in the UI status.
+- 2026-08-22: Settlement confirmation admission binds both signature authority and event payload to the literal payee: a valid `groupTag:confirm:sid` signature is ignored if `SettlementConfirmed.pid` does not equal `SettlementRecorded.to`.

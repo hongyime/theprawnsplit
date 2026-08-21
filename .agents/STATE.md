@@ -513,6 +513,11 @@ Notes:
   cannot inflate the shown attestation count for an unverified recovered device. Latest
   verification on 2026-08-22 passed with `npm run build` (45 core tests, 98 root tests),
   root `npm audit --json`, protected-string scan, and `git diff --check`.
+- Tightened REQ-SEC-01/08 settlement confirmation admission so `SettlementConfirmed.pid`
+  must match the literal payee in `SettlementRecorded` before a valid signature can clear
+  pending or surface a contested confirmation. Latest verification on 2026-08-22 passed
+  with `npm run build` (47 core tests, 98 root tests), root `npm audit --json`,
+  protected-string scan, and `git diff --check`.
 - Vercel checks on 2026-08-21 show the current `main` production deployment is Ready
   and has the requested aliases attached. Vercel env listing still shows no env vars
   configured, so the operated relay runtime remains unconfigured.

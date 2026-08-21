@@ -150,18 +150,20 @@ function authorisedKeysWithoutReattestation(
   return keys;
 }
 
-export function verifyConfirmation(events: Event[], sid: string, claimSig: string, ctx: VerificationContext): boolean {
+export function verifyConfirmation(events: Event[], sid: string, claimSig: string, ctx: VerificationContext, claimedPid?: string): boolean {
   const settlement = events.find((event) => event.t === "SettlementRecorded" && event.sid === sid);
   if (!settlement || settlement.t !== "SettlementRecorded") return false;
+  if (claimedPid !== undefined && claimedPid !== settlement.to) return false;
   if (contestedClaimPids(events, ctx).has(settlement.to)) return false;
   const keySet = authorisedKeys(events, settlement.to, ctx);
   const keyAlgs = [...keySet].map((publicKey) => ({ publicKey, alg: findAlg(events, publicKey) ?? "ed25519" }));
   return verifiesWithAny(ctx, `${ctx.groupTag}:confirm:${sid}`, claimSig, keyAlgs);
 }
 
-export function matchesPayeeClaimSignature(events: Event[], sid: string, claimSig: string, ctx: VerificationContext): boolean {
+export function matchesPayeeClaimSignature(events: Event[], sid: string, claimSig: string, ctx: VerificationContext, claimedPid?: string): boolean {
   const settlement = events.find((event) => event.t === "SettlementRecorded" && event.sid === sid);
   if (!settlement || settlement.t !== "SettlementRecorded") return false;
+  if (claimedPid !== undefined && claimedPid !== settlement.to) return false;
   const voided = voidedEventIds(events);
   const keys = new Map<string, "ed25519" | "ecdsa-p256">();
 

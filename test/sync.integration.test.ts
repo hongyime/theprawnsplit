@@ -40,6 +40,13 @@ class MemoryRelay implements Relay {
   }
 }
 
+class DuplicateAckRelay extends MemoryRelay {
+  override async publish(tag: string, author: string, blob: string, writeProof = ""): Promise<AckResult> {
+    const stored = await super.publish(tag, author, blob, writeProof);
+    return { ok: false, reason: `duplicate: already stored at ${stored.cursor ?? "unknown"}` };
+  }
+}
+
 function event(dev: string, ctr: number, t: "ParticipantAdded" | "ExpenseAdded", payload: Record<string, unknown>): Event {
   return {
     v: 1,
@@ -88,6 +95,24 @@ describe("Phase 2 sync integration", () => {
     expect(publishQuorumReached(1, 1)).toBe(true);
     expect(publishQuorumReached(1, 2)).toBe(false);
     expect(publishQuorumReached(2, 2)).toBe(true);
+  });
+
+  it("treats duplicate publish acknowledgements as successful quorum members", async () => {
+    await resetRepositoryForTests("prawn-duplicate-ack-quorum");
+    const group = await ensureGroup();
+    const participant = defaultParticipant({ deviceId: group.deviceId, nextCounter: group.nextCounter }, "Alice");
+    await appendEvents(group.groupId, [participant]);
+
+    const duplicate = new DuplicateAckRelay("duplicate");
+    const live = new MemoryRelay("live");
+    const result = await syncOnce(group.groupId, [duplicate, live]);
+
+    expect(result.errors).not.toContain("relay quorum not reached (2/2 acknowledgements)");
+    expect(result.diagnostics).toEqual(
+      expect.arrayContaining([expect.objectContaining({ relay: "duplicate", code: "duplicate", actionKind: "treat-as-success" })]),
+    );
+    expect(result).toMatchObject({ published: 2, confirmed: 2 });
+    expect(await syncCounts(group.groupId)).toEqual({ local: 0, published: 0, confirmed: 2 });
   });
 
   it("plans topic bootstrap for empty logs and author-cursor fetches for populated operated logs", () => {

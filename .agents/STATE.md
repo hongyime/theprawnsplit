@@ -785,6 +785,11 @@ Notes:
   asserts byte-identical folded state across 1,000 deterministic delivery orders.
   Latest verification on 2026-08-22 passed with `npm run build` (64 core tests, 145
   root tests), root `npm audit --json`, protected-string scan, and `git diff --check`.
+- Added REQ-SYN-11 duplicate-ACK integration coverage. Sync now proves relay
+  `duplicate:` publish replies count toward quorum, surface as treat-as-success
+  diagnostics, and do not leave local outbound events stuck when read-back succeeds.
+  Latest verification on 2026-08-22 passed with `npm run build` (64 core tests, 146
+  root tests), root `npm audit --json`, protected-string scan, and `git diff --check`.
 - Vercel checks on 2026-08-21 show the current `main` production deployment is Ready
   and has the requested aliases attached. Vercel env listing still shows no env vars
   configured, so the operated relay runtime remains unconfigured.

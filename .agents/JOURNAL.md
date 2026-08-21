@@ -144,3 +144,4 @@
 - 2026-08-22: REQ-SYN-27 refetch-loop coverage proves surplus dropped relay events advance discard state and stop repeating after author cursor catch-up.
 - 2026-08-22: REQ-MON-18 coverage pins a real FNV-1a collision so allocation tie-breaking must fall back to participant-id order.
 - 2026-08-22: REQ-SYN-12 coverage now includes the PRD §16.2 explicit 1,000-shuffle folded-state convergence gate.
+- 2026-08-22: REQ-SYN-11 coverage proves duplicate relay publish acknowledgements are treated as successful quorum members during sync.

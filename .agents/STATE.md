@@ -769,6 +769,12 @@ Notes:
   folded under another tag with real WebCrypto signatures. Latest verification on
   2026-08-22 passed with `npm run build` (62 core tests, 144 root tests), root
   `npm audit --json`, protected-string scan, and `git diff --check`.
+- Added REQ-SYN-27/§16.2.1 refetch-loop coverage in the sync integration suite. A
+  throwaway author over the unknown-author cap now proves surplus drops advance
+  `discardVector`, topic bootstrap cursoring, author cursor establishment, and no
+  repeated dropped-event fetch on the following sync. Latest verification on 2026-08-22
+  passed with `npm run build` (62 core tests, 145 root tests), root `npm audit --json`,
+  protected-string scan, and `git diff --check`.
 - Vercel checks on 2026-08-21 show the current `main` production deployment is Ready
   and has the requested aliases attached. Vercel env listing still shows no env vars
   configured, so the operated relay runtime remains unconfigured.

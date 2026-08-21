@@ -400,4 +400,47 @@ describe("Phase 2 sync integration", () => {
     await expect(syncOnce(group.groupId, [relay])).resolves.toMatchObject({ received: 0 });
     expect(relay.fetches.at(-1)?.opts).toMatchObject({ author: "future_device", cursor: "operated:1", limit: 500 });
   });
+
+  it("stops refetching surplus events after drop vectors and author cursors advance", async () => {
+    const secret = createGroupSecret();
+    const key = await groupKey(secret);
+    const tag = await groupTag(secret);
+    const relay = new MemoryRelay("operated");
+    const injected = Array.from({ length: 51 }, (_, index) =>
+      event("throwaway_device", index + 1, "ExpenseAdded", {
+        xid: `throwaway-${index + 1}`,
+        financials: {
+          minor: 1n,
+          payers: [{ pid: "ghost", minor: 1n }],
+          shares: [{ pid: "ghost", minor: 1n }],
+        },
+        desc: `Throwaway ${index + 1}`,
+        at: index + 1,
+        date: "2026-08-22",
+      }),
+    );
+    await relay.publish(tag, "throwaway_device", await encryptEvents(key, injected));
+
+    await resetRepositoryForTests("prawn-drop-refetch-loop");
+    const group = await ensureGroup({
+      secretB64: secretToBase64(secret),
+      tagHex: tag,
+      name: "Trip",
+      currency: "USD",
+    });
+
+    await expect(syncOnce(group.groupId, [relay])).resolves.toMatchObject({ received: 50, dropped: 1 });
+    const afterTopicBootstrap = await readGroup(group.groupId);
+    expect(afterTopicBootstrap.meta.versionVector.throwaway_device).toBe(51);
+    expect(afterTopicBootstrap.meta.discardVector.throwaway_device).toBe(51);
+    expect(afterTopicBootstrap.meta.cursors["operated:topic"]).toBe("operated:1");
+
+    await expect(syncOnce(group.groupId, [relay])).resolves.toMatchObject({ received: 0, dropped: 51 });
+    const afterAuthorCursor = await readGroup(group.groupId);
+    expect(afterAuthorCursor.meta.discardVector.throwaway_device).toBe(51);
+    expect(afterAuthorCursor.meta.cursors["operated:author:throwaway_device"]).toBe("operated:1");
+
+    await expect(syncOnce(group.groupId, [relay])).resolves.toMatchObject({ received: 0, dropped: 0 });
+    expect(relay.fetches.at(-1)?.opts).toMatchObject({ author: "throwaway_device", cursor: "operated:1", limit: 500 });
+  });
 });

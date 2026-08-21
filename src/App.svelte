@@ -50,6 +50,7 @@
   import { defaultExpenseDate, defaultParticipant, makeEvent, makeExpenseFinancials, type EventFactory } from "@/lib/events";
   import { formatMinor, parseMinor, type SplitMode } from "@/lib/money";
   import { isArchivedEventLog } from "@/lib/archive";
+  import { expenseHistoryRows } from "@/lib/expense-history";
   import { findParticipantNameMatch, groupParticipantsForClaim, type ParticipantNameMatch } from "@/lib/participants";
   import { buildVerificationContext } from "@/lib/verification";
   import { syncOnce } from "@/relay/sync";
@@ -1056,6 +1057,16 @@
           <div>
             <strong>{expense.desc}</strong>
             <span>{expense.date}</span>
+            {#if expense.financialHistory.length > 1}
+              <details class="expense-history">
+                <summary>{expense.financialHistory.length - 1} correction{expense.financialHistory.length === 2 ? "" : "s"}</summary>
+                {#each expenseHistoryRows(expense) as row}
+                  <span class:active-history={row.active}>
+                    {row.label}: {formatMinor(row.financials.minor, group.currency)}{row.active ? " active" : ""}
+                  </span>
+                {/each}
+              </details>
+            {/if}
           </div>
           <div>
             <strong>{formatMinor(expense.financials.minor, group.currency)}</strong>

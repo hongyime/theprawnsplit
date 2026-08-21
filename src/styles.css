@@ -597,6 +597,28 @@ button.secondary {
   gap: 0.2rem;
 }
 
+.expense-history {
+  margin-top: 0.15rem;
+}
+
+.expense-history summary {
+  cursor: pointer;
+  color: #607068;
+  font-size: 0.85rem;
+}
+
+.expense-history span {
+  display: block;
+  margin-top: 0.18rem;
+  color: #607068;
+  font-size: 0.82rem;
+}
+
+.expense-history span.active-history {
+  color: #0f766e;
+  font-weight: 650;
+}
+
 .ledger-row > div:last-child {
   display: flex;
   align-items: center;

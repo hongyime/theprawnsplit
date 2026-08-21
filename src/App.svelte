@@ -13,6 +13,7 @@
     WalletCards,
     Archive,
     GitMerge,
+    Settings,
   } from "@lucide/svelte";
   import { allocate, fold, greedySettlement, type Event, type VerificationContext, type State } from "@theprawnsplit/core";
   import {
@@ -55,6 +56,7 @@
   import { frozenViewPolicy } from "@/lib/freeze-policy";
   import { archiveConfirmationText, isSettledViewPredicate, latestArchiveEvent, unarchiveConfirmationText } from "@/lib/lifecycle";
   import { findParticipantNameMatch, groupParticipantsForClaim, type ParticipantNameMatch } from "@/lib/participants";
+  import { normalizeRelaySettings, parseNostrRelayText, relaySettingsTargetCount, type RelaySettings } from "@/lib/relay-settings";
   import { reattestationStatus } from "@/lib/reattestation";
   import { canVoidRecordedSettlement, settlementClaimView } from "@/lib/settlement-history";
   import { buildVerificationContext } from "@/lib/verification";
@@ -98,6 +100,11 @@
   let launchDurability: DurabilityPromptState | null = null;
   let recoveryMode: "first-join" | "evicted" = "first-join";
   let claimCandidatePid = "";
+  let relaySettingsOpen = false;
+  let relayUseOperated = true;
+  let relayOperatedEndpoint = "";
+  let relayNostrText = "";
+  let relaySettingsError = "";
 
   $: participants = state ? [...state.participants.values()].sort((a, b) => a.name.localeCompare(b.name)) : [];
   $: balances = state && group ? [...state.balances.entries()].sort(([a], [b]) => participantLabel(a).localeCompare(participantLabel(b))) : [];
@@ -124,6 +131,8 @@
   $: archiveSummary = group ? latestArchiveEvent(group.events) : undefined;
   $: frozenPolicy = frozenViewPolicy(state);
   $: showInstallHint = !isStandalone && !isDesktop && isOnline && !archived;
+  $: relaySettings = currentRelaySettings();
+  $: relayTargetLabel = `${relaySettingsTargetCount(relaySettings)} relay target${relaySettingsTargetCount(relaySettings) === 1 ? "" : "s"}`;
   $: participantNameMatch = findParticipantNameMatch(participantName, participants);
   $: participantClaimGroups = groupParticipantsForClaim(participants);
   $: claimCandidate = claimCandidatePid ? participants.find((participant) => participant.pid === claimCandidatePid) : undefined;
@@ -138,6 +147,7 @@
       group = await ensureGroup(seed);
       launchDurability = normalizeDurabilityPromptState(group.meta.durability);
       group = { ...group, meta: await recordAppLaunch(group.groupId) };
+      resetRelaySettingsForm();
       await refreshState();
       await refreshCounts();
       await refreshProtectionStatus();
@@ -634,6 +644,7 @@
         group = artifact.type === "TripLedgerExport" ? await replaceFromExport(artifact) : await restoreIdentityBackup(artifact);
         syncStatus = artifact.type === "DeviceIdentityBackup" ? "Identity backup restored." : syncStatus;
       }
+      resetRelaySettingsForm();
       importText = "";
       joiningFromLink = false;
       recoveryAttempted = false;
@@ -667,6 +678,7 @@
       recoveryAttempted = true;
       lastSyncResult = result;
       group = await ensureGroup();
+      resetRelaySettingsForm();
       await refreshState();
       await refreshCounts();
       await refreshDurabilityPrompts();
@@ -699,6 +711,54 @@
     return recoveryMode === "evicted"
       ? "No raw events were recovered yet. Import is the fastest way back onto this trip."
       : "No raw events were recovered yet. Import a TripLedgerExport or retry sync.";
+  }
+
+  function relayDefaults() {
+    return { operatedEndpoint: config.relayEndpoint, nostrRelays: config.nostrRelays };
+  }
+
+  function currentRelaySettings(): RelaySettings {
+    return normalizeRelaySettings(group?.meta.relaySettings, relayDefaults());
+  }
+
+  function resetRelaySettingsForm(settings = currentRelaySettings()): void {
+    relayUseOperated = settings.useOperated;
+    relayOperatedEndpoint = settings.operatedEndpoint;
+    relayNostrText = settings.nostrRelays.join("\n");
+    relaySettingsError = "";
+  }
+
+  async function saveRelaySettings(): Promise<void> {
+    if (!group) return;
+    const nextSettings = normalizeRelaySettings(
+      {
+        useOperated: relayUseOperated,
+        operatedEndpoint: relayOperatedEndpoint,
+        nostrRelays: parseNostrRelayText(relayNostrText),
+      },
+      relayDefaults(),
+    );
+    if (relaySettingsTargetCount(nextSettings) === 0) {
+      relaySettingsError = "Keep at least one relay target enabled.";
+      return;
+    }
+    group = { ...group, meta: await updateMeta(group.groupId, (meta) => ({ ...meta, relaySettings: nextSettings })) };
+    resetRelaySettingsForm(nextSettings);
+    syncStatus = "Relay settings saved.";
+  }
+
+  async function resetRelaySettings(): Promise<void> {
+    if (!group) return;
+    group = {
+      ...group,
+      meta: await updateMeta(group.groupId, (meta) => {
+        const next = { ...meta };
+        delete next.relaySettings;
+        return next;
+      }),
+    };
+    resetRelaySettingsForm();
+    syncStatus = "Relay settings reset.";
   }
 
   function detectStandalone(): boolean {
@@ -956,7 +1016,30 @@
       {:else}
         <span>Claim a person before adding expenses.</span>
       {/if}
+      <button type="button" class="secondary" on:click={() => (relaySettingsOpen = !relaySettingsOpen)} title="Relay settings"><Settings size={17} /> Relays</button>
     </section>
+    {#if relaySettingsOpen}
+      <section class="relay-settings-panel" aria-label="Relay settings">
+        <div>
+          <h2>Relay Settings</h2>
+          <p>{relayTargetLabel} active on this device.</p>
+        </div>
+        <label class="relay-toggle">
+          <input type="checkbox" bind:checked={relayUseOperated} />
+          <span>Operated relay</span>
+        </label>
+        <input bind:value={relayOperatedEndpoint} disabled={!relayUseOperated} placeholder="/api/relay" aria-label="Operated relay endpoint" />
+        <label>
+          <span>Nostr relays</span>
+          <textarea bind:value={relayNostrText} rows="4" placeholder="wss://relay.example"></textarea>
+        </label>
+        {#if relaySettingsError}<p class="error compact-warning">{relaySettingsError}</p>{/if}
+        <div class="prompt-actions">
+          <button type="button" on:click={saveRelaySettings}>Save</button>
+          <button type="button" class="secondary" on:click={resetRelaySettings}>Reset defaults</button>
+        </div>
+      </section>
+    {/if}
     {#if lastSyncResult?.diagnostics.length}
       <section class="relay-diagnostics" aria-label="Relay diagnostics">
         <h2>Relay Diagnostics</h2>

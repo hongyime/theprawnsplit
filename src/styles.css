@@ -259,6 +259,49 @@ textarea {
   border-bottom: 1px solid #fed7aa;
 }
 
+.relay-settings-panel {
+  display: grid;
+  grid-template-columns: minmax(10rem, 0.8fr) minmax(9rem, 0.55fr) minmax(12rem, 1fr) minmax(14rem, 1.2fr) auto;
+  gap: 0.75rem;
+  align-items: end;
+  margin-bottom: 12px;
+  padding: 0.8rem 0;
+  border-top: 1px solid #dce4df;
+  border-bottom: 1px solid #dce4df;
+}
+
+.relay-settings-panel h2,
+.relay-settings-panel p {
+  margin: 0;
+}
+
+.relay-settings-panel h2 {
+  font-size: 1rem;
+}
+
+.relay-settings-panel p,
+.relay-settings-panel label span {
+  color: #607068;
+  font-size: 0.86rem;
+}
+
+.relay-settings-panel label {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.relay-settings-panel textarea {
+  min-height: 5.1rem;
+  resize: vertical;
+}
+
+.relay-toggle {
+  align-self: center;
+  grid-auto-flow: column;
+  justify-content: start;
+  align-items: center;
+}
+
 .relay-diagnostics h2 {
   margin: 0 0 0.45rem;
   font-size: 1rem;
@@ -698,6 +741,7 @@ button.secondary {
   .diagnostic-row,
   .recovery-panel,
   .recovery-actions,
+  .relay-settings-panel,
   .prompt-banner,
   .prompt-actions {
     align-items: stretch;

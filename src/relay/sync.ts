@@ -17,15 +17,24 @@ import {
 } from "@/db/repo";
 import { decryptEnvelope, encryptEnvelope, encryptEvents, type SnapshotEnvelope } from "@/crypto/envelope";
 import { relayWriteProof } from "@/crypto/group";
+import { normalizeRelaySettings } from "@/lib/relay-settings";
 import { HttpRelay } from "./http";
 import { NostrRelay } from "./nostr";
 import { classifyRelayIssue, isDuplicateRelayAck } from "./diagnostics";
 import type { Relay, SyncResult } from "./types";
 
 export function createRelays(group: GroupRecord): Relay[] {
-  const nostr = new NostrRelay(group.meta.nostrSk);
+  const relaySettings = normalizeRelaySettings(group.meta.relaySettings, {
+    operatedEndpoint: config.relayEndpoint,
+    nostrRelays: config.nostrRelays,
+  });
+  group.meta.relaySettings = relaySettings;
+  const relays: Relay[] = [];
+  if (relaySettings.useOperated) relays.push(new HttpRelay(relaySettings.operatedEndpoint));
+  const nostr = new NostrRelay(group.meta.nostrSk, relaySettings.nostrRelays);
   group.meta.nostrSk = nostr.secretHex();
-  return [new HttpRelay(), nostr];
+  if (relaySettings.nostrRelays.length > 0) relays.push(nostr);
+  return relays;
 }
 
 export async function syncOnce(groupId: string, relayOverride?: Relay[]): Promise<SyncResult> {

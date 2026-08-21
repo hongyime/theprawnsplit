@@ -41,3 +41,4 @@
 - 2026-08-21: Quarantine freeze now applies at the app money surface: balances are hidden and settlement controls are disabled while newer retained events cannot be folded.
 - 2026-08-21: Phase 5 lifecycle keeps archive/unarchive as explicit append-only events; archive copy states that relay retention is outside app control and no relay data is deleted.
 - 2026-08-21: `settled` remains a computed ACTIVE view over folded canonical balances; archive summaries read the active `GroupArchived` event instead of creating another lifecycle state.
+- 2026-08-21: Custom relay settings are local `StoredMeta` preferences, not ledger events or exports, so relay routing can vary by device without affecting convergence.

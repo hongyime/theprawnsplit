@@ -5,6 +5,7 @@ import { inferCurrency, newId } from "@/lib/ids";
 import { createGroupSecret, groupKey, groupTag, secretFromBase64, secretToBase64 } from "@/crypto/group";
 import { mintClaimKey, type ClaimAlg } from "@/crypto/claim";
 import { normalizeDurabilityPromptState, type DurabilityPromptState } from "@/lib/durability";
+import type { RelaySettings } from "@/lib/relay-settings";
 
 export interface StoredGroup {
   groupId: string;
@@ -46,6 +47,7 @@ export interface StoredMeta {
   lastSyncAt?: number;
   lastSyncError?: string;
   unsyncedSince?: number;
+  relaySettings?: RelaySettings;
 }
 
 interface StoredBuffer {

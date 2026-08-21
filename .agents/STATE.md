@@ -366,6 +366,9 @@ Notes:
 - Latest verification on 2026-08-21 after custom relay adapter proof: `npm run build`
   passed with 43 core tests and 61 root tests; root `npm audit --json`,
   protected-string scan, and `git diff --check` passed.
+- Latest verification on 2026-08-21 after Phase 5 money export/restore acceptance:
+  `npm run build` passed with 43 core tests and 62 root tests; root `npm audit
+  --json`, protected-string scan, and `git diff --check` passed.
 - Vercel checks on 2026-08-21 show the project exists but direct deployment creation was
   quota-blocked.
 - Vercel automatic deploy on 2026-08-21 for `cd21de2` succeeded and reports Ready.

@@ -378,6 +378,48 @@ button.secondary {
   font-size: 1.03rem;
 }
 
+.claim-section {
+  margin-top: 0.75rem;
+}
+
+.claim-section h3,
+.claimed-section summary {
+  margin: 0;
+  color: #394940;
+  font-size: 0.9rem;
+  font-weight: 720;
+}
+
+.primary-claim {
+  padding: 0.65rem 0;
+  border-top: 1px solid #9bd8c2;
+  border-bottom: 1px solid #dce4df;
+}
+
+.claimed-section {
+  padding-top: 0.65rem;
+}
+
+.claimed-section summary {
+  cursor: pointer;
+}
+
+.create-person {
+  margin-top: 1rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid #edf1ee;
+}
+
+.create-person input {
+  border-color: #dce4df;
+}
+
+.create-person button {
+  border-color: #b8c6bf;
+  background: white;
+  color: #394940;
+}
+
 .people-list {
   list-style: none;
   padding: 0;

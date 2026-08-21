@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { findParticipantNameMatch, levenshteinDistance, normalizeParticipantName } from "@/lib/participants";
+import { findParticipantNameMatch, groupParticipantsForClaim, levenshteinDistance, normalizeParticipantName } from "@/lib/participants";
 
 const people = [
   { pid: "alice", name: "Alice Tan" },
@@ -25,5 +25,16 @@ describe("participant name matching", () => {
 
   it("does not match distant names", () => {
     expect(findParticipantNameMatch("Beatrice", people)).toBeUndefined();
+  });
+
+  it("orders claimable people before already claimed people", () => {
+    const groups = groupParticipantsForClaim([
+      { pid: "claimed", name: "Claimed", devices: ["phone"] },
+      { pid: "shadow", name: "Shadow", devices: [] },
+      { pid: "also-shadow", name: "Also Shadow", devices: [] },
+    ]);
+
+    expect(groups.unclaimed.map((person) => person.pid)).toEqual(["shadow", "also-shadow"]);
+    expect(groups.claimed.map((person) => person.pid)).toEqual(["claimed"]);
   });
 });

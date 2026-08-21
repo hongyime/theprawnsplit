@@ -50,7 +50,7 @@
   import { defaultExpenseDate, defaultParticipant, makeEvent, makeExpenseFinancials, type EventFactory } from "@/lib/events";
   import { formatMinor, parseMinor, type SplitMode } from "@/lib/money";
   import { isArchivedEventLog } from "@/lib/archive";
-  import { findParticipantNameMatch, type ParticipantNameMatch } from "@/lib/participants";
+  import { findParticipantNameMatch, groupParticipantsForClaim, type ParticipantNameMatch } from "@/lib/participants";
   import { buildVerificationContext } from "@/lib/verification";
   import { syncOnce } from "@/relay/sync";
   import type { SyncResult } from "@/relay/types";
@@ -116,6 +116,7 @@
   $: archived = isGroupArchived();
   $: showInstallHint = !isStandalone && !isDesktop && isOnline && !archived;
   $: participantNameMatch = findParticipantNameMatch(participantName, participants);
+  $: participantClaimGroups = groupParticipantsForClaim(participants);
   $: claimCandidate = claimCandidatePid ? participants.find((participant) => participant.pid === claimCandidatePid) : undefined;
 
   async function load(): Promise<void> {
@@ -886,13 +887,6 @@
     <section class="grid">
       <article class="panel roster">
         <h2><Users size={18} /> People</h2>
-        <form class="row" on:submit|preventDefault={addParticipant}>
-          <input bind:value={participantName} placeholder="Add shadow participant" />
-          <button type="submit" disabled={joinBlocked || archived}><Plus size={17} /> Add</button>
-        </form>
-        {#if participantNameMatch}
-          <p class="hint duplicate-hint">{matchText(participantNameMatch)} Select the existing person before creating a new one.</p>
-        {/if}
         {#if participants.length === 0}
           <div class="empty">
             {#if recoveryActive}
@@ -904,27 +898,61 @@
             {/if}
           </div>
         {:else}
-          <ul class="people-list">
-            {#each participants as participant}
-              <li>
-                <label>
-                  <input type="checkbox" bind:checked={selectedPids[participant.pid]} />
-                  <span>
-                    <strong>{participant.name}</strong>
-                    <small>{participant.devices.length ? participantClaimAttribution(participant.pid) : participantAddAttribution(participant.pid)}</small>
-                  </span>
-                </label>
-                <span class="person-actions">
-                  {participant.devices.length ? `${participant.devices.length} device` : "shadow"}
-                  {#if localClaimPids.has(participant.pid)}
-                    <span>you</span>
-                  {:else if participant.devices.length === 0 && !archived}
-                    <button type="button" on:click={() => requestClaimParticipant(participant.pid)} title="Claim participant"><KeyRound size={15} /> Claim</button>
-                  {/if}
-                </span>
-              </li>
-            {/each}
-          </ul>
+          {#if participantClaimGroups.unclaimed.length}
+            <div class="claim-section primary-claim">
+              <h3>Unclaimed</h3>
+              <ul class="people-list">
+                {#each participantClaimGroups.unclaimed as participant}
+                  <li>
+                    <label>
+                      <input type="checkbox" bind:checked={selectedPids[participant.pid]} />
+                      <span>
+                        <strong>{participant.name}</strong>
+                        <small>{participantAddAttribution(participant.pid)}</small>
+                      </span>
+                    </label>
+                    <span class="person-actions">
+                      shadow
+                      {#if !archived}
+                        <button type="button" on:click={() => requestClaimParticipant(participant.pid)} title="Claim participant"><KeyRound size={15} /> Claim</button>
+                      {/if}
+                    </span>
+                  </li>
+                {/each}
+              </ul>
+            </div>
+          {/if}
+          {#if participantClaimGroups.claimed.length}
+            <details class="claim-section claimed-section">
+              <summary>Claimed people ({participantClaimGroups.claimed.length})</summary>
+              <ul class="people-list">
+                {#each participantClaimGroups.claimed as participant}
+                  <li>
+                    <label>
+                      <input type="checkbox" bind:checked={selectedPids[participant.pid]} />
+                      <span>
+                        <strong>{participant.name}</strong>
+                        <small>{participantClaimAttribution(participant.pid)}</small>
+                      </span>
+                    </label>
+                    <span class="person-actions">
+                      {participant.devices.length} device
+                      {#if localClaimPids.has(participant.pid)}
+                        <span>you</span>
+                      {/if}
+                    </span>
+                  </li>
+                {/each}
+              </ul>
+            </details>
+          {/if}
+        {/if}
+        <form class="row create-person" on:submit|preventDefault={addParticipant}>
+          <input bind:value={participantName} placeholder="Add shadow participant" />
+          <button type="submit" disabled={joinBlocked || archived}><Plus size={17} /> Add</button>
+        </form>
+        {#if participantNameMatch}
+          <p class="hint duplicate-hint">{matchText(participantNameMatch)} Select the existing person before creating a new one.</p>
         {/if}
       </article>
 

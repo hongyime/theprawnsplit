@@ -138,9 +138,12 @@ Progress:
 - Added Phase 4 participant add/claim UX. The People form now interrupts likely duplicate
   participant creation with normalized fuzzy matching, the claim flow uses an in-app
   provenance/balance confirmation modal, and the roster shows claim/add attribution.
+- Added REQ-ID-08 roster ordering. Unclaimed participants now render first with primary
+  claim emphasis, claimed participants are grouped in a collapsed section, and create-new
+  sits last with secondary styling.
 
 Next step:
-- Latest pushed commit before this slice is `745f209` on `main`.
+- Latest pushed commit before this slice is `d58d7eb` on `main`.
 - GitHub/Vercel automatic production deployment for `cd21de2` completed Ready on
   2026-08-21.
 - Remaining deployment work: configure Vercel env vars and verify custom-domain runtime.
@@ -222,6 +225,9 @@ Notes:
   root tests, and root `npm audit --json` reports zero vulnerabilities.
 - Latest verification on 2026-08-21 after participant add/claim UX: `npm run build`
   passed with 41 core tests and 17 root tests, and root `npm audit --json` reports zero
+  vulnerabilities.
+- Latest verification on 2026-08-21 after REQ-ID-08 roster ordering: `npm run build`
+  passed with 41 core tests and 18 root tests, and root `npm audit --json` reports zero
   vulnerabilities.
 - Vercel checks on 2026-08-21 show the project exists but direct deployment creation was
   quota-blocked.

@@ -8,6 +8,11 @@ export interface ParticipantNameMatch {
   kind: ParticipantNameMatchKind;
 }
 
+export interface ParticipantClaimGroups<T extends Pick<ParticipantState, "devices">> {
+  unclaimed: T[];
+  claimed: T[];
+}
+
 export function normalizeParticipantName(name: string): string {
   return name
     .normalize("NFD")
@@ -46,4 +51,15 @@ export function findParticipantNameMatch(input: string, participants: Pick<Parti
   }
 
   return undefined;
+}
+
+export function groupParticipantsForClaim<T extends Pick<ParticipantState, "devices">>(participants: T[]): ParticipantClaimGroups<T> {
+  return participants.reduce<ParticipantClaimGroups<T>>(
+    (groups, participant) => {
+      if (participant.devices.length === 0) groups.unclaimed.push(participant);
+      else groups.claimed.push(participant);
+      return groups;
+    },
+    { unclaimed: [], claimed: [] },
+  );
 }

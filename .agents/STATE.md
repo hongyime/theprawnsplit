@@ -210,6 +210,9 @@ Progress:
 - Added REQ-SYN-13 QR join-token sharing. Join-link encoding now lives in a tested helper
   that keeps the token in the URL fragment, and the app exposes a QR modal using the same
   join token as the copy-link action.
+- Hardened REQ-SYN-15/16 sync metadata. Partial read-back confirmation no longer clears
+  `unsyncedSince` while any local or published outbound event remains pending, so the
+  manual sharing banner cannot disappear before the outbox is fully confirmed.
 
 Next step:
 - Automatic production deploy for current `main` commit `805e6e9` is Ready on
@@ -389,6 +392,9 @@ Notes:
   protected-string scan, and `git diff --check` passed.
 - Latest verification on 2026-08-21 after REQ-SYN-13 QR join-token sharing: `npm run
   build` passed with 43 core tests and 69 root tests; root `npm audit --json`,
+  protected-string scan, and `git diff --check` passed.
+- Latest verification on 2026-08-21 after REQ-SYN-15/16 outbox clock hardening: `npm
+  run build` passed with 43 core tests and 70 root tests; root `npm audit --json`,
   protected-string scan, and `git diff --check` passed.
 - Vercel checks on 2026-08-21 show the current `main` production deployment is Ready
   and has the requested aliases attached. Vercel env listing still shows no env vars

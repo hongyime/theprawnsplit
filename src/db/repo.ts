@@ -457,7 +457,14 @@ export async function markEvents(groupId: string, eventIds: string[], syncState:
   const meta = await tx.objectStore("meta").get(groupId);
   if (meta) {
     const nextMeta: StoredMeta = { ...meta, lastSyncAt: now };
-    if (syncState === "confirmed") delete nextMeta.unsyncedSince;
+    if (syncState === "confirmed") {
+      const events = tx.objectStore("events");
+      const [local, published] = await Promise.all([
+        events.index("bySync").count([groupId, "local"]),
+        events.index("bySync").count([groupId, "published"]),
+      ]);
+      if (local + published === 0) delete nextMeta.unsyncedSince;
+    }
     await tx.objectStore("meta").put(nextMeta);
   }
   await tx.done;

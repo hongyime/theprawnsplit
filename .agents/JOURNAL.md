@@ -67,3 +67,4 @@
 - 2026-08-21: Pin-link prompting is initialized in group metadata at creation/join/restore time, so REQ-DUR-08 does not depend on a later metadata normalization pass before it becomes durable.
 - 2026-08-21: REQ-SYN-13 Web Share uses a separate `TripLedgerDelta` artifact containing pending outbound events only; it imports by matching `tagHex` and stays free of group secrets and identity keys.
 - 2026-08-21: QR join sharing reuses the same URL-fragment join token as copy-link; the token helper is tested so `groupSecret` stays out of the request URL/query path.
+- 2026-08-21: `unsyncedSince` is an outbox-level clock, not a per-event confirmation flag; it clears only when no local or published outbound events remain.

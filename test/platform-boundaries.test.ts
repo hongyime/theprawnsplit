@@ -82,4 +82,15 @@ describe("platform boundaries", () => {
 
     expect(offenders).toEqual([]);
   });
+
+  it("keeps operated relay credentials server-only", () => {
+    const clientSource = readSources();
+    const relaySource = readFileSync(join(process.cwd(), "api", "relay.ts"), "utf8");
+
+    expect(clientSource).not.toMatch(/\bUPSTASH_REDIS_REST_(?:URL|TOKEN)\b/);
+    expect(clientSource).not.toMatch(/\bVITE_[A-Z0-9_]*UPSTASH\b/);
+    expect(relaySource).toContain("process.env.UPSTASH_REDIS_REST_URL");
+    expect(relaySource).toContain("process.env.UPSTASH_REDIS_REST_TOKEN");
+    expect(relaySource).not.toContain("import.meta.env");
+  });
 });

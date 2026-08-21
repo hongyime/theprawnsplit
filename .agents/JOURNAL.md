@@ -114,3 +114,4 @@
 - 2026-08-22: Device-local Nostr secrets are stored and migrated as lowercase 64-hex keys in repository metadata; invalid older local metadata is repaired on read before sync.
 - 2026-08-22: Claim verification must never assume a default signature algorithm; settlement confirmation checks use only alg values recovered from key-bearing ledger events.
 - 2026-08-22: Nostr signatures remain transport attribution only; ledger authorization code must not inspect Nostr pubkeys, relay classes, or nostr-tools outputs.
+- 2026-08-22: Upstash relay credentials are server-only: client code may use public VITE configuration, but Redis URL/token must stay out of src and be read only via api/relay process.env.

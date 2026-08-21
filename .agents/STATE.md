@@ -625,6 +625,12 @@ Notes:
   classes, or `nostr-tools`; transport signatures remain relay attribution only. Latest
   verification on 2026-08-22 passed with `npm run build` (49 core tests, 126 root tests),
   root `npm audit --json`, protected-string scan, and `git diff --check`.
+- Added TDD §3.1/REQ-PLT-08 server-only relay credential coverage. Platform boundary
+  tests now fail if Upstash Redis credentials appear in client `src/` or under a
+  `VITE_` name, while asserting the operated relay reads them through server-only
+  `process.env`. Latest verification on 2026-08-22 passed with `npm run build` (49 core
+  tests, 127 root tests), root `npm audit --json`, protected-string scan, and `git diff
+  --check`.
 - Vercel checks on 2026-08-21 show the current `main` production deployment is Ready
   and has the requested aliases attached. Vercel env listing still shows no env vars
   configured, so the operated relay runtime remains unconfigured.

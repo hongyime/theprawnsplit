@@ -157,7 +157,7 @@ export function verifyConfirmation(events: Event[], sid: string, claimSig: strin
   if (claimedPid !== undefined && claimedPid !== settlement.to) return false;
   if (contestedClaimPids(events, ctx).has(settlement.to)) return false;
   const keySet = authorisedKeys(events, settlement.to, ctx);
-  const keyAlgs = [...keySet].map((publicKey) => ({ publicKey, alg: findAlg(events, publicKey) ?? "ed25519" }));
+  const keyAlgs = keyAlgsFor(events, keySet);
   return verifiesWithAny(ctx, `${ctx.groupTag}:confirm:${sid}`, claimSig, keyAlgs);
 }
 
@@ -174,7 +174,8 @@ export function matchesPayeeClaimSignature(events: Event[], sid: string, claimSi
     }
   }
   for (const publicKey of authorisedKeys(events, settlement.to, ctx)) {
-    keys.set(publicKey, findAlg(events, publicKey) ?? "ed25519");
+    const alg = findAlg(events, publicKey);
+    if (alg) keys.set(publicKey, alg);
   }
 
   return verifiesWithAny(
@@ -269,4 +270,11 @@ function findAlg(events: Event[], publicKey: string): "ed25519" | "ecdsa-p256" |
     if (event.t === "ClaimReattested" && event.newClaimPk === publicKey) return event.alg;
   }
   return undefined;
+}
+
+function keyAlgsFor(events: Event[], publicKeys: Set<string>): { publicKey: string; alg: "ed25519" | "ecdsa-p256" }[] {
+  return [...publicKeys].flatMap((publicKey) => {
+    const alg = findAlg(events, publicKey);
+    return alg ? [{ publicKey, alg }] : [];
+  });
 }

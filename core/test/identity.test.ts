@@ -1,8 +1,16 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { authorisedKeys, buildDSU, claimAnomalies, contestedClaimPids, matchesPayeeClaimSignature, verifyConfirmation } from "../src/identity";
 import { base, claim, confirm, groupTag, link, sig, verifier } from "./helpers";
 
 describe("REQ-ID-13/REQ-SEC-08 identity", () => {
+  it("does not assume a default claim-signature algorithm while verifying", () => {
+    const source = readFileSync("src/identity.ts", "utf8");
+
+    expect(source).not.toContain('?? "ed25519"');
+    expect(source).not.toContain('|| "ed25519"');
+  });
+
   it("rebuilds DSU with lowest canonical root regardless of merge direction", () => {
     const dsu = buildDSU([
       base("ParticipantMerged", { from: "mallory", into: "alice" } as never),

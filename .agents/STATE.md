@@ -864,3 +864,8 @@ Notes:
   sync/quarantine-derived labels. Verification on 2026-08-22 passed with focused `npx
   vitest run test/sync-honesty-ui.test.ts`, `npm run build` (64 core tests, 159 root
   tests), root `npm audit --json`, protected-string scan, and `git diff --check`.
+- Added REQ-ID-02 repository coverage proving first launch stores a stable local device
+  UUID and a joined browser database receives its own distinct device UUID without
+  replaying the creator's identity. Verification on 2026-08-22 passed with focused `npx
+  vitest run test/device-identity.test.ts`, `npm run build` (64 core tests, 161 root
+  tests), root `npm audit --json`, protected-string scan, and `git diff --check`.

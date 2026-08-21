@@ -1,6 +1,7 @@
 # Project State
 
-Current task: continue local build while Vercel direct deployment is blocked.
+Current task: continue next-phase hardening while production relay runtime env remains
+unconfigured.
 
 Progress:
 - Completed spec cleanup plus Phase 0 executable core.
@@ -202,19 +203,12 @@ Progress:
   shareable ledger artifact.
 
 Next step:
-- Latest pushed commit before this slice is `6484fbb` on `main`.
-- GitHub/Vercel automatic production deployment for `cd21de2` completed Ready on
-  2026-08-21.
-- Remaining deployment work: configure Vercel env vars and verify custom-domain runtime.
-- Direct Vercel CLI deploy remains blocked by the daily free-tier API deployment limit.
-  Attempted production deploy on 2026-08-21 failed with `api-deployments-free-per-day`
-  (>100 deployments).
-- Pushed commit `d543234` to `main` on 2026-08-21. GitHub recorded a Vercel status,
-  but Vercel failed it at the account/build-rate-limit layer before creating a new
-  deployment for that commit.
+- Automatic production deploy for current `main` commit `805e6e9` is Ready on
+  2026-08-21, and Vercel inspect shows both requested production aliases attached.
 - Configure Vercel env vars `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN`.
-  They are currently absent; without them the app can still build and Nostr sync can run,
-  but `/api/relay` will return a configuration error.
+  Vercel env listing on 2026-08-21 reports no environment variables; without them the
+  app can still build and Nostr sync can run, but `/api/relay` will return a
+  configuration error.
 
 Notes:
 - Keep `.agents/STATE.md` short and current.
@@ -369,15 +363,9 @@ Notes:
 - Latest verification on 2026-08-21 after Phase 5 money export/restore acceptance:
   `npm run build` passed with 43 core tests and 62 root tests; root `npm audit
   --json`, protected-string scan, and `git diff --check` passed.
-- Vercel checks on 2026-08-21 show the project exists but direct deployment creation was
-  quota-blocked.
-- Vercel automatic deploy on 2026-08-21 for `cd21de2` succeeded and reports Ready.
-- Retried a production Vercel CLI deploy on 2026-08-21; it is still blocked with
-  `api-deployments-free-per-day` (>100 deployments). Vercel env check still shows no
-  env vars configured. Domain verification remains OK with `dns_change_recommended`.
-- A deployment attempt briefly passed quota and exposed the missing root `fast-check`
-  dependency in Vercel build logs; after fixing it locally, the next deployment attempt
-  was quota-blocked again with `api-deployments-free-per-day`.
+- Vercel checks on 2026-08-21 show the current `main` production deployment is Ready
+  and has the requested aliases attached. Vercel env listing still shows no env vars
+  configured, so the operated relay runtime remains unconfigured.
 - `vercel build --prod` currently fails locally before project
   code runs with `spawn cmd.exe ENOENT`; `cmd.exe` exists on PATH, so keep this as a
   local CLI runner issue unless reproduced remotely.

@@ -1,4 +1,4 @@
-import { fold, type Event } from "@theprawnsplit/core";
+import { authorisedKeys, fold, type Event } from "@theprawnsplit/core";
 import { describe, expect, it } from "vitest";
 import { mintClaimKey, signClaim } from "@/crypto/claim";
 import { buildVerificationContext } from "@/lib/verification";
@@ -42,6 +42,33 @@ describe("app verification context", () => {
 
     expect(state.settlements.get("s1")?.confirmed).toBe(true);
     expect(state.settlements.get("s1")?.pending).toBe(false);
+  });
+
+  it("rejects claim and confirmation signatures replayed under another group tag", async () => {
+    const sourceTag = "a".repeat(64);
+    const targetTag = "b".repeat(64);
+    const key = await mintClaimKey("ecdsa-p256");
+    const claimSig = await signClaim(key.privateJwk, key.alg, `${sourceTag}:alice:alice-phone:${key.publicKey}`);
+    const confirmSig = await signClaim(key.privateJwk, key.alg, `${sourceTag}:confirm:s1`);
+    const events: Event[] = [
+      event("ParticipantClaimed", "alice-phone:1", {
+        pid: "alice",
+        deviceId: "alice-phone",
+        claimPk: key.publicKey,
+        alg: key.alg,
+        sig: claimSig,
+      }),
+      event("SettlementRecorded", "bob-phone:1", { sid: "s1", from: "bob", to: "alice", minor: 100n }),
+      event("SettlementConfirmed", "alice-phone:2", { sid: "s1", pid: "alice", claimSig: confirmSig }),
+    ];
+
+    const ctx = await buildVerificationContext({ tagHex: targetTag, events });
+    const state = fold(events, { supportedVersion: 1 }, ctx);
+
+    expect([...authorisedKeys(events, "alice", ctx)]).toEqual([]);
+    expect(state.settlements.get("s1")?.confirmed).toBe(false);
+    expect(state.settlements.get("s1")?.pending).toBe(false);
+    expect(state.settlements.get("s1")?.cashUnconfirmable).toBe(true);
   });
 
   it("lets a peer re-attest a recovered device with real signatures", async () => {

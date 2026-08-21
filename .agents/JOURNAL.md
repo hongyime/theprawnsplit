@@ -140,3 +140,4 @@
 - 2026-08-22: REQ-SYN-22 property coverage asserts quarantined unsupported-schema events still advance transport vectors while leaving balances unchanged.
 - 2026-08-22: REQ-ID-13 property coverage asserts DSU canonical roots converge across merge delivery order.
 - 2026-08-22: REQ-SYN-24 property coverage asserts future-drift events buffer without HLC mutation and admit at computed retry time.
+- 2026-08-22: REQ-SEC-04 replay coverage uses real browser signatures to prove group-tag-bound claims and confirmations cannot be replayed across groups.

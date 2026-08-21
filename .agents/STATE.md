@@ -197,9 +197,12 @@ Progress:
 - Added Phase 5 creation-to-archive acceptance coverage. A repository-level test now
   creates a trip, adds participants and an expense, records outstanding balances in
   `GroupArchived`, exports, restores into a fresh store, and verifies balances/archive.
+- Hardened the Phase 5 local-metadata export boundary. `TripLedgerExport` now has a
+  regression proving custom relay settings and subgroup presets stay out of the
+  shareable ledger artifact.
 
 Next step:
-- Latest pushed commit before this slice is `9131a38` on `main`.
+- Latest pushed commit before this slice is `6484fbb` on `main`.
 - GitHub/Vercel automatic production deployment for `cd21de2` completed Ready on
   2026-08-21.
 - Remaining deployment work: configure Vercel env vars and verify custom-domain runtime.
@@ -343,6 +346,9 @@ Notes:
   passed with 43 core tests and 56 root tests; root `npm audit --json`,
   protected-string scan, and `git diff --check` passed.
 - Latest verification on 2026-08-21 after Phase 5 creation-to-archive acceptance:
+  `npm run build` passed with 43 core tests and 57 root tests; root `npm audit
+  --json`, protected-string scan, and `git diff --check` passed.
+- Latest verification on 2026-08-21 after Phase 5 local metadata export boundary:
   `npm run build` passed with 43 core tests and 57 root tests; root `npm audit
   --json`, protected-string scan, and `git diff --check` passed.
 - Vercel checks on 2026-08-21 show the project exists but direct deployment creation was

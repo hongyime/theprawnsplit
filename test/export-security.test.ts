@@ -39,6 +39,12 @@ function groupWithIdentity(): GroupRecord {
       discardVector: {},
       cursors: {},
       nostrSk: "nostr-secret",
+      relaySettings: {
+        useOperated: false,
+        operatedEndpoint: "https://custom-relay.example/api",
+        nostrRelays: ["wss://custom-nostr.example"],
+      },
+      subgroups: [{ id: "sg_private", name: "Private subgroup", pids: ["p_alice"] }],
     },
     identities: [
       {
@@ -66,6 +72,9 @@ describe("export artifact split", () => {
     expect(json).not.toContain("private-d");
     expect(json).not.toContain("secret-material");
     expect(json).not.toContain("nostr-secret");
+    expect(json).not.toContain("custom-relay.example");
+    expect(json).not.toContain("custom-nostr.example");
+    expect(json).not.toContain("Private subgroup");
   });
 
   it("keeps DeviceIdentityBackup separate and explicitly credential-bearing", () => {

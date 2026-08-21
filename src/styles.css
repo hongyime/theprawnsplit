@@ -309,6 +309,16 @@ textarea {
   background: #eefbf5;
 }
 
+.prompt-banner.settled-banner {
+  border-color: #9bd8c2;
+  background: #f3fbf7;
+}
+
+.prompt-banner.archive-summary {
+  border-color: #c8d2cc;
+  background: #f7faf8;
+}
+
 .sticky-install {
   position: sticky;
   top: 8px;

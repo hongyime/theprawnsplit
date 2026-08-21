@@ -40,3 +40,4 @@
 - 2026-08-21: Re-attestation UI mirrors the Q14 threshold formula and explicitly warns that in two-peer groups one peer can restore authority, so the decision is social as well as cryptographic.
 - 2026-08-21: Quarantine freeze now applies at the app money surface: balances are hidden and settlement controls are disabled while newer retained events cannot be folded.
 - 2026-08-21: Phase 5 lifecycle keeps archive/unarchive as explicit append-only events; archive copy states that relay retention is outside app control and no relay data is deleted.
+- 2026-08-21: `settled` remains a computed ACTIVE view over folded canonical balances; archive summaries read the active `GroupArchived` event instead of creating another lifecycle state.

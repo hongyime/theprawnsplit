@@ -160,9 +160,12 @@ Progress:
   non-authoritative money state.
 - Started Phase 5 lifecycle polish. Archive confirmation now states relay data is not
   deleted, and archived trips expose an explicit confirmed unarchive action.
+- Continued Phase 5 lifecycle polish. The app now treats `settled` as a computed active
+  view predicate over folded balances, and archived trips show the outstanding transfers
+  captured by the controlling `GroupArchived` event.
 
 Next step:
-- Latest pushed commit before this slice is `5fb0893` on `main`.
+- Latest pushed commit before this slice is `b787adb` on `main`.
 - GitHub/Vercel automatic production deployment for `cd21de2` completed Ready on
   2026-08-21.
 - Remaining deployment work: configure Vercel env vars and verify custom-domain runtime.
@@ -269,6 +272,9 @@ Notes:
 - Latest verification on 2026-08-21 after Phase 5 lifecycle unarchive slice: `npm run
   build` passed with 41 core tests and 32 root tests, and root `npm audit --json`
   reports zero vulnerabilities.
+- Latest verification on 2026-08-21 after Phase 5 settled/archive summary slice: `npm
+  run build` passed with 41 core tests and 34 root tests; root `npm audit --json`,
+  protected-string scan, and `git diff --check` passed.
 - Vercel checks on 2026-08-21 show the project exists but direct deployment creation was
   quota-blocked.
 - Vercel automatic deploy on 2026-08-21 for `cd21de2` succeeded and reports Ready.

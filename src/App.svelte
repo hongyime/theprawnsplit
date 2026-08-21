@@ -53,7 +53,7 @@
   import { createDeviceLinkRequest, linkPayload, parseDeviceLinkRequest, type DeviceLinkRequest } from "@/lib/device-link";
   import { expenseHistoryRows } from "@/lib/expense-history";
   import { frozenViewPolicy } from "@/lib/freeze-policy";
-  import { archiveConfirmationText, unarchiveConfirmationText } from "@/lib/lifecycle";
+  import { archiveConfirmationText, isSettledViewPredicate, latestArchiveEvent, unarchiveConfirmationText } from "@/lib/lifecycle";
   import { findParticipantNameMatch, groupParticipantsForClaim, type ParticipantNameMatch } from "@/lib/participants";
   import { reattestationStatus } from "@/lib/reattestation";
   import { canVoidRecordedSettlement, settlementClaimView } from "@/lib/settlement-history";
@@ -120,6 +120,8 @@
   $: storageLabel = persistedStorage === null ? "storage unknown" : persistedStorage ? "storage protected" : "storage best effort";
   $: syncLabel = unconfirmedCount === 0 ? "sync current" : `${unconfirmedCount} unsynced`;
   $: archived = isGroupArchived();
+  $: settledView = state ? isSettledViewPredicate(state.balances, archived) : false;
+  $: archiveSummary = group ? latestArchiveEvent(group.events) : undefined;
   $: frozenPolicy = frozenViewPolicy(state);
   $: showInstallHint = !isStandalone && !isDesktop && isOnline && !archived;
   $: participantNameMatch = findParticipantNameMatch(participantName, participants);
@@ -578,6 +580,10 @@
     await commit([makeEvent(f, "GroupUnarchived", {})], f);
   }
 
+  function archiveOutstandingLabels(event: NonNullable<typeof archiveSummary>): string[] {
+    return event.outstanding.map((transfer) => `${participantLabel(transfer.from)} pays ${participantLabel(transfer.to)} ${formatMinor(transfer.minor, group?.currency ?? "USD")}`);
+  }
+
   function encodeJoinSeed(seed: JoinSeed): string {
     return btoa(JSON.stringify(seed)).replaceAll("+", "-").replaceAll("/", "_").replaceAll("=", "");
   }
@@ -859,6 +865,27 @@
 
     {#if error}<p class="error">{error}</p>{/if}
     {#if archived}<p class="warning">This trip is archived. The ledger remains readable and exportable. Relay retention is outside this app's control; archiving does not delete relay data.</p>{/if}
+    {#if settledView}
+      <section class="prompt-banner settled-banner">
+        <div>
+          <strong>Balances are settled</strong>
+          <p>This trip is still active. Adding a new expense will update balances automatically.</p>
+        </div>
+      </section>
+    {/if}
+    {#if archived && archiveSummary}
+      {@const archivedOutstanding = archiveOutstandingLabels(archiveSummary)}
+      <section class="prompt-banner archive-summary">
+        <div>
+          <strong>Archive summary</strong>
+          {#if archivedOutstanding.length}
+            <p>{archivedOutstanding.join(" · ")}</p>
+          {:else}
+            <p>Archived with all balances zero.</p>
+          {/if}
+        </div>
+      </section>
+    {/if}
     {#if frozenPolicy.message}<p class="warning">{frozenPolicy.message}</p>{/if}
     {#if manualFallbackDue}<p class="warning">Relay confirmation is still pending. Export the ledger or copy the join link to share manually.</p>{/if}
     {#if showPinLinkPrompt}

@@ -1,9 +1,24 @@
-import type { Money } from "@theprawnsplit/core";
+import { eventSortKey, type Event, type Money } from "@theprawnsplit/core";
 
 export interface OutstandingTransfer {
   from: string;
   to: string;
   minor: Money;
+}
+
+export type ArchiveEvent = Extract<Event, { t: "GroupArchived" }>;
+
+export function isSettledViewPredicate(balances: Map<string, Money>, archived: boolean): boolean {
+  return !archived && [...balances.values()].every((minor) => minor === 0n);
+}
+
+export function latestArchiveEvent(events: Event[]): ArchiveEvent | undefined {
+  let latest: ArchiveEvent | undefined;
+  for (const event of [...events].sort(eventSortKey)) {
+    if (event.t === "GroupArchived") latest = event;
+    if (event.t === "GroupUnarchived") latest = undefined;
+  }
+  return latest;
 }
 
 export function archiveConfirmationText(outstanding: string[]): string {

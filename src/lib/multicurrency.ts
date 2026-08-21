@@ -10,11 +10,26 @@ export interface CurrencyAmountPreview {
 
 export type CurrencyAmountResult = CurrencyAmountPreview | { ok: false; message: string };
 
+interface DecimalRate {
+  display: number;
+  numerator: bigint;
+  denominator: bigint;
+}
+
 export function parseExchangeRate(input: string): number | null {
+  return parseDecimalRate(input)?.display ?? null;
+}
+
+function parseDecimalRate(input: string): DecimalRate | null {
   const trimmed = input.trim();
   if (!/^\d+(\.\d+)?$/.test(trimmed)) return null;
-  const rate = Number(trimmed);
-  return Number.isFinite(rate) && rate > 0 ? rate : null;
+  const [whole = "", fraction = ""] = trimmed.split(".");
+  const digits = `${whole}${fraction}`;
+  const numerator = BigInt(digits);
+  const denominator = 10n ** BigInt(fraction.length);
+  if (numerator <= 0n) return null;
+  const display = Number(trimmed);
+  return Number.isFinite(display) && display > 0 ? { display, numerator, denominator } : null;
 }
 
 export function currencyAmountPreview(input: {
@@ -29,18 +44,19 @@ export function currencyAmountPreview(input: {
   const baseCurrency = normalizeCurrency(input.baseCurrency);
   if (currency === baseCurrency) return { ok: true, enteredMinor, baseMinor: enteredMinor };
 
-  const rate = parseExchangeRate(input.rateText);
+  const rate = parseDecimalRate(input.rateText);
   if (rate === null) return { ok: false, message: "Enter a valid exchange rate." };
   return {
     ok: true,
     enteredMinor,
     baseMinor: convertToBaseMinor(enteredMinor, rate),
-    rate: { currency, toBase: rate },
+    rate: { currency, toBase: rate.display },
   };
 }
 
-export function convertToBaseMinor(minor: bigint, toBase: number): bigint {
-  return BigInt(Math.round(Number(minor) * toBase));
+export function convertToBaseMinor(minor: bigint, toBase: DecimalRate): bigint {
+  const scaled = minor * toBase.numerator;
+  return (scaled + toBase.denominator / 2n) / toBase.denominator;
 }
 
 export function normalizeCurrency(currency: string): string {

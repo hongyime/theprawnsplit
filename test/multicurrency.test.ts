@@ -19,6 +19,15 @@ describe("multi-currency amount preview", () => {
     });
   });
 
+  it("converts large amounts from the decimal rate text without Number precision loss", () => {
+    expect(currencyAmountPreview({ amountText: "90071992547409.91", currency: "EUR", baseCurrency: "USD", rateText: "1.23" })).toMatchObject({
+      ok: true,
+      enteredMinor: 9007199254740991n,
+      baseMinor: 11078855083331419n,
+      rate: { currency: "EUR", toBase: 1.23 },
+    });
+  });
+
   it("rejects missing or non-positive exchange rates", () => {
     expect(parseExchangeRate("0")).toBeNull();
     expect(parseExchangeRate("abc")).toBeNull();

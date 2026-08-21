@@ -47,3 +47,4 @@
 - 2026-08-21: Multi-currency expenses are v2 events: entered foreign totals convert to base-currency minor units for balances while `Financials.rate` freezes the source currency and rate used.
 - 2026-08-21: Subgroups are local split-selection presets in metadata for Phase 5; they do not alter ledger events because each expense still records concrete participant shares.
 - 2026-08-21: Phase 5 archive acceptance requires TripLedgerExport to reconstruct the GroupArchived event and its outstanding transfers on a fresh store.
+- 2026-08-21: Multi-currency conversion must use the entered decimal rate as exact rational input for base minor units; `Financials.rate.toBase` remains the frozen display/audit value.

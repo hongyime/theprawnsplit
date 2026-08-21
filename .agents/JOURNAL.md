@@ -52,3 +52,4 @@
 - 2026-08-21: Editable money defaults must be formatted from integer minor units, not via `Number(minor)`, so large ledgers keep exact cents in prompts and preserved split/payer inputs.
 - 2026-08-21: Percentage split inputs are decimal text converted to integer basis points; invalid text is validation failure, not an exception path through `BigInt(NaN)`.
 - 2026-08-21: Share split weights are strict unsigned integer text; partial parses like `2abc` must be rejected instead of treated as `2`.
+- 2026-08-21: Phase 5 acceptance is anchored by a repository-level creation-to-archive export/restore path, not only isolated lifecycle helpers.

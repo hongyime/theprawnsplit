@@ -194,9 +194,12 @@ Progress:
   `Number(...)`/`Math.round(...)`.
 - Hardened share-weight parsing. Share-mode weights now require strict whole-number text
   instead of accepting partial `Number.parseInt(...)` matches.
+- Added Phase 5 creation-to-archive acceptance coverage. A repository-level test now
+  creates a trip, adds participants and an expense, records outstanding balances in
+  `GroupArchived`, exports, restores into a fresh store, and verifies balances/archive.
 
 Next step:
-- Latest pushed commit before this slice is `538e91c` on `main`.
+- Latest pushed commit before this slice is `9131a38` on `main`.
 - GitHub/Vercel automatic production deployment for `cd21de2` completed Ready on
   2026-08-21.
 - Remaining deployment work: configure Vercel env vars and verify custom-domain runtime.
@@ -339,6 +342,9 @@ Notes:
 - Latest verification on 2026-08-21 after strict share-weight parsing: `npm run build`
   passed with 43 core tests and 56 root tests; root `npm audit --json`,
   protected-string scan, and `git diff --check` passed.
+- Latest verification on 2026-08-21 after Phase 5 creation-to-archive acceptance:
+  `npm run build` passed with 43 core tests and 57 root tests; root `npm audit
+  --json`, protected-string scan, and `git diff --check` passed.
 - Vercel checks on 2026-08-21 show the project exists but direct deployment creation was
   quota-blocked.
 - Vercel automatic deploy on 2026-08-21 for `cd21de2` succeeded and reports Ready.

@@ -594,6 +594,10 @@ Notes:
   direct browser network APIs, Nostr pool calls, or relay adapter construction leak
   outside the relay adapters and sync relay factory. Latest verification on 2026-08-22
   passed with `npm run build` (48 core tests, 121 root tests).
+- Added REQ-SYN-04 relay secret-transmission coverage. The sync integration harness now
+  records relay writes and proves two live relay targets receive ciphertext, public tag,
+  author id, and derived write proof without the raw stored `secretB64`. Latest
+  verification on 2026-08-22 passed with `npm run build` (48 core tests, 122 root tests).
 - Vercel checks on 2026-08-21 show the current `main` production deployment is Ready
   and has the requested aliases attached. Vercel env listing still shows no env vars
   configured, so the operated relay runtime remains unconfigured.

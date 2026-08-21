@@ -13,13 +13,15 @@ type ParticipantAdded = Extract<Event, { t: "ParticipantAdded" }>;
 class MemoryRelay implements Relay {
   entries = new Map<string, RelayEntry[]>();
   fetches: { tag: string; opts: { author?: string; cursor?: string | null; limit?: number } }[] = [];
+  writes: { tag: string; author: string; blob: string; writeProof: string }[] = [];
 
   constructor(readonly name: string, private alive = true) {}
 
-  async publish(tag: string, author: string, blob: string): Promise<AckResult> {
+  async publish(tag: string, author: string, blob: string, writeProof = ""): Promise<AckResult> {
     if (!this.alive) return { ok: false, reason: `${this.name} down` };
     const entries = this.entries.get(tag) ?? [];
     const cursor = `${this.name}:${entries.length + 1}`;
+    this.writes.push({ tag, author, blob, writeProof });
     entries.push({ blob, author, cursor });
     this.entries.set(tag, entries);
     return { ok: true, cursor };
@@ -167,6 +169,28 @@ describe("Phase 2 sync integration", () => {
     const merged = await readEvents(relays, key, tag);
     const expected = canonicalStateBytes(fold([alice, bob, dinner], { supportedVersion: 1 }));
     expect(canonicalStateBytes(fold(merged, { supportedVersion: 1 }))).toBe(expected);
+  });
+
+  it("publishes encrypted relay payloads without transmitting the raw group secret", async () => {
+    const relays = [new MemoryRelay("operated"), new MemoryRelay("nostr")];
+
+    await resetRepositoryForTests(`prawn-relay-secret-${crypto.randomUUID()}`);
+    const group = await ensureGroup();
+    const participant = defaultParticipant({ deviceId: group.deviceId, nextCounter: group.nextCounter }, "Alice");
+    await appendEvents(group.groupId, [participant]);
+
+    await expect(syncOnce(group.groupId, relays)).resolves.toMatchObject({ confirmed: 2 });
+    const secretText = (await readGroup(group.groupId)).secretB64;
+    const writes = relays.flatMap((relay) => relay.writes);
+
+    expect(writes).toHaveLength(2);
+    for (const write of writes) {
+      expect(JSON.stringify(write)).not.toContain(secretText);
+      expect(write.tag).toHaveLength(64);
+      expect(write.tag).not.toBe(secretText);
+      expect(write.writeProof).toHaveLength(64);
+      expect(write.writeProof).not.toBe(secretText);
+    }
   });
 
   it("recovers a wiped IndexedDB device through a join seed and topic-only relay fetch", async () => {

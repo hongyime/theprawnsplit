@@ -159,3 +159,4 @@
 - 2026-08-22: REQ-ID-02 prohibits showing even shortened device UUIDs; UI copy may distinguish "this device" from "another device" without exposing identifiers.
 - 2026-08-22: REQ-SYN-15/REQ-UX-06 coverage treats the topbar unconfirmed count as persistent UI, separate from transient sync status messages.
 - 2026-08-22: REQ-ID-02 coverage distinguishes group identity from local device identity: opening a join seed must generate a new local device UUID, not inherit the creator's device ID.
+- 2026-08-22: REQ-UX-01 coverage treats paid-by-self equal split as the default expense path; advanced payer/split controls must remain opt-in.

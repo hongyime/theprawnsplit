@@ -869,3 +869,8 @@ Notes:
   replaying the creator's identity. Verification on 2026-08-22 passed with focused `npx
   vitest run test/device-identity.test.ts`, `npm run build` (64 core tests, 161 root
   tests), root `npm audit --json`, protected-string scan, and `git diff --check`.
+- Added REQ-UX-01 common expense UI coverage so the default expense path remains equal
+  split, one payer, self payer when locally claimed, requiring only description, total,
+  and save for the common case. Verification on 2026-08-22 passed with focused `npx
+  vitest run test/common-expense-ui.test.ts`, `npm run build` (64 core tests, 162 root
+  tests), root `npm audit --json`, protected-string scan, and `git diff --check`.

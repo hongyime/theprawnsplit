@@ -96,3 +96,4 @@
 - 2026-08-22: Browser verification coverage keeps valid `DeviceLinked` delegation and unpaired same-participant reclaim in separate logs: a mixed log would correctly leave the payee contested under REQ-SET-09, while the paired-only path must confirm.
 - 2026-08-22: Expense ledger display treats `date` as the calendar-day source of truth; UTC `at` remains audit/order metadata and must not be used to derive the shown day.
 - 2026-08-22: DeviceIdentityBackup is a credential export, not a sharing artifact: UI copy must say it grants impersonation power, and its actions stay download-only rather than using share-sheet/manual sharing handlers.
+- 2026-08-22: Sync status copy treats "ready" as a confirmed-state word: usable offline with unconfirmed local/published events must say changes are unconfirmed or unsynced, and newer-schema quarantine takes precedence.

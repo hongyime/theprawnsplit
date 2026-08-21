@@ -81,6 +81,7 @@
   import { canVoidRecordedSettlement, settlementClaimView } from "@/lib/settlement-history";
   import { applySubgroupSelection, deleteSubgroupPreset, upsertSubgroupPreset } from "@/lib/subgroups";
   import { isEventCoveredByEveryKnownDevice } from "@/lib/sync-coverage";
+  import { syncSurfaceLabels } from "@/lib/sync-labels";
   import { buildVerificationContext } from "@/lib/verification";
   import { syncOnce } from "@/relay/sync";
   import type { SyncResult } from "@/relay/types";
@@ -163,7 +164,7 @@
   $: recoveryActive = Boolean(joiningFromLink && joinBlocked);
   $: canSaveExpense = Boolean(!archived && hasLocalClaim && expenseDesc.trim() && amountPreview.ok && sharePreview.ok && payerPreview.ok);
   $: storageLabel = persistedStorage === null ? "storage unknown" : persistedStorage ? "storage protected" : "storage best effort";
-  $: syncLabel = unconfirmedCount === 0 ? "sync current" : `${unconfirmedCount} unsynced`;
+  $: syncLabels = syncSurfaceLabels({ unconfirmedCount, quarantinedCount: state?.quarantined.length ?? 0 });
   $: archived = isGroupArchived();
   $: groupProfileEditable = canEditGroupProfile(archived);
   $: settledView = state ? isSettledViewPredicate(state.balances, archived) : false;
@@ -1114,7 +1115,7 @@
     <header class="topbar">
       <div>
         <input class="title-input" value={group.name} aria-label="Trip name" disabled={!groupProfileEditable} on:change={(e) => renameGroup((e.currentTarget as HTMLInputElement).value)} />
-        <div class="subtle">No accounts · {unconfirmedCount} unconfirmed · {state.quarantined.length ? "update required" : "ready offline"}</div>
+        <div class="subtle">No accounts · {unconfirmedCount} unconfirmed · {syncLabels.topbar}</div>
         {#if showInstallHint}<div class="subtle">On iOS, use Share then Add to Home Screen for offline launch.</div>{/if}
       </div>
       <div class="header-actions">
@@ -1242,7 +1243,7 @@
       <span class="protection-status" aria-label="Protection status">
         <span class:ok={isStandalone}>{isStandalone ? "installed" : "browser tab"}</span>
         <span class:ok={persistedStorage === true} class:warn={persistedStorage === false}>{storageLabel}</span>
-        <span class:ok={unconfirmedCount === 0} class:warn={unconfirmedCount > 0}>{syncLabel}</span>
+        <span class:ok={unconfirmedCount === 0 && state.quarantined.length === 0} class:warn={unconfirmedCount > 0 || state.quarantined.length > 0}>{syncLabels.protection}</span>
       </span>
       {#if hasLocalClaim}
         <button type="button" on:click={() => { if (downloadIdentityBackup()) void markIdentityBackupPromptHandled(); }}><KeyRound size={17} /> Identity backup</button>

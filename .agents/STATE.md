@@ -535,6 +535,11 @@ Notes:
   impersonation power, and source-level coverage keeps identity backup on download-only
   handlers rather than share-sheet/manual sharing paths. Latest verification on
   2026-08-22 passed with `npm run build` (48 core tests, 101 root tests).
+- Hardened REQ-UX-06 sync wording. Topbar/protection labels now come from a tested
+  sync-label helper that withholds success-style "ready offline" copy while local or
+  published events remain unconfirmed, and prioritizes update-required copy for
+  quarantined schema events. Latest verification on 2026-08-22 passed with
+  `npm run build` (48 core tests, 104 root tests).
 - Vercel checks on 2026-08-21 show the current `main` production deployment is Ready
   and has the requested aliases attached. Vercel env listing still shows no env vars
   configured, so the operated relay runtime remains unconfigured.

@@ -50,3 +50,4 @@
 - 2026-08-21: Multi-currency conversion must use the entered decimal rate as exact rational input for base minor units; `Financials.rate.toBase` remains the frozen display/audit value.
 - 2026-08-21: Archive transition ordering is a testable lifecycle contract: present `TripLedgerExport` first, then append `GroupArchived` with a copied outstanding-transfer snapshot.
 - 2026-08-21: Editable money defaults must be formatted from integer minor units, not via `Number(minor)`, so large ledgers keep exact cents in prompts and preserved split/payer inputs.
+- 2026-08-21: Percentage split inputs are decimal text converted to integer basis points; invalid text is validation failure, not an exception path through `BigInt(NaN)`.

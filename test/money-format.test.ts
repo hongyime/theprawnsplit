@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatMinorInput, formatPercentageInput } from "@/lib/money";
+import { formatMinorInput, formatPercentageInput, parsePercentageBasisPoints } from "@/lib/money";
 
 describe("money input formatting", () => {
   it("formats minor units for editable inputs without Number precision loss", () => {
@@ -11,5 +11,13 @@ describe("money input formatting", () => {
     expect(formatPercentageInput(1n, 3n)).toBe("33.33");
     expect(formatPercentageInput(2n, 3n)).toBe("66.67");
     expect(formatPercentageInput(9007199254740991n, 18014398509481982n)).toBe("50.00");
+  });
+
+  it("parses percentage basis points without floating point arithmetic", () => {
+    expect(parsePercentageBasisPoints("33.33")).toBe(3333n);
+    expect(parsePercentageBasisPoints("33.3")).toBe(3330n);
+    expect(parsePercentageBasisPoints("100")).toBe(10000n);
+    expect(parsePercentageBasisPoints("bad")).toBeNull();
+    expect(parsePercentageBasisPoints("12.345")).toBeNull();
   });
 });

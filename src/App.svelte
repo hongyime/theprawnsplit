@@ -49,7 +49,7 @@
   import { signClaim } from "@/crypto/claim";
   import { config } from "@/config";
   import { defaultExpenseDate, defaultParticipant, makeEvent, makeExpenseFinancials, type EventFactory } from "@/lib/events";
-  import { formatMinor, formatMinorInput, formatPercentageInput, parseMinor, type SplitMode } from "@/lib/money";
+  import { formatMinor, formatMinorInput, formatPercentageInput, parseMinor, parsePercentageBasisPoints, type SplitMode } from "@/lib/money";
   import { isArchivedEventLog } from "@/lib/archive";
   import { createDeviceLinkRequest, linkPayload, parseDeviceLinkRequest, type DeviceLinkRequest } from "@/lib/device-link";
   import { expenseHistoryRows } from "@/lib/expense-history";
@@ -465,7 +465,8 @@
       const result = allocatedShares(total, weights, "preview", pids);
       return result.remainderPid ? { ok: true, shares: result.shares, remainderPid: result.remainderPid } : { ok: true, shares: result.shares };
     }
-    const weights = pids.map((pid) => BigInt(Math.max(0, Math.round(Number(percentages[pid] ?? "0") * 100))));
+    const weights = pids.map((pid) => parsePercentageBasisPoints(percentages[pid] ?? "0") ?? -1n);
+    if (weights.some((weight) => weight < 0n)) return { ok: false, message: "Percentages must be valid." };
     if (weights.reduce((a, b) => a + b, 0n) !== 10_000n) return { ok: false, message: "Percentages must total 100%." };
     const result = allocatedShares(total, weights, "preview", pids);
     return result.remainderPid ? { ok: true, shares: result.shares, remainderPid: result.remainderPid } : { ok: true, shares: result.shares };

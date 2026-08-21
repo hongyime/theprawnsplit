@@ -8,6 +8,14 @@ export function parseMinor(input: string): bigint | null {
   return BigInt(whole) * 100n + BigInt(frac.padEnd(2, "0").slice(0, 2));
 }
 
+export function parsePercentageBasisPoints(input: string): bigint | null {
+  const trimmed = input.trim();
+  if (!/^\d+(\.\d{0,2})?$/.test(trimmed)) return null;
+  const [whole, frac = ""] = trimmed.split(".");
+  if (whole === undefined) return null;
+  return BigInt(whole) * 100n + BigInt(frac.padEnd(2, "0").slice(0, 2));
+}
+
 export function formatMinor(minor: bigint, currency: string): string {
   const sign = minor < 0n ? "-" : "";
   const abs = minor < 0n ? -minor : minor;

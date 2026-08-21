@@ -15,3 +15,28 @@ export function canRecordSettlement(input: {
       input.minor > 0n,
   );
 }
+
+export function hasActiveClaimAnomaly(
+  anomalies: { code: string; pid?: string }[],
+  pid: string,
+): boolean {
+  return anomalies.some(
+    (anomaly) => anomaly.pid === pid && (anomaly.code === "unverified-reclaim" || anomaly.code === "device-claims-multiple-participants"),
+  );
+}
+
+export function canConfirmSettlement(input: {
+  archived: boolean;
+  allowSettlementActions: boolean;
+  pending: boolean;
+  hasLocalPayeeIdentity: boolean;
+  payeeHasActiveClaimAnomaly: boolean;
+}): boolean {
+  return Boolean(
+    !input.archived &&
+      input.allowSettlementActions &&
+      input.pending &&
+      input.hasLocalPayeeIdentity &&
+      !input.payeeHasActiveClaimAnomaly,
+  );
+}

@@ -104,3 +104,4 @@
 - 2026-08-22: Expense append eligibility is a command boundary, not just button state: local claim, non-empty description, and valid amount/share/payer previews are checked before creating `ExpenseAdded`.
 - 2026-08-22: REQ-SET-02 is enforced as a platform boundary: settlement UI may append ledger records, but app source must not introduce payment processors or browser payment APIs.
 - 2026-08-22: Settlement recording eligibility is a command boundary: active, unfrozen, positive, non-self transfers are required before appending `SettlementRecorded`.
+- 2026-08-22: Settlement confirmation eligibility mirrors core authority: a normal confirm action requires a local payee identity and no active payee claim anomaly before signing `SettlementConfirmed`.

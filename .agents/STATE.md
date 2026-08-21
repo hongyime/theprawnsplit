@@ -570,6 +570,11 @@ Notes:
   positive transfer between different participants before appending `SettlementRecorded`.
   Latest verification on 2026-08-22 passed with `npm run build` (48 core tests, 113
   root tests).
+- Hardened REQ-SET-04/09 settlement confirmation eligibility. The Confirm action and
+  handler now share a tested command helper requiring an active, unfrozen, pending
+  settlement, a local payee identity, and no active payee claim anomaly before signing
+  `SettlementConfirmed`. Latest verification on 2026-08-22 passed with `npm run build`
+  (48 core tests, 115 root tests).
 - Vercel checks on 2026-08-21 show the current `main` production deployment is Ready
   and has the requested aliases attached. Vercel env listing still shows no env vars
   configured, so the operated relay runtime remains unconfigured.

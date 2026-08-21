@@ -79,7 +79,7 @@
   import { relayDiagnosticActionText } from "@/lib/relay-diagnostics";
   import { normalizeRelaySettings, parseNostrRelayText, relaySettingsTargetCount, type RelaySettings } from "@/lib/relay-settings";
   import { reattestationStatus } from "@/lib/reattestation";
-  import { canRecordSettlement } from "@/lib/settlement-command";
+  import { canConfirmSettlement, canRecordSettlement, hasActiveClaimAnomaly } from "@/lib/settlement-command";
   import { canVoidRecordedSettlement, settlementClaimView } from "@/lib/settlement-history";
   import { preserveSplitInputs } from "@/lib/split-preservation";
   import { applySubgroupSelection, deleteSubgroupPreset, upsertSubgroupPreset } from "@/lib/subgroups";
@@ -646,6 +646,17 @@
     if (!settlement) return;
     const identity = localIdentityForPid(settlement.to);
     if (!identity) return;
+    if (
+      !canConfirmSettlement({
+        archived,
+        allowSettlementActions: frozenPolicy.allowSettlementActions,
+        pending: settlement.pending,
+        hasLocalPayeeIdentity: true,
+        payeeHasActiveClaimAnomaly: hasActiveClaimAnomaly(anomalies, settlement.to),
+      })
+    ) {
+      return;
+    }
     const f = factory();
     const claimSig = await signClaim(identity.claimSkJwk, identity.alg, `${group.tagHex}:confirm:${sid}`);
     await commit([makeEvent(f, "SettlementConfirmed", { sid, pid: settlement.to, claimSig })], f);
@@ -1560,7 +1571,13 @@
                   <strong class:positive={settlement.confirmed} class:negative={settlement.disputed || settlement.contestedConfirmation}>
                     {settlement.disputed ? "disputed" : settlement.contestedConfirmation ? "contested" : settlement.confirmed ? "confirmed" : settlement.cashUnconfirmable ? "cash" : "pending"}
                   </strong>
-                  {#if settlement.pending && localIdentityForPid(settlement.to)}
+                  {#if canConfirmSettlement({
+                    archived,
+                    allowSettlementActions: frozenPolicy.allowSettlementActions,
+                    pending: settlement.pending,
+                    hasLocalPayeeIdentity: Boolean(localIdentityForPid(settlement.to)),
+                    payeeHasActiveClaimAnomaly: hasActiveClaimAnomaly(anomalies, settlement.to),
+                  })}
                     <button type="button" disabled={archived} on:click={() => confirmSettlement(settlement.sid)}>Confirm</button>
                   {/if}
                   {#if !settlement.disputed}

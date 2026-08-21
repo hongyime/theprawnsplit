@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { canRecordSettlement } from "@/lib/settlement-command";
+import { canConfirmSettlement, canRecordSettlement, hasActiveClaimAnomaly } from "@/lib/settlement-command";
 
 const valid = {
   archived: false,
@@ -19,5 +19,29 @@ describe("settlement command eligibility", () => {
     expect(canRecordSettlement({ ...valid, to: "bob" })).toBe(false);
     expect(canRecordSettlement({ ...valid, minor: null })).toBe(false);
     expect(canRecordSettlement({ ...valid, minor: 0n })).toBe(false);
+  });
+
+  it("allows confirmation only for a local uncontested payee identity", () => {
+    const confirmable = {
+      archived: false,
+      allowSettlementActions: true,
+      pending: true,
+      hasLocalPayeeIdentity: true,
+      payeeHasActiveClaimAnomaly: false,
+    };
+
+    expect(canConfirmSettlement(confirmable)).toBe(true);
+    expect(canConfirmSettlement({ ...confirmable, archived: true })).toBe(false);
+    expect(canConfirmSettlement({ ...confirmable, allowSettlementActions: false })).toBe(false);
+    expect(canConfirmSettlement({ ...confirmable, pending: false })).toBe(false);
+    expect(canConfirmSettlement({ ...confirmable, hasLocalPayeeIdentity: false })).toBe(false);
+    expect(canConfirmSettlement({ ...confirmable, payeeHasActiveClaimAnomaly: true })).toBe(false);
+  });
+
+  it("treats payee claim anomalies as active confirmation blockers", () => {
+    expect(hasActiveClaimAnomaly([{ code: "unverified-reclaim", pid: "alice" }], "alice")).toBe(true);
+    expect(hasActiveClaimAnomaly([{ code: "device-claims-multiple-participants", pid: "alice" }], "alice")).toBe(true);
+    expect(hasActiveClaimAnomaly([{ code: "unverified-reclaim", pid: "bob" }], "alice")).toBe(false);
+    expect(hasActiveClaimAnomaly([{ code: "possible-duplicate-participants", pid: "alice" }], "alice")).toBe(false);
   });
 });

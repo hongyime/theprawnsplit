@@ -23,6 +23,37 @@ const shuffleWithSeed = <T>(items: T[], seed: number): T[] => {
 };
 
 describe("REQ-SYN-12 property convergence", () => {
+  it("keeps folded state identical across 1,000 deterministic shuffles", () => {
+    const events: Event[] = [
+      base("ParticipantAdded", { id: "participant-alice", hlc: hlc(1), pid: "alice", name: "Alice" } as never),
+      base("ParticipantAdded", { id: "participant-bob", hlc: hlc(2), pid: "bob", name: "Bob" } as never),
+      base("ParticipantAdded", { id: "participant-chris", hlc: hlc(3), pid: "chris", name: "Chris" } as never),
+      base("ExpenseAdded", {
+        id: "expense-add",
+        hlc: hlc(4),
+        xid: "x-shuffled",
+        financials: financials(120n, [["alice", 120n]], [["alice", 40n], ["bob", 40n], ["chris", 40n]]),
+        desc: "Shared dinner",
+        at: 1,
+        date: "2026-08-22",
+      } as never),
+      base("ExpenseEdited", {
+        id: "expense-edit",
+        hlc: hlc(5),
+        xid: "x-shuffled",
+        financials: financials(150n, [["bob", 150n]], [["alice", 50n], ["bob", 50n], ["chris", 50n]]),
+      } as never),
+      base("ParticipantMerged", { id: "merge-chris-bob", hlc: hlc(6), from: "chris", into: "bob" } as never),
+      base("SettlementRecorded", { id: "settlement-recorded", hlc: hlc(7), sid: "s1", from: "bob", to: "alice", minor: 50n } as never),
+      base("SettlementDisputed", { id: "settlement-disputed", hlc: hlc(8), sid: "s1", note: "Cash not received" } as never),
+    ];
+    const expected = canonicalStateBytes(fold(events, { supportedVersion: 1 }));
+
+    for (let seed = 1; seed <= 1000; seed += 1) {
+      expect(canonicalStateBytes(fold(shuffleWithSeed(events, seed), { supportedVersion: 1 }))).toBe(expected);
+    }
+  }, 20_000);
+
   it("canonicalStateBytes are identical across deterministic shuffles", () => {
     fc.assert(
       fc.property(fc.array(fc.integer({ min: 1, max: 1000 }), { minLength: 1, maxLength: 20 }), (amounts) => {

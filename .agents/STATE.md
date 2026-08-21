@@ -780,6 +780,11 @@ Notes:
   lexicographic participant-id order, including reversed input order. Latest
   verification on 2026-08-22 passed with `npm run build` (63 core tests, 145 root
   tests), root `npm audit --json`, protected-string scan, and `git diff --check`.
+- Added explicit REQ-SYN-12/§16.2 1,000-shuffle convergence coverage in the core
+  property suite. A mixed participant/expense/edit/merge/settlement/dispute log now
+  asserts byte-identical folded state across 1,000 deterministic delivery orders.
+  Latest verification on 2026-08-22 passed with `npm run build` (64 core tests, 145
+  root tests), root `npm audit --json`, protected-string scan, and `git diff --check`.
 - Vercel checks on 2026-08-21 show the current `main` production deployment is Ready
   and has the requested aliases attached. Vercel env listing still shows no env vars
   configured, so the operated relay runtime remains unconfigured.

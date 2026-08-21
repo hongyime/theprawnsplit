@@ -1,9 +1,26 @@
 import "fake-indexeddb/auto";
 import { describe, expect, it } from "vitest";
-import { appendEvents, ensureGroup, markEvents, readGroup, resetRepositoryForTests, syncCounts } from "@/db/repo";
+import { appendEvents, ensureGroup, markEvents, readGroup, resetRepositoryForTests, syncCounts, updateMeta } from "@/db/repo";
 import { defaultParticipant, type EventFactory } from "@/lib/events";
 
+const NOSTR_SECRET_RE = /^[0-9a-f]{64}$/;
+
 describe("sync state metadata", () => {
+  it("stores a valid device-local Nostr secret and repairs older invalid metadata", async () => {
+    await resetRepositoryForTests(`sync-nostr-key-${crypto.randomUUID()}`);
+    const group = await ensureGroup();
+
+    expect(group.meta.nostrSk).toMatch(NOSTR_SECRET_RE);
+
+    await updateMeta(group.groupId, (meta) => ({ ...meta, nostrSk: "too-short" }));
+    const repaired = await readGroup(group.groupId);
+    expect(repaired.meta.nostrSk).toMatch(NOSTR_SECRET_RE);
+    expect(repaired.meta.nostrSk).not.toBe("too-short");
+
+    const persisted = await readGroup(group.groupId);
+    expect(persisted.meta.nostrSk).toBe(repaired.meta.nostrSk);
+  });
+
   it("keeps unsyncedSince until every outbound event is confirmed", async () => {
     await resetRepositoryForTests(`sync-state-${crypto.randomUUID()}`);
     const group = await ensureGroup();

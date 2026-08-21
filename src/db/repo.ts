@@ -1,5 +1,6 @@
 import { openDB, type DBSchema, type IDBPDatabase } from "idb";
 import type { Event } from "@theprawnsplit/core";
+import { bytesToHex } from "@/crypto/bytes";
 import { bigintReplacer, bigintReviver } from "@/lib/money";
 import { inferCurrency, newId } from "@/lib/ids";
 import { createGroupSecret, groupKey, groupTag, secretFromBase64, secretToBase64 } from "@/crypto/group";
@@ -83,6 +84,16 @@ let dbName = "ThePrawnSplit";
 const DB_VERSION = 2;
 
 let dbPromise: Promise<IDBPDatabase<PrawnDb>> | undefined;
+
+const NOSTR_SECRET_RE = /^[0-9a-f]{64}$/;
+
+function createNostrSecretHex(): string {
+  return bytesToHex(crypto.getRandomValues(new Uint8Array(32)));
+}
+
+function normalizeNostrSecretHex(secret: string | undefined): string {
+  return secret && NOSTR_SECRET_RE.test(secret) ? secret : createNostrSecretHex();
+}
 
 function db(): Promise<IDBPDatabase<PrawnDb>> {
   dbPromise ??= openDB<PrawnDb>(dbName, DB_VERSION, {
@@ -205,8 +216,12 @@ async function ensureMeta(group: StoredGroup, events: Event[]): Promise<StoredMe
   const database = await db();
   const existing = await database.get("meta", group.groupId);
   if (existing) {
-    const normalized = { ...existing, durability: normalizeDurabilityPromptState(existing.durability) };
-    if (!existing.durability) await database.put("meta", normalized);
+    const normalized = {
+      ...existing,
+      durability: normalizeDurabilityPromptState(existing.durability),
+      nostrSk: normalizeNostrSecretHex(existing.nostrSk),
+    };
+    if (!existing.durability || normalized.nostrSk !== existing.nostrSk) await database.put("meta", normalized);
     return normalized;
   }
   const meta: StoredMeta = {
@@ -214,7 +229,7 @@ async function ensureMeta(group: StoredGroup, events: Event[]): Promise<StoredMe
     versionVector: vectorFromEvents(events),
     discardVector: {},
     cursors: {},
-    nostrSk: crypto.randomUUID().replaceAll("-", ""),
+    nostrSk: createNostrSecretHex(),
   };
   await database.put("meta", meta);
   return meta;
@@ -262,7 +277,7 @@ export async function ensureGroup(seed?: JoinSeed): Promise<GroupRecord> {
     versionVector: {},
     discardVector: {},
     cursors: {},
-    nostrSk: crypto.randomUUID().replaceAll("-", ""),
+    nostrSk: createNostrSecretHex(),
     durability: emptyDurabilityPromptState(),
   };
   const tx = database.transaction(["groups", "events", "meta"], "readwrite");
@@ -313,7 +328,7 @@ export async function appendEvents(groupId: string, events: Event[]): Promise<Gr
   if (!group) throw new Error("Group not found");
   const meta =
     (await tx.objectStore("meta").get(groupId)) ??
-    ({ groupId, versionVector: {}, discardVector: {}, cursors: {}, nostrSk: crypto.randomUUID().replaceAll("-", "") } satisfies StoredMeta);
+    ({ groupId, versionVector: {}, discardVector: {}, cursors: {}, nostrSk: createNostrSecretHex() } satisfies StoredMeta);
   for (const event of events) {
     const stamped = withVersionVector(event, meta.versionVector);
     await tx.objectStore("events").put({ groupId, eventId: stamped.id, eventJson: encodeEvent(stamped), syncState: "local" });
@@ -350,7 +365,7 @@ export async function replaceFromExport(exported: TripLedgerExport): Promise<Gro
     versionVector: vectorFromEvents(exported.events),
     discardVector: {},
     cursors: {},
-    nostrSk: crypto.randomUUID().replaceAll("-", ""),
+    nostrSk: createNostrSecretHex(),
     durability: emptyDurabilityPromptState(),
   });
   await tx.done;

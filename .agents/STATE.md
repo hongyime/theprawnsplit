@@ -610,6 +610,11 @@ Notes:
   Copy link. Latest verification on 2026-08-22 passed with `npm run build` (48 core
   tests, 124 root tests), root `npm audit --json`, protected-string scan, and `git diff
   --check`.
+- Hardened REQ-SYN-17 device-local Nostr key handling. Metadata creation now stores a
+  64-hex Nostr secret immediately, and `readGroup()` repairs older invalid local metadata
+  instead of relying on the relay adapter to rotate it at sync time. Latest verification
+  on 2026-08-22 passed with `npm run build` (48 core tests, 125 root tests), root `npm
+  audit --json`, protected-string scan, and `git diff --check`.
 - Vercel checks on 2026-08-21 show the current `main` production deployment is Ready
   and has the requested aliases attached. Vercel env listing still shows no env vars
   configured, so the operated relay runtime remains unconfigured.

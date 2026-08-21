@@ -1379,9 +1379,9 @@
             </button>
           {/each}
           <div class="form-grid">
-            <select bind:value={settleFrom}><option value="">From</option>{#each participants as p}<option value={p.pid}>{p.name}</option>{/each}</select>
-            <select bind:value={settleTo}><option value="">To</option>{#each participants as p}<option value={p.pid}>{p.name}</option>{/each}</select>
-            <input bind:value={settleAmount} inputmode="decimal" placeholder="Amount" />
+            <select bind:value={settleFrom} disabled={archived}><option value="">From</option>{#each participants as p}<option value={p.pid}>{p.name}</option>{/each}</select>
+            <select bind:value={settleTo} disabled={archived}><option value="">To</option>{#each participants as p}<option value={p.pid}>{p.name}</option>{/each}</select>
+            <input bind:value={settleAmount} inputmode="decimal" placeholder="Amount" disabled={archived} />
             <button type="button" disabled={archived} on:click={() => recordSettlement(settleFrom, settleTo, settleAmount)}>Record</button>
           </div>
         {/if}

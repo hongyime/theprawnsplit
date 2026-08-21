@@ -97,4 +97,56 @@ describe("REQ-MON-15/REQ-SYN-12 fold", () => {
     expect(state.settlements.get("s1")?.pending).toBe(true);
     expect(state.settlements.get("s1")?.confirmed).toBe(false);
   });
+
+  it("surfaces duplicate participant names unless marked distinct", () => {
+    const aliceA = base("ParticipantAdded", { pid: "alice-a", name: "Dave" } as never);
+    const aliceB = base("ParticipantAdded", { pid: "alice-b", name: " dave " } as never);
+    const duplicate = fold([aliceA, aliceB], { supportedVersion: 1 });
+    expect(duplicate.anomalies.map((anomaly) => anomaly.code)).toContain("possible-duplicate-participants");
+
+    const distinct = fold(
+      [aliceA, aliceB, base("ParticipantsMarkedDistinct", { a: "alice-a", b: "alice-b" } as never)],
+      { supportedVersion: 1 },
+    );
+    expect(distinct.anomalies.map((anomaly) => anomaly.code)).not.toContain("possible-duplicate-participants");
+    expect(distinct.participants.get("alice-a")?.canonicalPid).toBe("alice-a");
+    expect(distinct.participants.get("alice-b")?.canonicalPid).toBe("alice-b");
+  });
+
+  it("surfaces marked-distinct contradictions without altering merge balances", () => {
+    const events = [
+      base("ParticipantAdded", { pid: "alice", name: "Alex" } as never),
+      base("ParticipantAdded", { pid: "bob", name: "Blake" } as never),
+      base("ParticipantMerged", { id: "merge-1", from: "bob", into: "alice" } as never),
+      base("ParticipantsMarkedDistinct", { id: "distinct-1", a: "alice", b: "bob" } as never),
+      base("ExpenseAdded", {
+        xid: "x1",
+        financials: financials(100n, [["alice", 100n]], [["bob", 100n]]),
+        desc: "Lunch",
+        at: 1,
+        date: "2026-08-21",
+      } as never),
+    ];
+    const state = fold(events, { supportedVersion: 1 });
+
+    expect(state.anomalies.find((anomaly) => anomaly.code === "distinct-participants-merged")?.relatedEventId).toBe("merge-1");
+    expect(state.participants.has("bob")).toBe(false);
+    expect(state.balances.get("alice")).toBe(0n);
+  });
+
+  it("undoes merges by voiding the merge event", () => {
+    const merge = base("ParticipantMerged", { id: "merge-1", from: "bob", into: "alice" } as never);
+    const state = fold(
+      [
+        base("ParticipantAdded", { pid: "alice", name: "Alice" } as never),
+        base("ParticipantAdded", { pid: "bob", name: "Bob" } as never),
+        merge,
+        base("EventVoided", { targetId: "merge-1" } as never),
+      ],
+      { supportedVersion: 1 },
+    );
+
+    expect(state.participants.get("alice")?.canonicalPid).toBe("alice");
+    expect(state.participants.get("bob")?.canonicalPid).toBe("bob");
+  });
 });

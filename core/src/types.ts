@@ -108,6 +108,7 @@ export interface SettlementState {
 export interface Anomaly {
   code: string;
   pid?: string;
+  relatedPid?: string;
   sid?: string;
   eventId?: string;
   relatedEventId?: string;

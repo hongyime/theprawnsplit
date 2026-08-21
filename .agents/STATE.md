@@ -99,6 +99,10 @@ Progress:
 - Added adversarial Phase 4 tests for forged/unpaired second-device claims, valid
   `DeviceLinked` confirmation, one device claiming two participants, and contested
   settlement confirmation staying pending in folded state.
+- Added Phase 4 duplicate/merge fold semantics. The core fold now surfaces duplicate-name
+  participant hints, lets `ParticipantsMarkedDistinct` suppress only the duplicate scanner,
+  keeps it out of union-find, surfaces `distinct-participants-merged` contradictions with
+  the merge edge involved, and preserves EventVoided-as-merge-undo behavior.
 
 Next step:
 - Commit and push `main` when ready; GitHub push is expected to trigger Vercel deployment.
@@ -148,6 +152,9 @@ Notes:
   vulnerabilities.
 - Latest verification on 2026-08-21 after Phase 4 trust core slice: `npm run build`
   passed locally with 27 core tests and 10 root tests; root `npm audit --json` reports
+  zero vulnerabilities.
+- Latest verification on 2026-08-21 after duplicate/merge fold slice: `npm run build`
+  passed locally with 30 core tests and 10 root tests; root `npm audit --json` reports
   zero vulnerabilities.
 - Vercel checks on 2026-08-21 show the project exists but direct deployment creation was
   quota-blocked.

@@ -26,6 +26,45 @@ const validateFinancials = (financials: Financials): boolean =>
   sumRows(financials.payers) === financials.minor &&
   sumRows(financials.shares) === financials.minor;
 
+const pairKey = (a: string, b: string): string => (a < b ? `${a}\0${b}` : `${b}\0${a}`);
+
+const normalizeName = (name: string): string => name.trim().toLocaleLowerCase().replace(/\s+/g, " ");
+
+function activeMergeEdges(events: Event[]): Map<string, { eventId: string; from: string; into: string }> {
+  const voided = voidedEventIds(events);
+  const edges = new Map<string, { eventId: string; from: string; into: string }>();
+  for (const event of [...events].sort(eventSortKey)) {
+    if (event.t === "ParticipantMerged" && !voided.has(event.id)) {
+      edges.set(pairKey(event.from, event.into), { eventId: event.id, from: event.from, into: event.into });
+    }
+  }
+  return edges;
+}
+
+function mergePath(
+  start: string,
+  target: string,
+  edges: Map<string, { eventId: string; from: string; into: string }>,
+): { eventId: string; from: string; into: string }[] {
+  const adjacency = new Map<string, { eventId: string; from: string; into: string; next: string }[]>();
+  for (const edge of edges.values()) {
+    adjacency.set(edge.from, [...(adjacency.get(edge.from) ?? []), { ...edge, next: edge.into }]);
+    adjacency.set(edge.into, [...(adjacency.get(edge.into) ?? []), { ...edge, next: edge.from }]);
+  }
+  const seen = new Set([start]);
+  const queue: { pid: string; path: { eventId: string; from: string; into: string }[] }[] = [{ pid: start, path: [] }];
+  for (let i = 0; i < queue.length; i += 1) {
+    const current = queue[i]!;
+    if (current.pid === target) return current.path;
+    for (const edge of adjacency.get(current.pid) ?? []) {
+      if (seen.has(edge.next)) continue;
+      seen.add(edge.next);
+      queue.push({ pid: edge.next, path: [...current.path, { eventId: edge.eventId, from: edge.from, into: edge.into }] });
+    }
+  }
+  return [];
+}
+
 export function fold(events: Event[], opts: FoldOptions, ctx?: VerificationContext): State {
   const ordered = [...events].sort(eventSortKey);
   const quarantined: string[] = [];
@@ -40,6 +79,8 @@ export function fold(events: Event[], opts: FoldOptions, ctx?: VerificationConte
 
   const voided = voidedEventIds(supported);
   if (ctx) anomalies.push(...claimAnomalies(supported, ctx));
+  const mergeEdges = activeMergeEdges(supported);
+  const markedDistinct = new Map<string, { eventId: string; a: string; b: string }>();
   const expenseVoids = new Set<string>();
   const settlementVoids = new Set<string>();
   for (const event of supported) {
@@ -50,6 +91,9 @@ export function fold(events: Event[], opts: FoldOptions, ctx?: VerificationConte
       if (target?.t === "EventVoided") {
         anomalies.push({ code: "voids-void", eventId: event.id, relatedEventId: target.id, message: "EventVoided cannot be voided" });
       }
+    }
+    if (event.t === "ParticipantsMarkedDistinct" && !voided.has(event.id)) {
+      markedDistinct.set(pairKey(event.a, event.b), { eventId: event.id, a: event.a, b: event.b });
     }
   }
 
@@ -150,6 +194,43 @@ export function fold(events: Event[], opts: FoldOptions, ctx?: VerificationConte
     balances.set(pid, 0n);
   }
 
+  for (const mark of markedDistinct.values()) {
+    if (canonical(mark.a) === canonical(mark.b)) {
+      const path = mergePath(mark.a, mark.b, mergeEdges);
+      const anomaly: Anomaly = {
+        code: "distinct-participants-merged",
+        pid: canonical(mark.a),
+        eventId: mark.eventId,
+        message: `Participants marked distinct are merged via ${path.map((edge) => `${edge.from}->${edge.into}`).join(", ")}`,
+      };
+      if (path[0]) anomaly.relatedEventId = path[0].eventId;
+      anomalies.push(anomaly);
+    }
+  }
+
+  const names = new Map<string, ParticipantState[]>();
+  for (const participant of participants.values()) {
+    if (participant.deactivated) continue;
+    const key = normalizeName(participant.name);
+    if (!key) continue;
+    names.set(key, [...(names.get(key) ?? []), participant]);
+  }
+  for (const candidates of names.values()) {
+    for (let i = 0; i < candidates.length; i += 1) {
+      for (let j = i + 1; j < candidates.length; j += 1) {
+        const a = candidates[i]!;
+        const b = candidates[j]!;
+        if (a.canonicalPid === b.canonicalPid || markedDistinct.has(pairKey(a.pid, b.pid))) continue;
+        anomalies.push({
+          code: "possible-duplicate-participants",
+          pid: a.pid,
+          relatedPid: b.pid,
+          message: `${a.name} appears more than once`,
+        });
+      }
+    }
+  }
+
   for (const expense of expenses.values()) {
     for (const payer of expense.financials.payers) add(balances, canonical(payer.pid), payer.minor);
     for (const share of expense.financials.shares) add(balances, canonical(share.pid), -share.minor);
@@ -170,6 +251,7 @@ export function fold(events: Event[], opts: FoldOptions, ctx?: VerificationConte
     (a.eventId ?? "").localeCompare(b.eventId ?? "") ||
     (a.relatedEventId ?? "").localeCompare(b.relatedEventId ?? "") ||
     (a.pid ?? "").localeCompare(b.pid ?? "") ||
+    (a.relatedPid ?? "").localeCompare(b.relatedPid ?? "") ||
     (a.sid ?? "").localeCompare(b.sid ?? ""),
   );
 

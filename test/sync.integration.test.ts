@@ -315,4 +315,40 @@ describe("Phase 2 sync integration", () => {
     expect(fold(recovered.events, { supportedVersion: 1 }).participants.size).toBe(0);
     expect(recovered.meta.versionVector.old_device).toBe(100);
   });
+
+  it("retains unsupported schema events, freezes fold state, and advances transport cursors", async () => {
+    const secret = createGroupSecret();
+    const key = await groupKey(secret);
+    const tag = await groupTag(secret);
+    const relay = new MemoryRelay("operated");
+    const futureEvent = {
+      ...event("future_device", 1, "ParticipantAdded", { pid: "future_alice", name: "Future Alice" }),
+      v: 99,
+    } as Event;
+    await relay.publish(tag, futureEvent.dev, await encryptEvents(key, [futureEvent]));
+
+    await resetRepositoryForTests("prawn-future-schema-freeze");
+    const group = await ensureGroup({
+      secretB64: secretToBase64(secret),
+      tagHex: tag,
+      name: "Trip",
+      currency: "USD",
+    });
+
+    await expect(syncOnce(group.groupId, [relay])).resolves.toMatchObject({ received: 1 });
+    const recovered = await readGroup(group.groupId);
+    const oldFold = fold(recovered.events, { supportedVersion: 2 });
+    expect(recovered.events.map((stored) => stored.id)).toContain(futureEvent.id);
+    expect(oldFold).toMatchObject({ frozen: true, quarantined: [futureEvent.id] });
+    expect(oldFold.participants.has("future_alice")).toBe(false);
+    expect(recovered.meta.versionVector.future_device).toBe(1);
+    expect(recovered.meta.cursors["operated:topic"]).toBe("operated:1");
+
+    await expect(syncOnce(group.groupId, [relay])).resolves.toMatchObject({ received: 0 });
+    const afterAuthorCursor = await readGroup(group.groupId);
+    expect(afterAuthorCursor.meta.cursors["operated:author:future_device"]).toBe("operated:1");
+
+    await expect(syncOnce(group.groupId, [relay])).resolves.toMatchObject({ received: 0 });
+    expect(relay.fetches.at(-1)?.opts).toMatchObject({ author: "future_device", cursor: "operated:1", limit: 500 });
+  });
 });

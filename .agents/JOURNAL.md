@@ -79,3 +79,4 @@
 - 2026-08-21: Operated relay write eligibility is proof-commitment based: the function stores only a hash of the secret-derived write proof per tag and rejects mismatched later proofs, preserving blind ciphertext storage while separating tag visibility from write access.
 - 2026-08-21: Nostr group addressing must stay in tested helper code: lowercase 64-hex tags only, with the indexed single-letter `t` tag used for both publish templates and fetch filters.
 - 2026-08-21: Snapshots must cover confirmed raw history only; local events beyond the confirmed read-back frontier cannot enter a snapshot `vv` or folded snapshot state.
+- 2026-08-21: Unsupported schema relay events are transport-retained but semantically frozen: they advance sync cursors/vectors to avoid stable refetch loops while old folds quarantine them out of balances.

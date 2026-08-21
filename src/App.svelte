@@ -58,6 +58,7 @@
   import { formatMinor, formatMinorInput, parseMinor, parsePercentageBasisPoints, parseShareWeight, type SplitMode } from "@/lib/money";
   import { isArchivedEventLog } from "@/lib/archive";
   import { createDeviceLinkRequest, linkPayload, parseDeviceLinkRequest, type DeviceLinkRequest } from "@/lib/device-link";
+  import { canAppendExpense } from "@/lib/expense-command";
   import { expenseDisplayRows } from "@/lib/expense-display";
   import { expenseHistoryRows } from "@/lib/expense-history";
   import { frozenViewPolicy } from "@/lib/freeze-policy";
@@ -164,7 +165,7 @@
   $: manualFallbackDue = isManualFallbackDue(group?.meta.unsyncedSince, nowMs);
   $: joinBlocked = Boolean(group && !group.events.some((event) => event.t === "GroupCreated"));
   $: recoveryActive = Boolean(joiningFromLink && joinBlocked);
-  $: canSaveExpense = Boolean(!archived && hasLocalClaim && expenseDesc.trim() && amountPreview.ok && sharePreview.ok && payerPreview.ok);
+  $: canSaveExpense = canAppendExpense({ archived, hasLocalClaim, description: expenseDesc, amountOk: amountPreview.ok, sharesOk: sharePreview.ok, payersOk: payerPreview.ok });
   $: storageLabel = persistedStorage === null ? "storage unknown" : persistedStorage ? "storage protected" : "storage best effort";
   $: syncLabels = syncSurfaceLabels({ unconfirmedCount, quarantinedCount: state?.quarantined.length ?? 0 });
   $: archived = isGroupArchived();
@@ -565,7 +566,7 @@
   }
 
   async function addExpense(): Promise<void> {
-    if (!group || !sharePreview.ok || !payerPreview.ok || archived) return;
+    if (!group || !sharePreview.ok || !payerPreview.ok || !canSaveExpense) return;
     if (!amountPreview.ok) return;
     const wasFirstExpense = expenses.length === 0;
     const f = factory();

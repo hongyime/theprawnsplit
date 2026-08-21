@@ -557,6 +557,10 @@ Notes:
   device's locally claimed participant when no valid payer is selected, while preserving
   an existing valid manual payer choice. Latest verification on 2026-08-22 passed with
   `npm run build` (48 core tests, 110 root tests).
+- Hardened REQ-ID-15/REQ-MON-02/11 expense append eligibility. `addExpense()` now uses
+  the same tested command helper as the disabled button state, enforcing local claim,
+  non-empty description, and valid amount/share/payer previews before appending. Latest
+  verification on 2026-08-22 passed with `npm run build` (48 core tests, 111 root tests).
 - Vercel checks on 2026-08-21 show the current `main` production deployment is Ready
   and has the requested aliases attached. Vercel env listing still shows no env vars
   configured, so the operated relay runtime remains unconfigured.

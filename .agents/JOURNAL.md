@@ -101,3 +101,4 @@
 - 2026-08-22: Currency is onboarding metadata, not an onboarding screen: new local groups infer a three-letter currency immediately and emit `GroupCreated`; users may edit currency later from the main UI.
 - 2026-08-22: Split-mode preservation treats equal split share weights as user intent: Equal -> Shares writes `1` for each included participant, while Exact/Percentage transitions derive display inputs from the current computed amounts.
 - 2026-08-22: Common-case expense entry defaults the single payer to a locally claimed participant when possible; existing valid payer choices are user intent and are not overwritten.
+- 2026-08-22: Expense append eligibility is a command boundary, not just button state: local claim, non-empty description, and valid amount/share/payer previews are checked before creating `ExpenseAdded`.

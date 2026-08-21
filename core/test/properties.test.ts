@@ -46,4 +46,33 @@ describe("REQ-SYN-12 property convergence", () => {
       { seed: Number(process.env.FAST_CHECK_SEED ?? 20260821), numRuns: 50, verbose: true },
     );
   }, 20_000);
+
+  it("keeps balances zero-sum at every valid event prefix", () => {
+    fc.assert(
+      fc.property(fc.array(fc.integer({ min: 1, max: 1000 }), { minLength: 1, maxLength: 40 }), (amounts) => {
+        resetIds();
+        const events: Event[] = [
+          base("ParticipantAdded", { pid: "alice", name: "Alice" } as never),
+          base("ParticipantAdded", { pid: "bob", name: "Bob" } as never),
+          ...amounts.map((amount, index) =>
+            base("ExpenseAdded", {
+              xid: `x${index}`,
+              financials: financials(BigInt(amount), [["alice", BigInt(amount)]], [["bob", BigInt(amount)]]),
+              desc: `Expense ${index}`,
+              at: index,
+              date: "2026-08-22",
+            } as never),
+          ),
+        ];
+
+        for (let prefixLength = 1; prefixLength <= events.length; prefixLength += 1) {
+          const state = fold(events.slice(0, prefixLength), { supportedVersion: 1 });
+          const balanceSum = [...state.balances.values()].reduce((sum, minor) => sum + minor, 0n);
+          expect(balanceSum).toBe(0n);
+          expect(state.anomalies.map((anomaly) => anomaly.code)).not.toContain("balance-not-zero");
+        }
+      }),
+      { seed: Number(process.env.FAST_CHECK_SEED ?? 20260822), numRuns: 75, verbose: true },
+    );
+  }, 20_000);
 });

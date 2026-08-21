@@ -711,6 +711,11 @@ Notes:
   single transient relay ACK does not suppress later snapshot retries. Latest verification
   on 2026-08-22 passed with `npm run build` (52 core tests, 143 root tests), root
   `npm audit --json`, protected-string scan, and `git diff --check`.
+- Added REQ-MON-15 prefix invariant coverage in the core property suite. Random valid
+  expense logs now assert the folded balance sum is zero and no `balance-not-zero`
+  anomaly appears at every event prefix, not only at the final state. Latest verification
+  on 2026-08-22 passed with `npm run build` (53 core tests, 143 root tests), root
+  `npm audit --json`, protected-string scan, and `git diff --check`.
 - Vercel checks on 2026-08-21 show the current `main` production deployment is Ready
   and has the requested aliases attached. Vercel env listing still shows no env vars
   configured, so the operated relay runtime remains unconfigured.

@@ -5,13 +5,14 @@ import { decryptEnvelope, encryptEnvelope, encryptEvents, type RelayEnvelope } f
 import { createGroupSecret, groupKey, groupTag, secretToBase64 } from "@/crypto/group";
 import { appendEvents, createJoinSeed, ensureGroup, markEvents, readGroup, resetRepositoryForTests, syncCounts } from "@/db/repo";
 import { defaultParticipant, makeEvent, makeExpenseFinancials, type EventFactory } from "@/lib/events";
-import { syncOnce } from "@/relay/sync";
+import { relayFetchPlans, syncOnce } from "@/relay/sync";
 import type { AckResult, Relay, RelayEntry } from "@/relay/types";
 
 type ParticipantAdded = Extract<Event, { t: "ParticipantAdded" }>;
 
 class MemoryRelay implements Relay {
   entries = new Map<string, RelayEntry[]>();
+  fetches: { tag: string; opts: { author?: string; cursor?: string | null; limit?: number } }[] = [];
 
   constructor(readonly name: string, private alive = true) {}
 
@@ -24,9 +25,16 @@ class MemoryRelay implements Relay {
     return { ok: true, cursor };
   }
 
-  async fetch(tag: string): Promise<RelayEntry[]> {
+  async fetch(tag: string, opts: { author?: string; cursor?: string | null; limit?: number } = {}): Promise<RelayEntry[]> {
     if (!this.alive) throw new Error(`${this.name} down`);
-    return this.entries.get(tag) ?? [];
+    this.fetches.push({ tag, opts });
+    let entries = this.entries.get(tag) ?? [];
+    if (opts.author) entries = entries.filter((entry) => entry.author === opts.author);
+    if (opts.cursor) {
+      const cursorIndex = entries.findIndex((entry) => entry.cursor === opts.cursor);
+      entries = cursorIndex >= 0 ? entries.slice(cursorIndex + 1) : entries.filter((entry) => entry.cursor > opts.cursor!);
+    }
+    return entries.slice(0, opts.limit ?? entries.length);
   }
 }
 
@@ -52,7 +60,7 @@ async function readEvents(relays: MemoryRelay[], key: CryptoKey, tag: string): P
   const byId = new Map<string, Event>();
   for (const relay of relays) {
     try {
-      for (const entry of await relay.fetch(tag)) {
+      for (const entry of await relay.fetch(tag, {})) {
         const envelope = await decryptEnvelope(key, entry.blob);
         if (envelope.type !== "events") continue;
         for (const event of envelope.events) byId.set(event.id, event);
@@ -65,6 +73,41 @@ async function readEvents(relays: MemoryRelay[], key: CryptoKey, tag: string): P
 }
 
 describe("Phase 2 sync integration", () => {
+  it("plans topic bootstrap for empty logs and author-cursor fetches for populated operated logs", () => {
+    const empty = {
+      groupId: "g_empty",
+      name: "Trip",
+      currency: "USD",
+      deviceId: "d_me",
+      nextCounter: 1,
+      createdAt: 1,
+      secretB64: "secret",
+      tagHex: "a".repeat(64),
+      events: [],
+      identities: [],
+      meta: { groupId: "g_empty", versionVector: {}, discardVector: {}, cursors: {}, nostrSk: "1".repeat(64) },
+    };
+    expect(relayFetchPlans(empty, "operated")).toEqual([{ cursorKey: "operated:topic", opts: { limit: 500 } }]);
+
+    const populated = {
+      ...empty,
+      events: [
+        event("d_b", 1, "ParticipantAdded", { pid: "bob", name: "Bob" }),
+        event("d_a", 1, "ParticipantAdded", { pid: "alice", name: "Alice" }),
+      ],
+      meta: {
+        ...empty.meta,
+        cursors: { "operated:author:d_a": "operated:7", "nostr:topic": "nostr:3" },
+      },
+    };
+
+    expect(relayFetchPlans(populated, "operated")).toEqual([
+      { cursorKey: "operated:author:d_a", opts: { author: "d_a", cursor: "operated:7", limit: 500 } },
+      { cursorKey: "operated:author:d_b", opts: { author: "d_b", limit: 500 } },
+    ]);
+    expect(relayFetchPlans(populated, "nostr")).toEqual([{ cursorKey: "nostr:topic", opts: { cursor: "nostr:3", limit: 500 } }]);
+  });
+
   it("decrypts legacy array blobs and new typed snapshot envelopes", async () => {
     const key = await groupKey(createGroupSecret());
     const added = event("a", 1, "ParticipantAdded", { pid: "alice", name: "Alice" });
@@ -151,6 +194,32 @@ describe("Phase 2 sync integration", () => {
       canonicalStateBytes(fold((await readGroup(groupA.groupId).catch(() => syncedA)).events, { supportedVersion: 1 })),
     );
     expect(recovered.meta.versionVector[groupA.deviceId]).toBeGreaterThanOrEqual(4);
+    expect(relays[0]!.fetches.at(-1)?.opts).toEqual({ limit: 500 });
+  });
+
+  it("persists operated relay author cursors for populated incremental fetches", async () => {
+    const operated = new MemoryRelay("operated");
+    const spare = new MemoryRelay("spare");
+    const relays = [operated, spare];
+
+    await resetRepositoryForTests("prawn-operated-cursors");
+    const groupA = await ensureGroup();
+    const alice = defaultParticipant({ deviceId: groupA.deviceId, nextCounter: groupA.nextCounter }, "Alice");
+    await appendEvents(groupA.groupId, [alice]);
+    await expect(syncOnce(groupA.groupId, relays)).resolves.toMatchObject({ confirmed: 2 });
+    const afterFirstSync = await readGroup(groupA.groupId);
+    const cursorKey = `operated:author:${groupA.deviceId}`;
+    expect(afterFirstSync.meta.cursors[cursorKey]).toBe("operated:1");
+    expect(operated.fetches.at(-1)?.opts).toMatchObject({ author: groupA.deviceId, limit: 500 });
+
+    const next = makeEvent({ deviceId: groupA.deviceId, nextCounter: afterFirstSync.nextCounter }, "ParticipantAdded", {
+      pid: "p_cursor",
+      name: "Cursor",
+    });
+    await appendEvents(groupA.groupId, [next]);
+    await expect(syncOnce(groupA.groupId, relays)).resolves.toMatchObject({ confirmed: 1 });
+    expect(operated.fetches.at(-1)?.opts).toMatchObject({ author: groupA.deviceId, cursor: "operated:1", limit: 500 });
+    expect((await readGroup(groupA.groupId)).meta.cursors[cursorKey]).toBe("operated:2");
   });
 
   it("keeps local outbound events pending when publish quorum is unreachable", async () => {

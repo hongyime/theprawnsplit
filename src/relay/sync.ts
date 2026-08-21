@@ -12,6 +12,7 @@ import {
   removeBufferedEvents,
   saveMeta,
   updateTransportVectors,
+  updateMeta,
   upsertRemoteEvents,
   type GroupRecord,
 } from "@/db/repo";
@@ -24,6 +25,38 @@ import { classifyRelayIssue, isDuplicateRelayAck } from "./diagnostics";
 import type { Relay, SyncResult } from "./types";
 
 const PUBLISH_QUORUM_ACKS = 2;
+const FETCH_LIMIT = 500;
+
+interface RelayFetchPlan {
+  cursorKey: string;
+  opts: { author?: string; cursor?: string | null; limit?: number };
+}
+
+function knownDeviceIds(group: GroupRecord): string[] {
+  return [...new Set(group.events.map((event) => event.dev))].sort();
+}
+
+function fetchOpts(cursor: string | null | undefined, author?: string): RelayFetchPlan["opts"] {
+  return {
+    ...(author ? { author } : {}),
+    ...(cursor ? { cursor } : {}),
+    limit: FETCH_LIMIT,
+  };
+}
+
+export function relayFetchPlans(group: GroupRecord, relayName: string): RelayFetchPlan[] {
+  if (group.events.length === 0) {
+    return [{ cursorKey: `${relayName}:topic`, opts: { limit: FETCH_LIMIT } }];
+  }
+  if (relayName === "nostr") {
+    const cursorKey = `${relayName}:topic`;
+    return [{ cursorKey, opts: fetchOpts(group.meta.cursors[cursorKey]) }];
+  }
+  return knownDeviceIds(group).map((author) => {
+    const cursorKey = `${relayName}:author:${author}`;
+    return { cursorKey, opts: fetchOpts(group.meta.cursors[cursorKey], author) };
+  });
+}
 
 export function createRelays(group: GroupRecord): Relay[] {
   const relaySettings = normalizeRelaySettings(group.meta.relaySettings, {
@@ -93,18 +126,20 @@ export async function syncOnce(groupId: string, relayOverride?: Relay[]): Promis
     }
   }
 
+  const fetchJobs = relays.flatMap((relay) => relayFetchPlans(group, relay.name).map((plan) => ({ relay, plan })));
   const fetched = await Promise.all(
-    relays.map(async (relay) => {
+    fetchJobs.map(async ({ relay, plan }) => {
       try {
-        return { relay: relay.name, entries: await relay.fetch(group.tagHex, { limit: 500 }) };
+        return { relay: relay.name, cursorKey: plan.cursorKey, entries: await relay.fetch(group.tagHex, plan.opts) };
       } catch (reason) {
-        return { relay: relay.name, reason };
+        return { relay: relay.name, cursorKey: plan.cursorKey, reason };
       }
     }),
   );
   const remoteEvents: Event[] = [];
   const snapshots: SnapshotEnvelope[] = [];
   const readBackCounts = new Map<string, number>();
+  const cursorUpdates: Record<string, string> = {};
   for (const relayResult of fetched) {
     if ("reason" in relayResult) {
       const reason = relayResult.reason instanceof Error ? relayResult.reason.message : String(relayResult.reason);
@@ -112,6 +147,8 @@ export async function syncOnce(groupId: string, relayOverride?: Relay[]): Promis
       result.diagnostics.push(classifyRelayIssue({ relay: relayResult.relay, operation: "fetch", reason }));
       continue;
     }
+    const lastEntry = relayResult.entries.at(-1);
+    if (lastEntry) cursorUpdates[relayResult.cursorKey] = lastEntry.cursor;
     for (const entry of relayResult.entries) {
       try {
         const envelope = await decryptEnvelope(key, entry.blob);
@@ -125,6 +162,9 @@ export async function syncOnce(groupId: string, relayOverride?: Relay[]): Promis
         result.errors.push("discarded undecryptable relay blob");
       }
     }
+  }
+  if (Object.keys(cursorUpdates).length > 0) {
+    await updateMeta(groupId, (meta) => ({ ...meta, cursors: { ...meta.cursors, ...cursorUpdates } }));
   }
   result.snapshotsSeen = snapshots.length;
   const bestSnapshot = snapshots.sort((a, b) => b.seq - a.seq)[0];

@@ -424,6 +424,12 @@ Notes:
   them back; already-published events can still confirm from later read-back. Latest
   verification on 2026-08-21 passed with `npm run build` (43 core tests, 78 root tests),
   root `npm audit --json`, protected-string scan, and `git diff --check`.
+- Added REQ-SYN-09/21 incremental fetch planning. Empty local logs still use topic-only
+  bootstrap, while populated operated-relay sync now fetches by device author plus stored
+  cursor and persists cursor advancement; Nostr remains topic+cursor until the app stores
+  a usable per-device Nostr pubkey directory. Latest verification on 2026-08-21 passed
+  with `npm run build` (43 core tests, 80 root tests), root `npm audit --json`,
+  protected-string scan, and `git diff --check`.
 - Vercel checks on 2026-08-21 show the current `main` production deployment is Ready
   and has the requested aliases attached. Vercel env listing still shows no env vars
   configured, so the operated relay runtime remains unconfigured.

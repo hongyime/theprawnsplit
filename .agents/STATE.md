@@ -476,6 +476,10 @@ Notes:
   preserving the signed link payload's replay boundary. Latest verification on 2026-08-21
   passed with `npm run build` (43 core tests, 90 root tests), root `npm audit --json`,
   protected-string scan, and `git diff --check`.
+- Added REQ-SEC-03 claim algorithm fallback coverage. `pickAlg()` now has a regression
+  proving devices choose ECDSA P-256 when Ed25519 WebCrypto key generation is unavailable.
+  Latest verification on 2026-08-22 passed with `npm run build` (43 core tests, 91 root
+  tests), root `npm audit --json`, protected-string scan, and `git diff --check`.
 - Vercel checks on 2026-08-21 show the current `main` production deployment is Ready
   and has the requested aliases attached. Vercel env listing still shows no env vars
   configured, so the operated relay runtime remains unconfigured.

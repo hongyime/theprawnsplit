@@ -485,6 +485,11 @@ Notes:
   reasons outside first-zero and seven-day-unprotected return. Latest verification on
   2026-08-22 passed with `npm run build` (43 core tests, 92 root tests), root `npm
   audit --json`, protected-string scan, and `git diff --check`.
+- Added REQ-DUR-09/10 recovery-screen regression coverage so the offline/join blocking
+  screen keeps manual JSON import visible and distinguishes first join from suspected
+  storage eviction. Latest verification on 2026-08-22 passed with `npm run build` (43
+  core tests, 93 root tests), root `npm audit --json`, protected-string scan, and `git
+  diff --check`.
 - Vercel checks on 2026-08-21 show the current `main` production deployment is Ready
   and has the requested aliases attached. Vercel env listing still shows no env vars
   configured, so the operated relay runtime remains unconfigured.

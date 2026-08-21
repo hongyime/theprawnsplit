@@ -58,6 +58,15 @@ describe("platform boundaries", () => {
     expect(source).not.toMatch(/\b(?:checkoutSession|priceId|meteredBilling|usageLimit|trialEndsAt|entitlement)\b/);
   });
 
+  it("keeps budgeting, analytics, categories, recurring expenses, and cross-group workflows out of scope", () => {
+    const source = readSources();
+
+    expect(source).not.toMatch(
+      /\b(?:category|categories|budget|chart|recurring|itemized|itemised|Splitwise|splitwise|crossGroup|multiGroup)\b/,
+    );
+    expect(source).not.toMatch(/\b(?:cross-group|multi-group)\b/);
+  });
+
   it("keeps settlements as ledger records without payment rails", () => {
     const source = readSources();
 

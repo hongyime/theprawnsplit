@@ -74,3 +74,4 @@
 - 2026-08-21: Platform-boundary coverage is a runtime-source regression test: the PWA may register its offline shell service worker, but ledger storage must stay out of browser key-value stores and telemetry/push/background-sync APIs must stay absent.
 - 2026-08-21: Publish quorum applies before local outbound events advance to `published`; a one-relay read-back is not enough to clear local unsynced state, while rows already marked `published` may still confirm from later read-back.
 - 2026-08-21: Relay fetch mode is explicit: empty logs use topic-only bootstrap; populated operated-relay sync uses device-author plus cursor fetches, while Nostr remains topic+cursor until a device-to-Nostr-pubkey directory exists.
+- 2026-08-21: REQ-SYN-16 requires banner actions, not just banner copy; overdue relay confirmation now promotes Share delta, Export, and Copy link directly in the banner.

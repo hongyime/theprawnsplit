@@ -1136,7 +1136,19 @@
       </section>
     {/if}
     {#if frozenPolicy.message}<p class="warning">{frozenPolicy.message}</p>{/if}
-    {#if manualFallbackDue}<p class="warning">Relay confirmation is still pending. Share a delta, export the ledger, or copy the join link manually.</p>{/if}
+    {#if manualFallbackDue}
+      <section class="prompt-banner important manual-fallback-banner" aria-label="Manual sharing fallback">
+        <div>
+          <strong>Relay confirmation pending</strong>
+          <p>Use manual sharing now so another device can catch up without waiting for relay quorum.</p>
+        </div>
+        <div class="prompt-actions">
+          <button type="button" on:click={shareDelta}><Share2 size={17} /> Share delta</button>
+          <button type="button" class="secondary" on:click={() => downloadExport()}><Download size={17} /> Export</button>
+          <button type="button" class="secondary" on:click={copyJoinLink}><Link size={17} /> Copy link</button>
+        </div>
+      </section>
+    {/if}
     {#if showPinLinkPrompt}
       <section class="prompt-banner">
         <div>

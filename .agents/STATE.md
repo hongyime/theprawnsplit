@@ -430,6 +430,10 @@ Notes:
   a usable per-device Nostr pubkey directory. Latest verification on 2026-08-21 passed
   with `npm run build` (43 core tests, 80 root tests), root `npm audit --json`,
   protected-string scan, and `git diff --check`.
+- Hardened REQ-SYN-16 manual fallback promotion. The overdue relay confirmation banner
+  now exposes direct Share delta, Export, and Copy link actions instead of passive text.
+  Latest verification on 2026-08-21 passed with `npm run build` (43 core tests, 81 root
+  tests), root `npm audit --json`, protected-string scan, and `git diff --check`.
 - Vercel checks on 2026-08-21 show the current `main` production deployment is Ready
   and has the requested aliases attached. Vercel env listing still shows no env vars
   configured, so the operated relay runtime remains unconfigured.

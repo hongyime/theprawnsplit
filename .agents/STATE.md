@@ -901,3 +901,10 @@ Notes:
   test/expense-workflow-ui.test.ts`; full verification passed with `npm run build` (64
   core tests, 167 root tests), root `npm audit --json`, protected-string scan, and `git
   diff --check`.
+- Added REQ-DUR-02/03/04/08 and REQ-SEC-09 durability prompt UI boundary coverage so
+  install nagging remains gated/escalated by durable policy, the one-time pin-link
+  prompt stays visible, identity backup remains separately warned, and export prompts
+  stay tied to their allowed recovery triggers. Focused verification on 2026-08-22
+  passed with `npx vitest run test/durability-prompts-ui.test.ts`; full verification
+  passed with `npm run build` (64 core tests, 168 root tests), root `npm audit --json`,
+  protected-string scan, and `git diff --check`.

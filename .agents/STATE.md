@@ -523,6 +523,10 @@ Notes:
   targets for the same participant. Latest verification on 2026-08-22 passed with `npm
   run build` (48 core tests, 98 root tests), root `npm audit --json`,
   protected-string scan, and `git diff --check`.
+- Added Phase 4 browser verification coverage for real `DeviceLinked` signatures. The
+  regression proves an authorised paired second device can confirm settlement while a
+  separate unpaired same-participant claim remains contested and pending. Latest
+  verification on 2026-08-22 passed with `npm run build` (48 core tests, 99 root tests).
 - Vercel checks on 2026-08-21 show the current `main` production deployment is Ready
   and has the requested aliases attached. Vercel env listing still shows no env vars
   configured, so the operated relay runtime remains unconfigured.

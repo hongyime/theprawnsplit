@@ -94,4 +94,74 @@ describe("app verification context", () => {
     expect(state.settlements.get("s1")?.confirmed).toBe(true);
     expect(state.settlements.get("s1")?.pending).toBe(false);
   });
+
+  it("honours real DeviceLinked delegation and rejects an unpaired same-participant claim", async () => {
+    const phoneKey = await mintClaimKey("ecdsa-p256");
+    const tabletKey = await mintClaimKey("ecdsa-p256");
+    const impostorKey = await mintClaimKey("ecdsa-p256");
+    const phoneClaimSig = await signClaim(phoneKey.privateJwk, phoneKey.alg, `${groupTag}:alice:alice-phone:${phoneKey.publicKey}`);
+    const tabletClaimSig = await signClaim(tabletKey.privateJwk, tabletKey.alg, `${groupTag}:alice:alice-tablet:${tabletKey.publicKey}`);
+    const impostorClaimSig = await signClaim(impostorKey.privateJwk, impostorKey.alg, `${groupTag}:alice:impostor-phone:${impostorKey.publicKey}`);
+    const linkSig = await signClaim(phoneKey.privateJwk, phoneKey.alg, `${groupTag}:link:alice:alice-tablet:${tabletKey.publicKey}:abc123`);
+    const tabletConfirmSig = await signClaim(tabletKey.privateJwk, tabletKey.alg, `${groupTag}:confirm:s1`);
+    const impostorConfirmSig = await signClaim(impostorKey.privateJwk, impostorKey.alg, `${groupTag}:confirm:s2`);
+    const linkedEvents: Event[] = [
+      event("ParticipantClaimed", "alice-phone:1", {
+        pid: "alice",
+        deviceId: "alice-phone",
+        claimPk: phoneKey.publicKey,
+        alg: phoneKey.alg,
+        sig: phoneClaimSig,
+      }),
+      event("ParticipantClaimed", "alice-tablet:1", {
+        pid: "alice",
+        deviceId: "alice-tablet",
+        claimPk: tabletKey.publicKey,
+        alg: tabletKey.alg,
+        sig: tabletClaimSig,
+      }),
+      event("DeviceLinked", "alice-phone:2", {
+        pid: "alice",
+        parentDevice: "alice-phone",
+        newDevice: "alice-tablet",
+        newClaimPk: tabletKey.publicKey,
+        alg: tabletKey.alg,
+        nonce: "abc123",
+        sig: linkSig,
+      }),
+      event("SettlementRecorded", "bob-phone:1", { sid: "s1", from: "bob", to: "alice", minor: 100n }),
+      event("SettlementConfirmed", "alice-tablet:2", { sid: "s1", pid: "alice", claimSig: tabletConfirmSig }),
+    ];
+    const unpairedEvents: Event[] = [
+      event("ParticipantClaimed", "alice-phone:1", {
+        pid: "alice",
+        deviceId: "alice-phone",
+        claimPk: phoneKey.publicKey,
+        alg: phoneKey.alg,
+        sig: phoneClaimSig,
+      }),
+      event("ParticipantClaimed", "impostor-phone:1", {
+        pid: "alice",
+        deviceId: "impostor-phone",
+        claimPk: impostorKey.publicKey,
+        alg: impostorKey.alg,
+        sig: impostorClaimSig,
+      }),
+      event("SettlementRecorded", "bob-phone:2", { sid: "s2", from: "bob", to: "alice", minor: 50n }),
+      event("SettlementConfirmed", "impostor-phone:2", { sid: "s2", pid: "alice", claimSig: impostorConfirmSig }),
+    ];
+
+    const linkedCtx = await buildVerificationContext({ tagHex: groupTag, events: linkedEvents });
+    const linkedState = fold(linkedEvents, { supportedVersion: 1 }, linkedCtx);
+    expect(linkedState.anomalies.map((anomaly) => anomaly.code)).not.toContain("unverified-reclaim");
+    expect(linkedState.settlements.get("s1")?.confirmed).toBe(true);
+    expect(linkedState.settlements.get("s1")?.pending).toBe(false);
+
+    const unpairedCtx = await buildVerificationContext({ tagHex: groupTag, events: unpairedEvents });
+    const unpairedState = fold(unpairedEvents, { supportedVersion: 1 }, unpairedCtx);
+    expect(unpairedState.anomalies.map((anomaly) => anomaly.code)).toContain("unverified-reclaim");
+    expect(unpairedState.settlements.get("s2")?.confirmed).toBe(false);
+    expect(unpairedState.settlements.get("s2")?.pending).toBe(true);
+    expect(unpairedState.settlements.get("s2")?.contestedConfirmation).toBe(true);
+  });
 });

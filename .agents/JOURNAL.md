@@ -93,3 +93,4 @@
 - 2026-08-22: Re-attestation display counts must use the same claimed-peer population as the threshold; matching events from shadow or unknown attestors are ignored in the UI status.
 - 2026-08-22: Settlement confirmation admission binds both signature authority and event payload to the literal payee: a valid `groupTag:confirm:sid` signature is ignored if `SettlementConfirmed.pid` does not equal `SettlementRecorded.to`.
 - 2026-08-22: Peer re-attestation majority is per recovered device/key target; attestations for different `newClaimPk` values cannot be pooled to authorize all recovered keys for one participant.
+- 2026-08-22: Browser verification coverage keeps valid `DeviceLinked` delegation and unpaired same-participant reclaim in separate logs: a mixed log would correctly leave the payee contested under REQ-SET-09, while the paired-only path must confirm.

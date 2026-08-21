@@ -85,6 +85,12 @@ Progress:
 - Added structural REQ-SEC-05 export artifact tests. `TripLedgerExport` is asserted to
   exclude identity backup data, claim private keys, group secret material, and local Nostr
   secret material; `DeviceIdentityBackup` remains the separate credential-bearing artifact.
+- Added a minimal archive workflow for the REQ-DUR-07/REQ-LIF-04 export trigger. Archiving
+  asks for final confirmation naming outstanding balances, downloads `TripLedgerExport`
+  before recording `GroupArchived`, makes the trip read-only, and suppresses adaptive
+  polling while archived.
+- Added a pure archive lifecycle helper/test so archived/read-only/polling decisions are
+  based on the ordered event log.
 
 Next step:
 - Commit and push `main` when ready; GitHub push is expected to trigger Vercel deployment.
@@ -129,6 +135,9 @@ Notes:
 - Latest verification on 2026-08-21 after recovery distinction/export tests: `npm run
   build` passed locally with 23 core tests and 9 root tests; root `npm audit --json`
   reports zero vulnerabilities.
+- Latest verification on 2026-08-21 after minimal archive flow: `npm run build` passed
+  locally with 23 core tests and 10 root tests; root `npm audit --json` reports zero
+  vulnerabilities.
 - Vercel checks on 2026-08-21 show the project exists but direct deployment creation was
   quota-blocked.
 - Retried a production Vercel CLI deploy on 2026-08-21; it is still blocked with

@@ -11,8 +11,9 @@
     Upload,
     Users,
     WalletCards,
+    Archive,
   } from "@lucide/svelte";
-  import { allocate, eventSortKey, fold, greedySettlement, type Event, type State } from "@theprawnsplit/core";
+  import { allocate, fold, greedySettlement, type Event, type State } from "@theprawnsplit/core";
   import {
     appendEvents,
     createExport,
@@ -46,6 +47,7 @@
   import { config } from "@/config";
   import { defaultExpenseDate, defaultParticipant, makeEvent, makeExpenseFinancials, type EventFactory } from "@/lib/events";
   import { formatMinor, parseMinor, type SplitMode } from "@/lib/money";
+  import { isArchivedEventLog } from "@/lib/archive";
   import { syncOnce } from "@/relay/sync";
   import type { SyncResult } from "@/relay/types";
 
@@ -98,10 +100,11 @@
   $: manualFallbackDue = Boolean(group?.meta.unsyncedSince && Date.now() - group.meta.unsyncedSince > 600_000);
   $: joinBlocked = Boolean(group && !group.events.some((event) => event.t === "GroupCreated"));
   $: recoveryActive = Boolean(joiningFromLink && joinBlocked);
-  $: canSaveExpense = Boolean(hasLocalClaim && payerPid && expenseDesc.trim() && parseMinor(expenseTotal) !== null && sharePreview.ok);
+  $: canSaveExpense = Boolean(!archived && hasLocalClaim && payerPid && expenseDesc.trim() && parseMinor(expenseTotal) !== null && sharePreview.ok);
   $: storageLabel = persistedStorage === null ? "storage unknown" : persistedStorage ? "storage protected" : "storage best effort";
   $: syncLabel = unconfirmedCount === 0 ? "sync current" : `${unconfirmedCount} unsynced`;
-  $: showInstallHint = !isStandalone && !isDesktop && isOnline && !isGroupArchived();
+  $: archived = isGroupArchived();
+  $: showInstallHint = !isStandalone && !isDesktop && isOnline && !archived;
 
   async function load(): Promise<void> {
     loading = true;
@@ -161,14 +164,14 @@
 
   async function addParticipant(): Promise<void> {
     const name = participantName.trim();
-    if (!name || !group || joinBlocked) return;
+    if (!name || !group || joinBlocked || archived) return;
     const f = factory();
     await commit([defaultParticipant(f, name)], f);
     participantName = "";
   }
 
   async function claimParticipant(pid: string): Promise<void> {
-    if (!group || localClaimPids.has(pid)) return;
+    if (!group || localClaimPids.has(pid) || archived) return;
     const participant = participants.find((p) => p.pid === pid);
     if (!participant || participant.devices.length > 0) {
       error = "This participant already has a claiming device. Phase 2 does not self-authorise extra devices.";
@@ -254,7 +257,7 @@
   }
 
   async function addExpense(): Promise<void> {
-    if (!group || !sharePreview.ok || !payerPid) return;
+    if (!group || !sharePreview.ok || !payerPid || archived) return;
     const total = parseMinor(expenseTotal);
     if (total === null) return;
     const wasFirstExpense = expenses.length === 0;
@@ -276,11 +279,13 @@
   }
 
   async function voidExpense(xid: string): Promise<void> {
+    if (archived) return;
     const f = factory();
     await commit([makeEvent(f, "ExpenseVoided", { xid })], f);
   }
 
   async function editExpense(xid: string): Promise<void> {
+    if (archived) return;
     const expense = state?.expenses.get(xid);
     if (!expense) return;
     const desc = window.prompt("Description", expense.desc);
@@ -303,6 +308,7 @@
   }
 
   async function recordSettlement(from: string, to: string, amount: string): Promise<void> {
+    if (archived) return;
     const minor = parseMinor(amount);
     if (!minor || !from || !to || from === to) return;
     const f = factory();
@@ -333,6 +339,25 @@
     a.download = `${group.name || "trip"}-identity-backup.json`;
     a.click();
     URL.revokeObjectURL(url);
+  }
+
+  async function archiveGroup(): Promise<void> {
+    if (!group || archived) return;
+    const label = suggestedSettlements.length
+      ? suggestedSettlements.map((transfer) => `${participantLabel(transfer.from)} pays ${participantLabel(transfer.to)} ${formatMinor(transfer.minor, group!.currency)}`).join("\n")
+      : "All balances are zero.";
+    const ok = window.confirm(`Archive this trip?\n\nOutstanding balances:\n${label}\n\nA ledger export will download before the archive event is recorded.`);
+    if (!ok) return;
+    downloadExport();
+    const f = factory();
+    await commit(
+      [
+        makeEvent(f, "GroupArchived", {
+          outstanding: suggestedSettlements.map((transfer) => ({ from: transfer.from, to: transfer.to, minor: transfer.minor })),
+        }),
+      ],
+      f,
+    );
   }
 
   function encodeJoinSeed(seed: JoinSeed): string {
@@ -470,12 +495,7 @@
   }
 
   function isGroupArchived(): boolean {
-    let archived = false;
-    for (const event of [...(group?.events ?? [])].sort(eventSortKey)) {
-      if (event.t === "GroupArchived") archived = true;
-      if (event.t === "GroupUnarchived") archived = false;
-    }
-    return archived;
+    return isArchivedEventLog(group?.events ?? []);
   }
 
   function allBalancesZero(): boolean {
@@ -571,7 +591,7 @@
   function startPolling(): void {
     if (pollHandle !== undefined) window.clearInterval(pollHandle);
     pollHandle = window.setInterval(() => {
-      if (!group || document.hidden) return;
+      if (!group || document.hidden || isGroupArchived()) return;
       const idle = Date.now() - lastActivityAt > config.idleAfterMs;
       const cadence = idle ? config.pollIdleMs : config.pollActiveMs;
       if (Date.now() - (group.meta.lastSyncAt ?? 0) >= cadence) void runSync();
@@ -602,10 +622,12 @@
         <button type="button" disabled={syncing} on:click={runSync} title="Sync now"><RefreshCcw size={18} /> {syncing ? "Syncing" : "Sync"}</button>
         <button type="button" on:click={copyJoinLink} title="Copy join link"><Link size={18} /> Link</button>
         <button type="button" on:click={() => downloadExport()} title="Export ledger"><Download size={18} /> Export</button>
+        <button type="button" disabled={archived} on:click={archiveGroup} title="Archive trip"><Archive size={18} /> Archive</button>
       </div>
     </header>
 
     {#if error}<p class="error">{error}</p>{/if}
+    {#if archived}<p class="warning">This trip is archived. The ledger remains readable and exportable.</p>{/if}
     {#if state.frozen}<p class="warning">A newer ledger event was retained but excluded. Balances are not authoritative until the app is updated.</p>{/if}
     {#if manualFallbackDue}<p class="warning">Relay confirmation is still pending. Export the ledger or copy the join link to share manually.</p>{/if}
     {#if showPinLinkPrompt}
@@ -683,7 +705,7 @@
         <h2><Users size={18} /> People</h2>
         <form class="row" on:submit|preventDefault={addParticipant}>
           <input bind:value={participantName} placeholder="Add shadow participant" />
-          <button type="submit" disabled={joinBlocked}><Plus size={17} /> Add</button>
+          <button type="submit" disabled={joinBlocked || archived}><Plus size={17} /> Add</button>
         </form>
         {#if participants.length === 0}
           <div class="empty">
@@ -704,7 +726,7 @@
                   {participant.devices.length ? `${participant.devices.length} device` : "shadow"}
                   {#if localClaimPids.has(participant.pid)}
                     <span>you</span>
-                  {:else if participant.devices.length === 0}
+                  {:else if participant.devices.length === 0 && !archived}
                     <button type="button" on:click={() => claimParticipant(participant.pid)} title="Claim participant"><KeyRound size={15} /> Claim</button>
                   {/if}
                 </span>
@@ -757,7 +779,7 @@
             {/each}
           </div>
         {/if}
-        {#if !hasLocalClaim}<p class="hint">Viewing is enabled. Expense creation requires claiming one participant on this device.</p>{/if}
+        {#if archived}<p class="hint">Archived trips are read-only.</p>{:else if !hasLocalClaim}<p class="hint">Viewing is enabled. Expense creation requires claiming one participant on this device.</p>{/if}
         {#if !sharePreview.ok}<p class="hint">{sharePreview.message}</p>{:else if sharePreview.remainderPid}<p class="hint">Rounding remainder goes to {participantLabel(sharePreview.remainderPid)}.</p>{/if}
         <button type="button" disabled={!canSaveExpense} on:click={addExpense}><Plus size={17} /> Save expense</button>
       </article>
@@ -765,7 +787,7 @@
       <article class="panel settlements">
         <h2><RefreshCcw size={18} /> Settle</h2>
         {#each suggestedSettlements as transfer}
-          <button type="button" class="settle-suggestion" on:click={() => recordSettlement(transfer.from, transfer.to, String(Number(transfer.minor) / 100))}>
+          <button type="button" class="settle-suggestion" disabled={archived} on:click={() => recordSettlement(transfer.from, transfer.to, String(Number(transfer.minor) / 100))}>
             {participantLabel(transfer.from)} pays {participantLabel(transfer.to)} {formatMinor(transfer.minor, group.currency)}
           </button>
         {/each}
@@ -773,7 +795,7 @@
           <select bind:value={settleFrom}><option value="">From</option>{#each participants as p}<option value={p.pid}>{p.name}</option>{/each}</select>
           <select bind:value={settleTo}><option value="">To</option>{#each participants as p}<option value={p.pid}>{p.name}</option>{/each}</select>
           <input bind:value={settleAmount} inputmode="decimal" placeholder="Amount" />
-          <button type="button" on:click={() => recordSettlement(settleFrom, settleTo, settleAmount)}>Record</button>
+          <button type="button" disabled={archived} on:click={() => recordSettlement(settleFrom, settleTo, settleAmount)}>Record</button>
         </div>
         {#if settlements.length}<p class="hint">{settlements.length} settlement event{settlements.length === 1 ? "" : "s"} recorded.</p>{/if}
       </article>
@@ -789,8 +811,8 @@
           </div>
           <div>
             <strong>{formatMinor(expense.financials.minor, group.currency)}</strong>
-            <button type="button" on:click={() => editExpense(expense.xid)} title="Edit expense"><ReceiptText size={16} /></button>
-            <button type="button" on:click={() => voidExpense(expense.xid)} title="Void expense"><Trash2 size={16} /></button>
+            <button type="button" disabled={archived} on:click={() => editExpense(expense.xid)} title="Edit expense"><ReceiptText size={16} /></button>
+            <button type="button" disabled={archived} on:click={() => voidExpense(expense.xid)} title="Void expense"><Trash2 size={16} /></button>
           </div>
         </div>
       {/each}

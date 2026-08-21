@@ -152,3 +152,4 @@
 - 2026-08-22: REQ-PLT-07 source-boundary coverage rejects relay subscribe, WebSocket/EventSource, Upgrade, and held-stream connection code.
 - 2026-08-22: REQ-PLT-02 installability coverage treats the linked Web App Manifest, app-shell caching, standalone detection, and iOS Add-to-Home-Screen guidance as one PWA boundary.
 - 2026-08-22: REQ-PLT-03/04 coverage must inspect `public/sw.js`; a client-source-only scan would miss forbidden Background Sync or push dependencies in the actual service worker.
+- 2026-08-22: REQ-DUR-01 coverage treats the placement of `navigator.storage.persist()` as a UI workflow invariant: first saved expense only, not launch, polling, or prompt timers.

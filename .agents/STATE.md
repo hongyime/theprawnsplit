@@ -831,3 +831,9 @@ Notes:
   dependencies. Verification on 2026-08-22 passed with focused `npx vitest run
   test/service-worker.test.ts`, `npm run build` (64 core tests, 153 root tests),
   root `npm audit --json`, protected-string scan, and `git diff --check`.
+- Added REQ-DUR-01 storage persistence boundary coverage so
+  `navigator.storage.persist()` remains wired only after a first saved expense, never
+  initial load, polling, or timer prompt paths. Verification on 2026-08-22 passed with
+  focused `npx vitest run test/storage-persistence-ui.test.ts`, `npm run build` (64
+  core tests, 154 root tests), root `npm audit --json`, protected-string scan, and
+  `git diff --check`.

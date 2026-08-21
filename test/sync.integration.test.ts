@@ -2,7 +2,7 @@ import "fake-indexeddb/auto";
 import { describe, expect, it } from "vitest";
 import { canonicalStateBytes, fold, type Event } from "@theprawnsplit/core";
 import { decryptEnvelope, encryptEnvelope, encryptEvents, type RelayEnvelope } from "@/crypto/envelope";
-import { createGroupSecret, groupKey, groupTag } from "@/crypto/group";
+import { createGroupSecret, groupKey, groupTag, secretToBase64 } from "@/crypto/group";
 import { appendEvents, createJoinSeed, ensureGroup, readGroup, resetRepositoryForTests } from "@/db/repo";
 import { defaultParticipant, makeEvent, makeExpenseFinancials, type EventFactory } from "@/lib/events";
 import { syncOnce } from "@/relay/sync";
@@ -151,5 +151,34 @@ describe("Phase 2 sync integration", () => {
       canonicalStateBytes(fold((await readGroup(groupA.groupId).catch(() => syncedA)).events, { supportedVersion: 1 })),
     );
     expect(recovered.meta.versionVector[groupA.deviceId]).toBeGreaterThanOrEqual(4);
+  });
+
+  it("uses snapshot-only bootstrap for transport vectors without creating semantic state", async () => {
+    const secret = createGroupSecret();
+    const key = await groupKey(secret);
+    const tag = await groupTag(secret);
+    const relay = new MemoryRelay("snapshot-only");
+    const snapshot: RelayEnvelope = {
+      type: "snapshot",
+      seq: 100,
+      vv: { old_device: 100 },
+      state: { participants: [["alice"]] },
+      createdAt: 1,
+    };
+    await relay.publish(tag, "old_device", await encryptEnvelope(key, snapshot));
+
+    await resetRepositoryForTests("prawn-snapshot-only-bootstrap");
+    const group = await ensureGroup({
+      secretB64: secretToBase64(secret),
+      tagHex: tag,
+      name: "Trip",
+      currency: "USD",
+    });
+    await expect(syncOnce(group.groupId, [relay])).resolves.toMatchObject({ snapshotsSeen: 1, received: 0 });
+    const recovered = await readGroup(group.groupId);
+
+    expect(recovered.events).toHaveLength(0);
+    expect(fold(recovered.events, { supportedVersion: 1 }).participants.size).toBe(0);
+    expect(recovered.meta.versionVector.old_device).toBe(100);
   });
 });

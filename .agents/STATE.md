@@ -213,6 +213,9 @@ Progress:
 - Hardened REQ-SYN-15/16 sync metadata. Partial read-back confirmation no longer clears
   `unsyncedSince` while any local or published outbound event remains pending, so the
   manual sharing banner cannot disappear before the outbox is fully confirmed.
+- Added REQ-SYN-25/26 snapshot-only bootstrap coverage. A relay snapshot can seed the
+  transport version vector for an empty joined device, but it does not create semantic
+  ledger events or folded participant state without raw event history.
 
 Next step:
 - Automatic production deploy for current `main` commit `805e6e9` is Ready on
@@ -396,6 +399,9 @@ Notes:
 - Latest verification on 2026-08-21 after REQ-SYN-15/16 outbox clock hardening: `npm
   run build` passed with 43 core tests and 70 root tests; root `npm audit --json`,
   protected-string scan, and `git diff --check` passed.
+- Latest verification on 2026-08-21 after REQ-SYN-25/26 snapshot-only bootstrap
+  coverage: `npm run build` passed with 43 core tests and 71 root tests; root `npm
+  audit --json`, protected-string scan, and `git diff --check` passed.
 - Vercel checks on 2026-08-21 show the current `main` production deployment is Ready
   and has the requested aliases attached. Vercel env listing still shows no env vars
   configured, so the operated relay runtime remains unconfigured.

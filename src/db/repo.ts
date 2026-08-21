@@ -383,8 +383,26 @@ export function stringifyExport(exported: TripLedgerExport | DeviceIdentityBacku
   return JSON.stringify(exported, bigintReplacer, 2);
 }
 
-export function parseExport(text: string): TripLedgerExport {
-  return JSON.parse(text, bigintReviver) as TripLedgerExport;
+export type ImportArtifact = TripLedgerExport | DeviceIdentityBackup;
+
+export function parseExport(text: string): ImportArtifact {
+  return JSON.parse(text, bigintReviver) as ImportArtifact;
+}
+
+export async function restoreIdentityBackup(backup: DeviceIdentityBackup): Promise<GroupRecord> {
+  if (backup.type !== "DeviceIdentityBackup" || backup.version !== 1) throw new Error("Unsupported identity backup");
+  const database = await db();
+  const groups = await database.getAll("groups");
+  const group = groups.find((candidate) => candidate.tagHex === backup.tagHex || candidate.groupId === backup.groupId);
+  if (!group) throw new Error("Import the matching TripLedgerExport or open the join link before restoring identity");
+  if (group.tagHex !== backup.tagHex) throw new Error("Identity backup does not match this trip");
+
+  const tx = database.transaction(["identity"], "readwrite");
+  for (const identity of backup.identities) {
+    await tx.objectStore("identity").put({ ...identity, groupId: group.groupId });
+  }
+  await tx.done;
+  return readGroup(group.groupId);
 }
 
 export async function markEvents(groupId: string, eventIds: string[], syncState: StoredEvent["syncState"]): Promise<void> {

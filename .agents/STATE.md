@@ -107,6 +107,10 @@ Progress:
   by an uncontested payee device as born confirmed, marks settlements to shadow payees as
   `cashUnconfirmable` without pending nag state, keeps disputes visible without reversing
   balances, and exposes settlement status rows in the app UI.
+- Added Phase 4 recovery-authority import path. `DeviceIdentityBackup` can now be pasted
+  through the recovery import UI and restored onto a matching local trip by `tagHex`,
+  even when the local IndexedDB `groupId` differs after join-link recovery. This keeps
+  identity backup separate from `TripLedgerExport` while restoring claim keys.
 
 Next step:
 - Commit and push `main` when ready; GitHub push is expected to trigger Vercel deployment.
@@ -162,6 +166,9 @@ Notes:
   zero vulnerabilities.
 - Latest verification on 2026-08-21 after settlement status slice: `npm run build`
   passed locally with 33 core tests and 10 root tests; root `npm audit --json` reports
+  zero vulnerabilities.
+- Latest verification on 2026-08-21 after identity-backup restore: `npm run build`
+  passed locally with 33 core tests and 11 root tests; root `npm audit --json` reports
   zero vulnerabilities.
 - Vercel checks on 2026-08-21 show the project exists but direct deployment creation was
   quota-blocked.

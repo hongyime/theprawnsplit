@@ -24,6 +24,7 @@
     parseExport,
     recordAppLaunch,
     replaceFromExport,
+    restoreIdentityBackup,
     saveGroup,
     stringifyExport,
     syncCounts,
@@ -401,11 +402,13 @@
   async function importExport(): Promise<void> {
     error = "";
     try {
-      group = await replaceFromExport(parseExport(importText));
+      const artifact = parseExport(importText);
+      group = artifact.type === "TripLedgerExport" ? await replaceFromExport(artifact) : await restoreIdentityBackup(artifact);
       importText = "";
       joiningFromLink = false;
       recoveryAttempted = false;
       lastSyncResult = null;
+      syncStatus = artifact.type === "DeviceIdentityBackup" ? "Identity backup restored." : syncStatus;
       refreshState();
       await refreshCounts();
       await refreshDurabilityPrompts();
@@ -831,8 +834,8 @@
     </section>
 
     <section class="panel import-panel" id="manual-import">
-      <h2><Upload size={18} /> Import TripLedgerExport</h2>
-      <textarea bind:value={importText} placeholder="Paste a TripLedgerExport JSON file here"></textarea>
+      <h2><Upload size={18} /> Import Recovery JSON</h2>
+      <textarea bind:value={importText} placeholder="Paste a TripLedgerExport or DeviceIdentityBackup JSON file here"></textarea>
       <button type="button" disabled={!importText.trim()} on:click={importExport}>Import</button>
     </section>
     {#if activeInstallLevel && activeInstallLevel >= 3}

@@ -22,3 +22,4 @@
 - 2026-08-21: Phase 4 trust model treats only the first valid self-claim as genesis authority; later devices must be delegated or re-attested, and contested claims cannot clear settlements.
 - 2026-08-21: `ParticipantsMarkedDistinct` is implemented strictly as a duplicate-scanner hint; contradictions with active merges are surfaced but never auto-resolved or fed into union-find.
 - 2026-08-21: Shadow-payee settlements are represented as `cashUnconfirmable`, not pending, because shadow participants cannot hold claim keys and must not generate confirmation nagging.
+- 2026-08-21: `DeviceIdentityBackup` restore matches local trips by `tagHex`, not only `groupId`, because a join-link recovered device can have a different local IndexedDB group id while representing the same trip.

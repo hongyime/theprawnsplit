@@ -1,5 +1,15 @@
+import "fake-indexeddb/auto";
 import { describe, expect, it } from "vitest";
-import { createExport, createIdentityBackup, stringifyExport, type GroupRecord } from "@/db/repo";
+import {
+  createExport,
+  createIdentityBackup,
+  ensureGroup,
+  replaceFromExport,
+  resetRepositoryForTests,
+  restoreIdentityBackup,
+  stringifyExport,
+  type GroupRecord,
+} from "@/db/repo";
 
 function groupWithIdentity(): GroupRecord {
   return {
@@ -65,5 +75,25 @@ describe("export artifact split", () => {
     expect(backup.identities).toHaveLength(1);
     expect(json).toContain("claimSkJwk");
     expect(json).toContain("private-d");
+  });
+
+  it("restores identity backup onto a matching recovered trip by tag", async () => {
+    const source = groupWithIdentity();
+    const ledger = createExport(source);
+    const backup = createIdentityBackup(source);
+
+    await resetRepositoryForTests(`export-security-${crypto.randomUUID()}`);
+    const recovered = await replaceFromExport(ledger);
+    expect(recovered.groupId).toBe(source.groupId);
+    expect(recovered.identities).toHaveLength(0);
+
+    await resetRepositoryForTests(`export-security-${crypto.randomUUID()}`);
+    const joined = await ensureGroup({ secretB64: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA", tagHex: source.tagHex, name: "Trip", currency: "USD" });
+    expect(joined.groupId).not.toBe(source.groupId);
+
+    const restored = await restoreIdentityBackup(backup);
+    expect(restored.groupId).toBe(joined.groupId);
+    expect(restored.identities).toHaveLength(1);
+    expect(restored.identities[0]?.claimSkJwk).toEqual(source.identities[0]?.claimSkJwk);
   });
 });

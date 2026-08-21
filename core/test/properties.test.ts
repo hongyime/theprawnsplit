@@ -367,4 +367,55 @@ describe("REQ-SYN-12 property convergence", () => {
       { seed: Number(process.env.FAST_CHECK_SEED ?? 20260822), numRuns: 75, verbose: true },
     );
   }, 20_000);
+
+  it("advances transport vectors for quarantined schema events without changing balances", () => {
+    fc.assert(
+      fc.property(
+        fc.record({
+          unsupportedCounter: fc.integer({ min: 1, max: 1000 }),
+          unsupportedMinor: fc.integer({ min: 1, max: 1000 }),
+        }),
+        ({ unsupportedCounter, unsupportedMinor }) => {
+          const current: Event[] = [
+            base("ParticipantAdded", { id: "participant-alice", hlc: hlc(1), pid: "alice", name: "Alice" } as never),
+            base("ParticipantAdded", { id: "participant-bob", hlc: hlc(2), pid: "bob", name: "Bob" } as never),
+          ];
+          const futureSchema = base("ExpenseAdded", {
+            id: `future:${unsupportedCounter}`,
+            dev: "future",
+            v: 2,
+            hlc: hlc(10 + unsupportedCounter, unsupportedCounter, "future"),
+            xid: "x-future-schema",
+            financials: {
+              ...financials(BigInt(unsupportedMinor), [["alice", BigInt(unsupportedMinor)]], [["bob", BigInt(unsupportedMinor)]]),
+              rate: { currency: "EUR", toBase: 2 },
+            },
+            desc: "Future schema",
+            at: unsupportedCounter,
+            date: "2026-08-22",
+          } as never);
+
+          const admitted = admitTransportEvents([futureSchema], current, {}, {
+            now: 10_000,
+            supportedVersion: 1,
+            maxFutureDriftMs: 120_000,
+            capUnknownAuthor: 50,
+            capKnownAuthor: 1000,
+            capGroupTotal: 10_000,
+            bufferMaxEvents: 500,
+          });
+          const state = fold([...current, ...admitted.admitted], { supportedVersion: 1 });
+
+          expect(admitted.transportVector.future).toBe(unsupportedCounter);
+          expect(admitted.admitted.map((event) => event.id)).toEqual([futureSchema.id]);
+          expect(state.quarantined).toEqual([futureSchema.id]);
+          expect(state.frozen).toBe(true);
+          expect(state.expenses.has("x-future-schema")).toBe(false);
+          expect(state.balances.get("alice")).toBe(0n);
+          expect(state.balances.get("bob")).toBe(0n);
+        },
+      ),
+      { seed: Number(process.env.FAST_CHECK_SEED ?? 20260822), numRuns: 75, verbose: true },
+    );
+  }, 20_000);
 });

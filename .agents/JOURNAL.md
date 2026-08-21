@@ -137,3 +137,4 @@
 - 2026-08-22: REQ-MON-16 property coverage asserts expense edits resolve whole Financials structs, including payer rows, share rows, and rate.
 - 2026-08-22: REQ-MON-17 property coverage asserts superseded concurrent financial edits remain retrievable in expense history.
 - 2026-08-22: REQ-SYN-19/20 property coverage asserts per-author caps drop only the offending author's surplus and preserve admitted-state folding.
+- 2026-08-22: REQ-SYN-22 property coverage asserts quarantined unsupported-schema events still advance transport vectors while leaving balances unchanged.

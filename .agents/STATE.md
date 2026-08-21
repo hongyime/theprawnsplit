@@ -749,6 +749,11 @@ Notes:
   admitted subset. Latest verification on 2026-08-22 passed with `npm run build` (59
   core tests, 143 root tests), root `npm audit --json`, protected-string scan, and
   `git diff --check`.
+- Added REQ-SYN-22/§16.2 quarantine transport-vector coverage in the core property
+  suite. Generated unsupported-schema expenses now advance the transport vector while
+  fold quarantines/freezes them without changing balances. Latest verification on
+  2026-08-22 passed with `npm run build` (60 core tests, 143 root tests), root
+  `npm audit --json`, protected-string scan, and `git diff --check`.
 - Vercel checks on 2026-08-21 show the current `main` production deployment is Ready
   and has the requested aliases attached. Vercel env listing still shows no env vars
   configured, so the operated relay runtime remains unconfigured.

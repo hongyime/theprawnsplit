@@ -2,7 +2,7 @@ import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import { canonicalStateBytes } from "../src/canonical";
 import { fold } from "../src/fold";
-import { authorisedKeys } from "../src/identity";
+import { authorisedKeys, buildDSU } from "../src/identity";
 import { admitTransportEvents } from "../src/transport";
 import type { Event } from "../src/types";
 import { base, financials, groupTag, hlc, resetIds, sig, verifier } from "./helpers";
@@ -108,6 +108,38 @@ describe("REQ-SYN-12 property convergence", () => {
 
         expect(reversed).toBe(reference);
         expect(duplicated).toBe(reference);
+      }),
+      { seed: Number(process.env.FAST_CHECK_SEED ?? 20260822), numRuns: 75, verbose: true },
+    );
+  }, 20_000);
+
+  it("keeps DSU canonical roots convergent across delivery order", () => {
+    const pids = ["alice", "bob", "chris", "dave", "erin"] as const;
+    const pairArbitrary = fc.tuple(fc.constantFrom(...pids), fc.constantFrom(...pids)).filter(([from, into]) => from !== into);
+
+    fc.assert(
+      fc.property(fc.array(pairArbitrary, { minLength: 1, maxLength: 10 }), (pairs) => {
+        const participants: Event[] = pids.map((pid, index) =>
+          base("ParticipantAdded", {
+            id: `participant-${pid}`,
+            hlc: hlc(index + 1),
+            pid,
+            name: pid,
+          } as never),
+        );
+        const merges = pairs.map(([from, into], index) =>
+          base("ParticipantMerged", {
+            id: `merge-${index}`,
+            hlc: hlc(100 + index),
+            from,
+            into,
+          } as never),
+        );
+        const expected = [...buildDSU([...participants, ...merges]).entries()];
+
+        for (let seed = 1; seed <= 20; seed += 1) {
+          expect([...buildDSU(shuffleWithSeed([...participants, ...merges], seed)).entries()]).toEqual(expected);
+        }
       }),
       { seed: Number(process.env.FAST_CHECK_SEED ?? 20260822), numRuns: 75, verbose: true },
     );

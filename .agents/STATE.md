@@ -754,6 +754,11 @@ Notes:
   fold quarantines/freezes them without changing balances. Latest verification on
   2026-08-22 passed with `npm run build` (60 core tests, 143 root tests), root
   `npm audit --json`, protected-string scan, and `git diff --check`.
+- Added REQ-ID-13/§16.2 DSU root convergence coverage in the core property suite.
+  Generated participant merge graphs now assert `buildDSU()` returns identical
+  canonical roots across deterministic delivery orders. Latest verification on
+  2026-08-22 passed with `npm run build` (61 core tests, 143 root tests), root
+  `npm audit --json`, protected-string scan, and `git diff --check`.
 - Vercel checks on 2026-08-21 show the current `main` production deployment is Ready
   and has the requested aliases attached. Vercel env listing still shows no env vars
   configured, so the operated relay runtime remains unconfigured.

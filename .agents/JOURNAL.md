@@ -108,3 +108,4 @@
 - 2026-08-22: The automatic archive export must represent the archived ledger: prepare one `GroupArchived` event, include it in the downloaded export view, then append that same event.
 - 2026-08-22: Expense total edits preserve the existing financial shape: payer rows, share rows, and frozen `rate` are rescaled atomically rather than rebuilt as a single-payer base-currency expense.
 - 2026-08-22: Zero-value stored financial rows are still editable ledger shape: edit rescaling uses equal fallback weights only when all existing row amounts are zero.
+- 2026-08-22: REQ-SYN-02 remains a source boundary: direct network APIs and Nostr pool operations stay inside relay adapters, while adapter construction stays in the sync relay factory.

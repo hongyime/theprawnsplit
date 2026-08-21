@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { readdirSync, readFileSync, statSync } from "node:fs";
-import { extname, join } from "node:path";
+import { extname, join, relative } from "node:path";
 
 const sourceRoot = join(process.cwd(), "src");
 const sourceExtensions = new Set([".svelte", ".ts"]);
@@ -18,6 +18,10 @@ function readSources(): string {
   return sourceFiles(sourceRoot)
     .map((path) => readFileSync(path, "utf8"))
     .join("\n");
+}
+
+function sourceEntries(): { path: string; source: string }[] {
+  return sourceFiles(sourceRoot).map((path) => ({ path, source: readFileSync(path, "utf8") }));
 }
 
 describe("platform boundaries", () => {
@@ -43,5 +47,25 @@ describe("platform boundaries", () => {
       /\b(?:Stripe|stripe|PayPal|paypal|Venmo|venmo|Plaid|plaid|CheckoutProvider|PaymentRequest|paymentRequest|PaymentResponse|navigator\.payments)\b/,
     );
     expect(source).not.toMatch(/\b(?:ApplePay|GooglePay|merchantAccount|bankAccount|routingNumber|cardNumber|iban|ach)\b/i);
+  });
+
+  it("keeps direct network APIs inside relay adapters", () => {
+    const adapterPaths = new Set([join(sourceRoot, "relay", "http.ts"), join(sourceRoot, "relay", "nostr.ts")]);
+    const offenders = sourceEntries()
+      .filter((entry) => !adapterPaths.has(entry.path))
+      .filter((entry) => /\b(?:window|globalThis)\.fetch\s*\(|\bawait\s+fetch\s*\(|\bnew\s+(?:WebSocket|EventSource)\s*\(|\bSimplePool\b|\bpool\.(?:publish|querySync)\b/.test(entry.source))
+      .map((entry) => relative(process.cwd(), entry.path));
+
+    expect(offenders).toEqual([]);
+  });
+
+  it("keeps relay adapter construction behind the sync relay factory", () => {
+    const factoryPath = join(sourceRoot, "relay", "sync.ts");
+    const offenders = sourceEntries()
+      .filter((entry) => entry.path !== factoryPath)
+      .filter((entry) => /\bnew\s+(?:HttpRelay|NostrRelay)\b/.test(entry.source))
+      .map((entry) => relative(process.cwd(), entry.path));
+
+    expect(offenders).toEqual([]);
   });
 });

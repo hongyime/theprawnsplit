@@ -590,6 +590,10 @@ Notes:
   rows are zero, preserving row shape and keeping imported zero-total expenses editable
   instead of throwing in allocation. Latest verification on 2026-08-22 passed with `npm
   run build` (48 core tests, 119 root tests).
+- Added REQ-SYN-02 relay-boundary coverage. Source-level platform tests now fail if
+  direct browser network APIs, Nostr pool calls, or relay adapter construction leak
+  outside the relay adapters and sync relay factory. Latest verification on 2026-08-22
+  passed with `npm run build` (48 core tests, 121 root tests).
 - Vercel checks on 2026-08-21 show the current `main` production deployment is Ready
   and has the requested aliases attached. Vercel env listing still shows no env vars
   configured, so the operated relay runtime remains unconfigured.

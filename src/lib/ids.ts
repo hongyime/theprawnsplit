@@ -18,6 +18,10 @@ export function todayLocal(): string {
 
 export function inferCurrency(): string {
   const locale = navigator.language || "en-US";
+  return inferCurrencyFromLocale(locale);
+}
+
+export function inferCurrencyFromLocale(locale: string): string {
   const region = locale.split("-")[1]?.toUpperCase();
   if (region === "SG") return "SGD";
   if (region === "GB") return "GBP";

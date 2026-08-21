@@ -544,6 +544,11 @@ Notes:
   both primary actions: Add people, which focuses the participant input, and Share trip
   file. Latest verification on 2026-08-22 passed with `npm run build` (48 core tests,
   105 root tests).
+- Added REQ-MON-07/REQ-UX-03 currency-onboarding coverage. Currency inference is now
+  exposed through a pure helper, and repository coverage proves `ensureGroup()` creates a
+  local group immediately with inferred currency and a `GroupCreated` event instead of a
+  setup currency step. Latest verification on 2026-08-22 passed with `npm run build`
+  (48 core tests, 107 root tests).
 - Vercel checks on 2026-08-21 show the current `main` production deployment is Ready
   and has the requested aliases attached. Vercel env listing still shows no env vars
   configured, so the operated relay runtime remains unconfigured.

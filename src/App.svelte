@@ -50,6 +50,7 @@
   import { defaultExpenseDate, defaultParticipant, makeEvent, makeExpenseFinancials, type EventFactory } from "@/lib/events";
   import { formatMinor, parseMinor, type SplitMode } from "@/lib/money";
   import { isArchivedEventLog } from "@/lib/archive";
+  import { createDeviceLinkRequest, linkPayload, parseDeviceLinkRequest, type DeviceLinkRequest } from "@/lib/device-link";
   import { expenseHistoryRows } from "@/lib/expense-history";
   import { findParticipantNameMatch, groupParticipantsForClaim, type ParticipantNameMatch } from "@/lib/participants";
   import { canVoidRecordedSettlement, settlementClaimView } from "@/lib/settlement-history";
@@ -226,6 +227,45 @@
       f,
     );
     claimCandidatePid = "";
+  }
+
+  async function requestDeviceLink(pid: string): Promise<void> {
+    if (!group || archived) return;
+    const identity = await ensureClaimIdentity(group, pid);
+    const request = createDeviceLinkRequest({ tagHex: group.tagHex, pid, deviceId: group.deviceId, identity });
+    const text = JSON.stringify(request, null, 2);
+    try {
+      await navigator.clipboard.writeText(text);
+      syncStatus = "Device link request copied.";
+    } catch {
+      window.prompt("Copy device link request", text);
+    }
+    group = await ensureGroup();
+    await refreshState();
+  }
+
+  async function acceptDeviceLinkRequest(request: DeviceLinkRequest): Promise<void> {
+    if (!group || archived) return;
+    if (request.tagHex !== group.tagHex) throw new Error("Device link request does not match this trip");
+    const signer = localIdentityForPid(request.pid);
+    if (!signer) throw new Error(`Claim ${participantLabel(request.pid)} on this device before authorising another device`);
+    const f = factory();
+    const sig = await signClaim(signer.claimSkJwk, signer.alg, linkPayload(request));
+    await commit(
+      [
+        makeEvent(f, "DeviceLinked", {
+          pid: request.pid,
+          parentDevice: group.deviceId,
+          newDevice: request.newDevice,
+          newClaimPk: request.newClaimPk,
+          alg: request.alg,
+          nonce: request.nonce,
+          sig,
+        }),
+      ],
+      f,
+    );
+    syncStatus = `Device linked for ${participantLabel(request.pid)}.`;
   }
 
   async function mergeParticipants(from: string, into: string): Promise<void> {
@@ -555,13 +595,19 @@
   async function importExport(): Promise<void> {
     error = "";
     try {
-      const artifact = parseExport(importText);
-      group = artifact.type === "TripLedgerExport" ? await replaceFromExport(artifact) : await restoreIdentityBackup(artifact);
+      const text = importText;
+      const artifactType = (JSON.parse(text) as { type?: string }).type;
+      if (artifactType === "DeviceLinkRequest") {
+        await acceptDeviceLinkRequest(parseDeviceLinkRequest(text));
+      } else {
+        const artifact = parseExport(text);
+        group = artifact.type === "TripLedgerExport" ? await replaceFromExport(artifact) : await restoreIdentityBackup(artifact);
+        syncStatus = artifact.type === "DeviceIdentityBackup" ? "Identity backup restored." : syncStatus;
+      }
       importText = "";
       joiningFromLink = false;
       recoveryAttempted = false;
       lastSyncResult = null;
-      syncStatus = artifact.type === "DeviceIdentityBackup" ? "Identity backup restored." : syncStatus;
       await refreshState();
       await refreshCounts();
       await refreshDurabilityPrompts();
@@ -968,6 +1014,8 @@
                       {participant.devices.length} device
                       {#if localClaimPids.has(participant.pid)}
                         <span>you</span>
+                      {:else if !archived}
+                        <button type="button" class="secondary" on:click={() => requestDeviceLink(participant.pid)} title="Request device link"><Link size={15} /> Link</button>
                       {/if}
                     </span>
                   </li>
@@ -1108,7 +1156,7 @@
 
     <section class="panel import-panel" id="manual-import">
       <h2><Upload size={18} /> Import Recovery JSON</h2>
-      <textarea bind:value={importText} placeholder="Paste a TripLedgerExport or DeviceIdentityBackup JSON file here"></textarea>
+      <textarea bind:value={importText} placeholder="Paste a TripLedgerExport, DeviceIdentityBackup, or DeviceLinkRequest JSON file here"></textarea>
       <button type="button" disabled={!importText.trim()} on:click={importExport}>Import</button>
     </section>
     {#if claimCandidate}

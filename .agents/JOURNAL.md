@@ -36,3 +36,4 @@
 - 2026-08-21: Relay diagnostics parse NIP-01 OK failure prefixes into user-visible actions; duplicate publish replies are treated as already-stored success while rate-limit, auth, blocked, invalid, pow, and error replies remain visible sync issues.
 - 2026-08-21: REQ-MON-17 is surfaced in the app ledger by showing every folded financial correction, with the active correction marked and superseded corrections still retrievable.
 - 2026-08-21: Settlement disputes and voids remain append-only UI actions: disputes display beside the payment claim without reversing balances, and void is offered only on the device that recorded the settlement.
+- 2026-08-21: Device pairing uses a shareable DeviceLinkRequest containing the joining device key and nonce; an authorised device signs the PRD DeviceLinked payload and appends the delegation event.

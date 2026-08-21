@@ -24,3 +24,4 @@
 - 2026-08-21: Shadow-payee settlements are represented as `cashUnconfirmable`, not pending, because shadow participants cannot hold claim keys and must not generate confirmation nagging.
 - 2026-08-21: `DeviceIdentityBackup` restore matches local trips by `tagHex`, not only `groupId`, because a join-link recovered device can have a different local IndexedDB group id while representing the same trip.
 - 2026-08-21: Pushed accumulated local work to `main` at `cd21de2`; Vercel automatic production deployment succeeded after prior rate-limit failures.
+- 2026-08-21: `SettlementVoided` is honored only from the device that recorded the settlement; unauthorized void attempts surface an anomaly and leave balances unchanged.

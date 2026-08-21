@@ -142,6 +142,38 @@ describe("REQ-MON-15/REQ-SYN-12 fold", () => {
     expect(state.balances.get("bob")).toBe(-100n);
   });
 
+  it("allows the recording device to void its own settlement", () => {
+    const state = fold(
+      [
+        base("ParticipantAdded", { pid: "alice", name: "Alice" } as never),
+        base("ParticipantAdded", { pid: "bob", name: "Bob" } as never),
+        base("SettlementRecorded", { id: "settle-1", sid: "s1", from: "bob", to: "alice", minor: 100n, dev: "bob-phone" } as never),
+        base("SettlementVoided", { sid: "s1", dev: "bob-phone" } as never),
+      ],
+      { supportedVersion: 1 },
+    );
+
+    expect(state.settlements.has("s1")).toBe(false);
+    expect([...state.balances.values()].reduce((a, b) => a + b, 0n)).toBe(0n);
+  });
+
+  it("rejects settlement voids from another device", () => {
+    const state = fold(
+      [
+        base("ParticipantAdded", { pid: "alice", name: "Alice" } as never),
+        base("ParticipantAdded", { pid: "bob", name: "Bob" } as never),
+        base("SettlementRecorded", { id: "settle-1", sid: "s1", from: "bob", to: "alice", minor: 100n, dev: "bob-phone" } as never),
+        base("SettlementVoided", { id: "void-1", sid: "s1", dev: "alice-phone" } as never),
+      ],
+      { supportedVersion: 1 },
+    );
+
+    expect(state.settlements.has("s1")).toBe(true);
+    expect(state.anomalies.find((anomaly) => anomaly.code === "unauthorized-settlement-void")?.relatedEventId).toBe("settle-1");
+    expect(state.balances.get("alice")).toBe(100n);
+    expect(state.balances.get("bob")).toBe(-100n);
+  });
+
   it("surfaces duplicate participant names unless marked distinct", () => {
     const aliceA = base("ParticipantAdded", { pid: "alice-a", name: "Dave" } as never);
     const aliceB = base("ParticipantAdded", { pid: "alice-b", name: " dave " } as never);

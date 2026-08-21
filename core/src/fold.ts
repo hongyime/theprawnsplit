@@ -65,6 +65,34 @@ function mergePath(
   return [];
 }
 
+function settlementVoidDecisions(events: Event[]): { voided: Set<string>; anomalies: Anomaly[] } {
+  const settlementBySid = new Map<string, Extract<Event, { t: "SettlementRecorded" }>>();
+  const voided = new Set<string>();
+  const anomalies: Anomaly[] = [];
+
+  for (const event of [...events].sort(eventSortKey)) {
+    if (event.t === "SettlementRecorded" && !settlementBySid.has(event.sid)) settlementBySid.set(event.sid, event);
+  }
+  for (const event of [...events].sort(eventSortKey)) {
+    if (event.t !== "SettlementVoided") continue;
+    const settlement = settlementBySid.get(event.sid);
+    if (!settlement) continue;
+    if (event.dev === settlement.dev) {
+      voided.add(event.sid);
+    } else {
+      anomalies.push({
+        code: "unauthorized-settlement-void",
+        sid: event.sid,
+        eventId: event.id,
+        relatedEventId: settlement.id,
+        message: "SettlementVoided must be emitted by the device that recorded the settlement",
+      });
+    }
+  }
+
+  return { voided, anomalies };
+}
+
 export function fold(events: Event[], opts: FoldOptions, ctx?: VerificationContext): State {
   const ordered = [...events].sort(eventSortKey);
   const quarantined: string[] = [];
@@ -82,11 +110,12 @@ export function fold(events: Event[], opts: FoldOptions, ctx?: VerificationConte
   const contestedPids = ctx ? contestedClaimPids(supported, ctx) : new Set<string>();
   const mergeEdges = activeMergeEdges(supported);
   const markedDistinct = new Map<string, { eventId: string; a: string; b: string }>();
+  const settlementVoidDecision = settlementVoidDecisions(supported);
+  anomalies.push(...settlementVoidDecision.anomalies);
   const expenseVoids = new Set<string>();
-  const settlementVoids = new Set<string>();
+  const settlementVoids = settlementVoidDecision.voided;
   for (const event of supported) {
     if (event.t === "ExpenseVoided") expenseVoids.add(event.xid);
-    if (event.t === "SettlementVoided") settlementVoids.add(event.sid);
     if (event.t === "EventVoided") {
       const target = supported.find((candidate) => candidate.id === event.targetId);
       if (target?.t === "EventVoided") {

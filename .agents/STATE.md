@@ -111,9 +111,12 @@ Progress:
   through the recovery import UI and restored onto a matching local trip by `tagHex`,
   even when the local IndexedDB `groupId` differs after join-link recovery. This keeps
   identity backup separate from `TripLedgerExport` while restoring claim keys.
+- Added Phase 4 settlement-void authority. `SettlementVoided` is honored only when
+  emitted by the device that recorded the original settlement; other void attempts now
+  surface `unauthorized-settlement-void` and leave settlements/balances intact.
 
 Next step:
-- Latest pushed commit is `cd21de2` on `main`.
+- Latest pushed commit before this slice is `1d17e8e` on `main`.
 - GitHub/Vercel automatic production deployment for `cd21de2` completed Ready on
   2026-08-21.
 - Remaining deployment work: configure Vercel env vars and verify custom-domain runtime.
@@ -172,6 +175,9 @@ Notes:
 - Latest verification on 2026-08-21 after identity-backup restore: `npm run build`
   passed locally with 33 core tests and 11 root tests; root `npm audit --json` reports
   zero vulnerabilities.
+- Latest verification on 2026-08-21 after settlement-void authority: `npm --prefix
+  core test` passed with 35 tests, `npm run build` passed with 35 core tests and 11
+  root tests, and root `npm audit --json` reports zero vulnerabilities.
 - Vercel checks on 2026-08-21 show the project exists but direct deployment creation was
   quota-blocked.
 - Vercel automatic deploy on 2026-08-21 for `cd21de2` succeeded and reports Ready.

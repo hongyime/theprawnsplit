@@ -49,6 +49,15 @@ describe("platform boundaries", () => {
     expect(source).not.toMatch(/\b(?:email|phoneNumber|phone number|sms|otp|one-time password)\b/i);
   });
 
+  it("keeps ads, paywalls, subscriptions, and premium gates out of the client", () => {
+    const source = readSources();
+
+    expect(source).not.toMatch(
+      /\b(?:AdSense|adsbygoogle|DoubleClick|googletag|admob|interstitial|rewardedAd|paywall|subscription|subscribeNow|premium|proPlan|billingPortal)\b/,
+    );
+    expect(source).not.toMatch(/\b(?:checkoutSession|priceId|meteredBilling|usageLimit|trialEndsAt|entitlement)\b/);
+  });
+
   it("keeps settlements as ledger records without payment rails", () => {
     const source = readSources();
 

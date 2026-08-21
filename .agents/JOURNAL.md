@@ -147,3 +147,4 @@
 - 2026-08-22: REQ-SYN-11 coverage proves duplicate relay publish acknowledgements are treated as successful quorum members during sync.
 - 2026-08-22: REQ-PLT-09 coverage pins exact adaptive polling cadence boundaries for active, backoff, idle, hidden/archive/no-group suppression.
 - 2026-08-22: REQ-ID-01 source-boundary coverage rejects client account, login, signup, third-party auth, email, phone, SMS, OTP, magic-link, and password-reset flows.
+- 2026-08-22: REQ-UX-05 source-boundary coverage rejects client ads, paywalls, subscriptions, premium gates, billing, usage-limit, trial, and entitlement code.

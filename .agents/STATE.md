@@ -122,9 +122,12 @@ Progress:
   for a payee with an active claim anomaly now leaves the settlement pending, marks the
   settlement as contested, and records `contested-settlement-confirmation`; invalid
   signatures remain ignored.
+- Added Phase 4 version-vector financial edit resolution. Causally newer financial edits
+  now remain the active expense financials even when HLC clock skew sorts an older edit
+  later, while valid superseded financial edits remain visible in `financialHistory`.
 
 Next step:
-- Latest pushed commit before this slice is `43e6b37` on `main`.
+- Latest pushed commit before this slice is `bf2fce5` on `main`.
 - GitHub/Vercel automatic production deployment for `cd21de2` completed Ready on
   2026-08-21.
 - Remaining deployment work: configure Vercel env vars and verify custom-domain runtime.
@@ -192,6 +195,9 @@ Notes:
 - Latest verification on 2026-08-21 after contested-confirmation surfacing: `npm
   --prefix core test` passed with 39 tests, `npm run build` passed with 39 core tests
   and 11 root tests, and root `npm audit --json` reports zero vulnerabilities.
+- Latest verification on 2026-08-21 after version-vector financial edit resolution:
+  `npm --prefix core test` passed with 40 tests, `npm run build` passed with 40 core
+  tests and 11 root tests, and root `npm audit --json` reports zero vulnerabilities.
 - Vercel checks on 2026-08-21 show the project exists but direct deployment creation was
   quota-blocked.
 - Vercel automatic deploy on 2026-08-21 for `cd21de2` succeeded and reports Ready.

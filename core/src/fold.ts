@@ -34,6 +34,21 @@ const validateFinancials = (financials: Financials): boolean =>
   sumRows(financials.payers) === financials.minor &&
   sumRows(financials.shares) === financials.minor;
 
+const eventCounter = (event: Event): number => {
+  const suffix = event.id.startsWith(`${event.dev}:`) ? Number(event.id.slice(event.dev.length + 1)) : Number.NaN;
+  return Number.isSafeInteger(suffix) ? suffix : event.hlc.ctr;
+};
+
+const versionCovers = (event: Event, other: Event): boolean => (event.vv?.[other.dev] ?? 0) >= eventCounter(other);
+
+const financialWinner = (current: Event, candidate: Event): Event => {
+  const candidateCoversCurrent = versionCovers(candidate, current);
+  const currentCoversCandidate = versionCovers(current, candidate);
+  if (candidateCoversCurrent && !currentCoversCandidate) return candidate;
+  if (currentCoversCandidate && !candidateCoversCurrent) return current;
+  return compareHlc(candidate.hlc, current.hlc) >= 0 ? candidate : current;
+};
+
 const pairKey = (a: string, b: string): string => (a < b ? `${a}\0${b}` : `${b}\0${a}`);
 
 const normalizeName = (name: string): string => name.trim().toLocaleLowerCase().replace(/\s+/g, " ");
@@ -140,6 +155,7 @@ export function fold(events: Event[], opts: FoldOptions, ctx?: VerificationConte
   const participants = new Map<string, ParticipantState>();
   const claimDevices = new Map<string, Set<string>>();
   const expenses = new Map<string, ExpenseState>();
+  const expenseFinancialEvents = new Map<string, Event>();
   const settlements = new Map<string, SettlementState>();
   const balances = new Map<string, Money>();
 
@@ -202,6 +218,7 @@ export function fold(events: Event[], opts: FoldOptions, ctx?: VerificationConte
         date: event.date,
         financialHistory: [event.financials],
       });
+      expenseFinancialEvents.set(event.xid, event);
     }
     if (event.t === "ExpenseEdited" && !expenseVoids.has(event.xid)) {
       const existing = expenses.get(event.xid);
@@ -213,7 +230,9 @@ export function fold(events: Event[], opts: FoldOptions, ctx?: VerificationConte
           continue;
         }
         next.financialHistory = [...existing.financialHistory, event.financials];
-        next.financials = event.financials;
+        const winningEvent = financialWinner(expenseFinancialEvents.get(event.xid) ?? event, event);
+        expenseFinancialEvents.set(event.xid, winningEvent);
+        next.financials = winningEvent === event ? event.financials : existing.financials;
       }
       if (event.meta?.desc !== undefined) next.desc = event.meta.desc;
       if (event.meta?.date !== undefined) next.date = event.meta.date;

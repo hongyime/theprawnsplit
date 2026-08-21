@@ -27,3 +27,4 @@
 - 2026-08-21: `SettlementVoided` is honored only from the device that recorded the settlement; unauthorized void attempts surface an anomaly and leave balances unchanged.
 - 2026-08-21: Merged participant display unions claiming devices across the component, but settlement confirmation authority still verifies only against the literal pre-merge payee chain.
 - 2026-08-21: Contested payee confirmations are preserved as visible settlement state when the signature matches a payee claim key, but they never clear pending authority.
+- 2026-08-21: Financial edit winners use version-vector causality before HLC tie-breaks, so clock-skewed older edits cannot overwrite known newer corrections.

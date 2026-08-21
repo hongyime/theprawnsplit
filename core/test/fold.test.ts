@@ -64,6 +64,41 @@ describe("REQ-MON-15/REQ-SYN-12 fold", () => {
     expect(state.expenses.get("x1")?.financialHistory.map((f) => f.minor)).toEqual([100n, 120n, 140n]);
   });
 
+  it("does not let a causally older financial edit overwrite a newer one by HLC skew", () => {
+    const added = base("ExpenseAdded", {
+      id: "a:1",
+      dev: "a",
+      hlc: { wall: 1, ctr: 1, dev: "a" },
+      vv: { a: 1 },
+      xid: "x1",
+      financials: financials(100n, [["alice", 100n]], [["bob", 100n]]),
+      desc: "Lunch",
+      at: 1,
+      date: "2026-08-21",
+    } as never);
+    const oldCorrection = base("ExpenseEdited", {
+      id: "b:1",
+      dev: "b",
+      hlc: { wall: 30, ctr: 1, dev: "b" },
+      vv: { a: 1, b: 1 },
+      xid: "x1",
+      financials: financials(120n, [["alice", 120n]], [["bob", 120n]]),
+    } as never);
+    const newCorrection = base("ExpenseEdited", {
+      id: "a:2",
+      dev: "a",
+      hlc: { wall: 20, ctr: 2, dev: "a" },
+      vv: { a: 2, b: 1 },
+      xid: "x1",
+      financials: financials(140n, [["alice", 140n]], [["bob", 140n]]),
+    } as never);
+
+    const state = fold([oldCorrection, added, newCorrection], { supportedVersion: 1 });
+
+    expect(state.expenses.get("x1")?.financials.minor).toBe(140n);
+    expect(state.expenses.get("x1")?.financialHistory.map((f) => f.minor)).toEqual([100n, 140n, 120n]);
+  });
+
   it("produces canonical bytes independent of delivery order", () => {
     const events = [
       claim("alice", "phone", "alice-key"),

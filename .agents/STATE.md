@@ -854,3 +854,8 @@ Notes:
   with focused `npx vitest run test/export-prompt-ui.test.ts`, `npm run build` (64
   core tests, 157 root tests), root `npm audit --json`, protected-string scan, and
   `git diff --check`.
+- Fixed and covered REQ-ID-02 device ID privacy in the UI so generated device UUIDs
+  remain local and user-facing copy never reveals the full ID or a prefix. Verification
+  on 2026-08-22 passed with focused `npx vitest run test/device-id-privacy-ui.test.ts
+  test/participants.test.ts`, `npm run build` (64 core tests, 158 root tests), root
+  `npm audit --json`, protected-string scan, and `git diff --check`.

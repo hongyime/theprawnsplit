@@ -72,10 +72,10 @@ describe("participant name matching", () => {
     expect(
       claimAttributionText({
         name: "Ben",
-        device: "device abc12345",
+        device: "another device",
         claimedAt: "Aug 21, 2026, 8:30 PM",
         balance: "USD 12.00",
       }),
-    ).toBe("Ben was claimed by device abc12345 on Aug 21, 2026, 8:30 PM. Current balance: USD 12.00.");
+    ).toBe("Ben was claimed by another device on Aug 21, 2026, 8:30 PM. Current balance: USD 12.00.");
   });
 });

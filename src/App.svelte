@@ -405,7 +405,7 @@
   function shortDevice(deviceId?: string): string {
     if (!deviceId) return "unknown device";
     if (deviceId === group?.deviceId) return "this device";
-    return `device ${deviceId.slice(0, 8)}`;
+    return "another device";
   }
 
   function mergeUndoEventIds(anomaly: State["anomalies"][number]): string[] {
@@ -1324,7 +1324,7 @@
                 <span>{anomaly.message}</span>
               {:else if anomaly.code === "unverified-reclaim" && anomaly.pid}
                 <strong>{participantLabel(anomaly.pid)} has an unverified recovered device</strong>
-                <span>{participantClaimEvent(anomaly.eventId)?.deviceId ?? "A device"} needs peer re-attestation before it can confirm settlements. {reattestationMessage(anomaly.eventId)}</span>
+                <span>{shortDevice(participantClaimEvent(anomaly.eventId)?.deviceId)} needs peer re-attestation before it can confirm settlements. {reattestationMessage(anomaly.eventId)}</span>
               {:else}
                 <strong>{anomaly.code}</strong>
                 <span>{anomaly.message}</span>

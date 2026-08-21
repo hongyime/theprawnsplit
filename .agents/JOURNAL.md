@@ -103,3 +103,4 @@
 - 2026-08-22: Common-case expense entry defaults the single payer to a locally claimed participant when possible; existing valid payer choices are user intent and are not overwritten.
 - 2026-08-22: Expense append eligibility is a command boundary, not just button state: local claim, non-empty description, and valid amount/share/payer previews are checked before creating `ExpenseAdded`.
 - 2026-08-22: REQ-SET-02 is enforced as a platform boundary: settlement UI may append ledger records, but app source must not introduce payment processors or browser payment APIs.
+- 2026-08-22: Settlement recording eligibility is a command boundary: active, unfrozen, positive, non-self transfers are required before appending `SettlementRecorded`.

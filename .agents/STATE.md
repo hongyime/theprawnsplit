@@ -565,6 +565,11 @@ Notes:
   introduces payment processors or browser payment APIs, keeping settlements as
   append-only ledger records instead of money movement. Latest verification on
   2026-08-22 passed with `npm run build` (48 core tests, 112 root tests).
+- Hardened REQ-SET-03 settlement record eligibility. Manual settlement recording now
+  shares a tested command helper with the handler, requiring an active, unfrozen,
+  positive transfer between different participants before appending `SettlementRecorded`.
+  Latest verification on 2026-08-22 passed with `npm run build` (48 core tests, 113
+  root tests).
 - Vercel checks on 2026-08-21 show the current `main` production deployment is Ready
   and has the requested aliases attached. Vercel env listing still shows no env vars
   configured, so the operated relay runtime remains unconfigured.

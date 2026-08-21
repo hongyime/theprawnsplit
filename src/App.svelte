@@ -79,6 +79,7 @@
   import { relayDiagnosticActionText } from "@/lib/relay-diagnostics";
   import { normalizeRelaySettings, parseNostrRelayText, relaySettingsTargetCount, type RelaySettings } from "@/lib/relay-settings";
   import { reattestationStatus } from "@/lib/reattestation";
+  import { canRecordSettlement } from "@/lib/settlement-command";
   import { canVoidRecordedSettlement, settlementClaimView } from "@/lib/settlement-history";
   import { preserveSplitInputs } from "@/lib/split-preservation";
   import { applySubgroupSelection, deleteSubgroupPreset, upsertSubgroupPreset } from "@/lib/subgroups";
@@ -166,6 +167,13 @@
   $: joinBlocked = Boolean(group && !group.events.some((event) => event.t === "GroupCreated"));
   $: recoveryActive = Boolean(joiningFromLink && joinBlocked);
   $: canSaveExpense = canAppendExpense({ archived, hasLocalClaim, description: expenseDesc, amountOk: amountPreview.ok, sharesOk: sharePreview.ok, payersOk: payerPreview.ok });
+  $: canRecordManualSettlement = canRecordSettlement({
+    archived,
+    allowSettlementActions: frozenPolicy.allowSettlementActions,
+    from: settleFrom,
+    to: settleTo,
+    minor: parseMinor(settleAmount),
+  });
   $: storageLabel = persistedStorage === null ? "storage unknown" : persistedStorage ? "storage protected" : "storage best effort";
   $: syncLabels = syncSurfaceLabels({ unconfirmedCount, quarantinedCount: state?.quarantined.length ?? 0 });
   $: archived = isGroupArchived();
@@ -620,9 +628,9 @@
   }
 
   async function recordSettlement(from: string, to: string, amount: string): Promise<void> {
-    if (archived || !frozenPolicy.allowSettlementActions) return;
     const minor = parseMinor(amount);
-    if (!minor || !from || !to || from === to) return;
+    if (minor === null) return;
+    if (!canRecordSettlement({ archived, allowSettlementActions: frozenPolicy.allowSettlementActions, from, to, minor })) return;
     const f = factory();
     await commit([makeEvent(f, "SettlementRecorded", { sid: crypto.randomUUID(), from, to, minor })], f);
     settleAmount = "";
@@ -1534,7 +1542,7 @@
             <select bind:value={settleFrom} disabled={archived}><option value="">From</option>{#each participants as p}<option value={p.pid}>{p.name}</option>{/each}</select>
             <select bind:value={settleTo} disabled={archived}><option value="">To</option>{#each participants as p}<option value={p.pid}>{p.name}</option>{/each}</select>
             <input bind:value={settleAmount} inputmode="decimal" placeholder="Amount" disabled={archived} />
-            <button type="button" disabled={archived} on:click={() => recordSettlement(settleFrom, settleTo, settleAmount)}>Record</button>
+            <button type="button" disabled={!canRecordManualSettlement} on:click={() => recordSettlement(settleFrom, settleTo, settleAmount)}>Record</button>
           </div>
         {/if}
         {#if settlements.length && frozenPolicy.allowSettlementActions}

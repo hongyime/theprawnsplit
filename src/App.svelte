@@ -83,6 +83,7 @@
   let showPinLinkPrompt = false;
   let activeExportPrompt: ExportPromptReason | null = null;
   let launchDurability: DurabilityPromptState | null = null;
+  let recoveryMode: "first-join" | "evicted" = "first-join";
 
   $: participants = state ? [...state.participants.values()].sort((a, b) => a.name.localeCompare(b.name)) : [];
   $: balances = state && group ? [...state.balances.entries()].sort(([a], [b]) => participantLabel(a).localeCompare(participantLabel(b))) : [];
@@ -108,6 +109,7 @@
     try {
       const seed = readJoinSeed();
       joiningFromLink = Boolean(seed);
+      recoveryMode = seed ? readRecoveryMode() : "first-join";
       group = await ensureGroup(seed);
       launchDurability = normalizeDurabilityPromptState(group.meta.durability);
       group = { ...group, meta: await recordAppLaunch(group.groupId) };
@@ -354,6 +356,11 @@
     }
   }
 
+  function readRecoveryMode(): "first-join" | "evicted" {
+    const params = new URLSearchParams(window.location.hash.slice(1));
+    return params.get("recovery") === "evicted" ? "evicted" : "first-join";
+  }
+
   async function copyJoinLink(): Promise<void> {
     if (!group) return;
     const url = new URL(window.location.href);
@@ -416,14 +423,24 @@
   }
 
   function recoveryMessage(): string {
-    if (!recoveryAttempted || syncing) return "Recovering from relays before rendering an empty ledger.";
-    if (!lastSyncResult) return "Relay recovery did not complete. Manual import is available.";
+    if (!recoveryAttempted || syncing) {
+      return recoveryMode === "evicted"
+        ? "This device looks empty. Recovering from relays before showing anything stale."
+        : "Recovering from relays before rendering an empty ledger.";
+    }
+    if (!lastSyncResult) {
+      return recoveryMode === "evicted"
+        ? "Relay recovery did not complete. Import your latest TripLedgerExport to restore this device."
+        : "Relay recovery did not complete. Manual import is available.";
+    }
     if (lastSyncResult.received > 0) return "Raw events were recovered. Balances will render from the event log.";
     if (lastSyncResult.snapshotsSeen > 0) {
       return "A relay snapshot was found and used only for transport bootstrap. Raw event history is still reconciling.";
     }
     if (lastSyncResult.errors.length > 0) return `Relay recovery failed: ${lastSyncResult.errors[0]}`;
-    return "No raw events were recovered yet. Import a TripLedgerExport or retry sync.";
+    return recoveryMode === "evicted"
+      ? "No raw events were recovered yet. Import is the fastest way back onto this trip."
+      : "No raw events were recovered yet. Import a TripLedgerExport or retry sync.";
   }
 
   function detectStandalone(): boolean {
@@ -629,12 +646,21 @@
     {#if recoveryActive}
       <section class="recovery-panel">
         <div>
-          <h2>Recover Trip</h2>
+          <h2>{recoveryMode === "evicted" ? "Device Storage Empty" : "Join Trip"}</h2>
           <p>{recoveryMessage()}</p>
+          <div class="recovery-mode" aria-label="Recovery mode">
+            <button type="button" class:active={recoveryMode === "first-join"} on:click={() => (recoveryMode = "first-join")}>First time here</button>
+            <button type="button" class:active={recoveryMode === "evicted"} on:click={() => (recoveryMode = "evicted")}>Had it before</button>
+          </div>
         </div>
         <div class="recovery-actions">
-          <button type="button" disabled={syncing} on:click={runSync}><RefreshCcw size={17} /> {syncing ? "Recovering" : "Retry sync"}</button>
-          <a href="#manual-import">Import JSON</a>
+          {#if recoveryMode === "evicted"}
+            <a class="primary-link" href="#manual-import">Import JSON</a>
+            <button type="button" disabled={syncing} on:click={runSync}><RefreshCcw size={17} /> {syncing ? "Recovering" : "Retry sync"}</button>
+          {:else}
+            <button type="button" disabled={syncing} on:click={runSync}><RefreshCcw size={17} /> {syncing ? "Recovering" : "Retry sync"}</button>
+            <a href="#manual-import">Import JSON</a>
+          {/if}
         </div>
       </section>
     {/if}

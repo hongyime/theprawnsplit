@@ -79,6 +79,12 @@ Progress:
 - Added durability prompt policy tests for standalone/archive/offline/desktop suppression,
   dismissal retirement, modal once-per-session behavior, pin-link once-only behavior, and
   export prompt triggers.
+- Added REQ-DUR-10 recovery distinction in the empty join-link blocker. The recovery UI
+  now lets the user mark the screen as first-time join or "had it before"; eviction mode
+  changes the heading/copy and promotes manual JSON import ahead of retry sync.
+- Added structural REQ-SEC-05 export artifact tests. `TripLedgerExport` is asserted to
+  exclude identity backup data, claim private keys, group secret material, and local Nostr
+  secret material; `DeviceIdentityBackup` remains the separate credential-bearing artifact.
 
 Next step:
 - Commit and push `main` when ready; GitHub push is expected to trigger Vercel deployment.
@@ -120,6 +126,9 @@ Notes:
 - Latest verification on 2026-08-21 after Phase 3 prompt gating: `npm run build` passed
   locally with 23 core tests and 7 root tests; root `npm audit --json` reports zero
   vulnerabilities.
+- Latest verification on 2026-08-21 after recovery distinction/export tests: `npm run
+  build` passed locally with 23 core tests and 9 root tests; root `npm audit --json`
+  reports zero vulnerabilities.
 - Vercel checks on 2026-08-21 show the project exists but direct deployment creation was
   quota-blocked.
 - Retried a production Vercel CLI deploy on 2026-08-21; it is still blocked with

@@ -16,6 +16,12 @@ export function parsePercentageBasisPoints(input: string): bigint | null {
   return BigInt(whole) * 100n + BigInt(frac.padEnd(2, "0").slice(0, 2));
 }
 
+export function parseShareWeight(input: string): bigint | null {
+  const trimmed = input.trim();
+  if (!/^\d+$/.test(trimmed)) return null;
+  return BigInt(trimmed);
+}
+
 export function formatMinor(minor: bigint, currency: string): string {
   const sign = minor < 0n ? "-" : "";
   const abs = minor < 0n ? -minor : minor;

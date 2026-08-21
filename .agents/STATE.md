@@ -192,9 +192,11 @@ Progress:
 - Hardened percentage split parsing. Percentage-mode weights now parse decimal input into
   integer basis points and surface invalid percentage text instead of using floating-point
   `Number(...)`/`Math.round(...)`.
+- Hardened share-weight parsing. Share-mode weights now require strict whole-number text
+  instead of accepting partial `Number.parseInt(...)` matches.
 
 Next step:
-- Latest pushed commit before this slice is `b62db08` on `main`.
+- Latest pushed commit before this slice is `538e91c` on `main`.
 - GitHub/Vercel automatic production deployment for `cd21de2` completed Ready on
   2026-08-21.
 - Remaining deployment work: configure Vercel env vars and verify custom-domain runtime.
@@ -333,6 +335,9 @@ Notes:
   protected-string scan, and `git diff --check` passed.
 - Latest verification on 2026-08-21 after percentage split parsing hardening: `npm run
   build` passed with 43 core tests and 55 root tests; root `npm audit --json`,
+  protected-string scan, and `git diff --check` passed.
+- Latest verification on 2026-08-21 after strict share-weight parsing: `npm run build`
+  passed with 43 core tests and 56 root tests; root `npm audit --json`,
   protected-string scan, and `git diff --check` passed.
 - Vercel checks on 2026-08-21 show the project exists but direct deployment creation was
   quota-blocked.

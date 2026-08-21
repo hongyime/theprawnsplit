@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatMinorInput, formatPercentageInput, parsePercentageBasisPoints } from "@/lib/money";
+import { formatMinorInput, formatPercentageInput, parsePercentageBasisPoints, parseShareWeight } from "@/lib/money";
 
 describe("money input formatting", () => {
   it("formats minor units for editable inputs without Number precision loss", () => {
@@ -19,5 +19,12 @@ describe("money input formatting", () => {
     expect(parsePercentageBasisPoints("100")).toBe(10000n);
     expect(parsePercentageBasisPoints("bad")).toBeNull();
     expect(parsePercentageBasisPoints("12.345")).toBeNull();
+  });
+
+  it("parses share weights as strict whole-number text", () => {
+    expect(parseShareWeight("0012")).toBe(12n);
+    expect(parseShareWeight("0")).toBe(0n);
+    expect(parseShareWeight("2abc")).toBeNull();
+    expect(parseShareWeight("1.5")).toBeNull();
   });
 });

@@ -49,7 +49,7 @@
   import { signClaim } from "@/crypto/claim";
   import { config } from "@/config";
   import { defaultExpenseDate, defaultParticipant, makeEvent, makeExpenseFinancials, type EventFactory } from "@/lib/events";
-  import { formatMinor, formatMinorInput, formatPercentageInput, parseMinor, parsePercentageBasisPoints, type SplitMode } from "@/lib/money";
+  import { formatMinor, formatMinorInput, formatPercentageInput, parseMinor, parsePercentageBasisPoints, parseShareWeight, type SplitMode } from "@/lib/money";
   import { isArchivedEventLog } from "@/lib/archive";
   import { createDeviceLinkRequest, linkPayload, parseDeviceLinkRequest, type DeviceLinkRequest } from "@/lib/device-link";
   import { expenseHistoryRows } from "@/lib/expense-history";
@@ -460,7 +460,8 @@
       return { ok: true, shares };
     }
     if (splitMode === "shares") {
-      const weights = pids.map((pid) => BigInt(Math.max(0, Number.parseInt(shareWeights[pid] ?? "0", 10) || 0)));
+      const weights = pids.map((pid) => parseShareWeight(shareWeights[pid] ?? "0") ?? -1n);
+      if (weights.some((weight) => weight < 0n)) return { ok: false, message: "Share weights must be whole numbers." };
       if (weights.every((weight) => weight === 0n)) return { ok: false, message: "Enter at least one share weight." };
       const result = allocatedShares(total, weights, "preview", pids);
       return result.remainderPid ? { ok: true, shares: result.shares, remainderPid: result.remainderPid } : { ok: true, shares: result.shares };

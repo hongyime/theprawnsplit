@@ -575,6 +575,11 @@ Notes:
   settlement, a local payee identity, and no active payee claim anomaly before signing
   `SettlementConfirmed`. Latest verification on 2026-08-22 passed with `npm run build`
   (48 core tests, 115 root tests).
+- Hardened REQ-LIF-04 archive export ordering. Archive now prepares the exact
+  `GroupArchived` event first, downloads a ledger export view containing that event, and
+  then appends the same event so the automatic archive export reconstructs the archived
+  state. Latest verification on 2026-08-22 passed with `npm run build` (48 core tests,
+  116 root tests).
 - Vercel checks on 2026-08-21 show the current `main` production deployment is Ready
   and has the requested aliases attached. Vercel env listing still shows no env vars
   configured, so the operated relay runtime remains unconfigured.

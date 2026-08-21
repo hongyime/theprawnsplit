@@ -59,9 +59,21 @@ export function createArchiveTransitionPlan(outstanding: OutstandingTransfer[]):
   };
 }
 
+export function groupWithPendingArchiveEvent<T extends { events: Event[]; nextCounter: number }>(
+  group: T,
+  archiveEvent: ArchiveEvent,
+  nextCounter: number,
+): T {
+  return {
+    ...group,
+    events: [...group.events, archiveEvent],
+    nextCounter,
+  };
+}
+
 export function archiveConfirmationText(outstanding: string[]): string {
   const label = outstanding.length ? outstanding.join("\n") : "All balances are zero.";
-  return `Archive this trip?\n\nOutstanding balances:\n${label}\n\nA ledger export will download before the archive event is recorded. Relay retention is outside this app's control; archiving does not delete relay data.`;
+  return `Archive this trip?\n\nOutstanding balances:\n${label}\n\nA ledger export containing the archive event will download before the archive event is saved. Relay retention is outside this app's control; archiving does not delete relay data.`;
 }
 
 export function unarchiveConfirmationText(): string {

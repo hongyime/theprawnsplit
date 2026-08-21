@@ -68,6 +68,7 @@
     archiveConfirmationText,
     canEditGroupProfile,
     createArchiveTransitionPlan,
+    groupWithPendingArchiveEvent,
     isSettledViewPredicate,
     latestArchiveEvent,
     shouldPollGroup,
@@ -677,13 +678,13 @@
     await commit([makeEvent(f, "SettlementVoided", { sid })], f);
   }
 
-  function downloadExport(reason?: ExportPromptReason): void {
-    if (!group) return;
-    const blob = new Blob([stringifyExport(createExport(group))], { type: "application/json" });
+  function downloadExport(reason?: ExportPromptReason, sourceGroup = group): void {
+    if (!sourceGroup) return;
+    const blob = new Blob([stringifyExport(createExport(sourceGroup))], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `${group.name || "trip"}-ledger.json`;
+    a.download = `${sourceGroup.name || "trip"}-ledger.json`;
     a.click();
     URL.revokeObjectURL(url);
     if (reason) void markExportPromptHandled(reason);
@@ -749,19 +750,16 @@
     const outstandingLabels = plan.outstanding.map((transfer) => `${participantLabel(transfer.from)} pays ${participantLabel(transfer.to)} ${formatMinor(transfer.minor, group!.currency)}`);
     const ok = window.confirm(archiveConfirmationText(outstandingLabels));
     if (!ok) return;
+    const f = factory();
+    const archiveEvent = makeEvent(f, "GroupArchived", {
+      outstanding: plan.outstanding,
+    });
+    const archivedExportGroup = groupWithPendingArchiveEvent(group, archiveEvent, f.nextCounter);
     for (const action of plan.actions) {
       if (action === "download-export") {
-        downloadExport();
+        downloadExport(undefined, archivedExportGroup);
       } else {
-        const f = factory();
-        await commit(
-          [
-            makeEvent(f, "GroupArchived", {
-              outstanding: plan.outstanding,
-            }),
-          ],
-          f,
-        );
+        await commit([archiveEvent], f);
       }
     }
   }

@@ -4,6 +4,7 @@ import {
   archiveConfirmationText,
   canEditGroupProfile,
   createArchiveTransitionPlan,
+  groupWithPendingArchiveEvent,
   isSettledViewPredicate,
   latestArchiveEvent,
   shouldPollGroup,
@@ -30,7 +31,7 @@ describe("lifecycle copy", () => {
     const text = archiveConfirmationText(["Bob pays Alice USD 12.00"]);
 
     expect(text).toContain("Bob pays Alice USD 12.00");
-    expect(text).toContain("ledger export will download");
+    expect(text).toContain("ledger export containing the archive event will download");
     expect(text).toContain("does not delete relay data");
   });
 
@@ -46,6 +47,20 @@ describe("lifecycle copy", () => {
 
     expect(plan.actions).toEqual(["download-export", "append-archive-event"]);
     expect(plan.outstanding).toEqual([{ from: "p_bob", to: "p_alice", minor: 1200n }]);
+  });
+
+  it("builds an automatic archive export view that already contains the archive event", () => {
+    const group = { events: [event("e_archive_1", 1, "GroupArchived", [])], nextCounter: 2, name: "Trip" };
+    const archive = event("e_archive_2", 2, "GroupArchived", [{ from: "p_bob", to: "p_alice", minor: 1200n }]) as Extract<
+      Event,
+      { t: "GroupArchived" }
+    >;
+    const exportView = groupWithPendingArchiveEvent(group, archive, 3);
+
+    expect(exportView).not.toBe(group);
+    expect(exportView.events.map((candidate) => candidate.id)).toEqual(["e_archive_1", "e_archive_2"]);
+    expect(group.events.map((candidate) => candidate.id)).toEqual(["e_archive_1"]);
+    expect(exportView.nextCounter).toBe(3);
   });
 
   it("derives settled only for active groups whose canonical balances are zero", () => {

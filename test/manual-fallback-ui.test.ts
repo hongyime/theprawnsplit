@@ -3,6 +3,20 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 describe("manual fallback promotion", () => {
+  it("keeps manual fallback actions available outside relay failure states", () => {
+    const source = readFileSync(join(process.cwd(), "src", "App.svelte"), "utf8");
+    const headerActions = source.match(/<div class="header-actions">([\s\S]*?)<\/div>/)?.[1] ?? "";
+    const manualFallbackBanner = source.match(/\{#if manualFallbackDue\}([\s\S]*?)\{\/if\}/)?.[1] ?? "";
+
+    expect(headerActions).toContain("on:click={copyJoinLink}");
+    expect(headerActions).toContain("on:click={showJoinQrCode}");
+    expect(headerActions).toContain("on:click={shareDelta}");
+    expect(headerActions).toContain("on:click={() => downloadExport()}");
+    expect(manualFallbackBanner).toContain("on:click={shareDelta}");
+    expect(manualFallbackBanner).toContain("on:click={() => downloadExport()}");
+    expect(manualFallbackBanner).toContain("on:click={copyJoinLink}");
+  });
+
   it("promotes overdue relay confirmation to visible manual sharing actions", () => {
     const source = readFileSync(join(process.cwd(), "src", "App.svelte"), "utf8");
     const banner = source.match(/\{#if manualFallbackDue\}([\s\S]*?)\{\/if\}/)?.[1] ?? "";

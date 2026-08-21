@@ -604,6 +604,12 @@ Notes:
   unknown/import-mismatched JSON before fallback import dispatch. Latest verification on
   2026-08-22 passed with `npm run build` (48 core tests, 123 root tests), root `npm
   audit --json`, protected-string scan, and `git diff --check`.
+- Added REQ-SYN-13 always-available fallback coverage. A source-level regression now
+  proves Link, QR, Share delta, and Export remain in the normal header outside
+  `manualFallbackDue`, while the overdue banner still promotes Share delta, Export, and
+  Copy link. Latest verification on 2026-08-22 passed with `npm run build` (48 core
+  tests, 124 root tests), root `npm audit --json`, protected-string scan, and `git diff
+  --check`.
 - Vercel checks on 2026-08-21 show the current `main` production deployment is Ready
   and has the requested aliases attached. Vercel env listing still shows no env vars
   configured, so the operated relay runtime remains unconfigured.

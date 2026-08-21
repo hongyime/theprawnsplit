@@ -152,9 +152,12 @@ Progress:
 - Started REQ-SEC-02 device pairing UI. Claimed participant rows can now create a
   shareable `DeviceLinkRequest`, and an authorised device can paste that request to emit a
   signed `DeviceLinked` event.
+- Added REQ-SEC-06 re-attestation threshold display. Contested recovered-device banners
+  now show the majority threshold, current attestation count, and the two-peer small-group
+  caveat from Q14.
 
 Next step:
-- Latest pushed commit before this slice is `33d3db0` on `main`.
+- Latest pushed commit before this slice is `4d30458` on `main`.
 - GitHub/Vercel automatic production deployment for `cd21de2` completed Ready on
   2026-08-21.
 - Remaining deployment work: configure Vercel env vars and verify custom-domain runtime.
@@ -252,6 +255,9 @@ Notes:
 - Latest verification on 2026-08-21 after REQ-SEC-02 device pairing UI: `npm run build`
   passed with 41 core tests and 26 root tests, and root `npm audit --json` reports zero
   vulnerabilities.
+- Latest verification on 2026-08-21 after REQ-SEC-06 re-attestation threshold UI: `npm
+  run build` passed with 41 core tests and 28 root tests, and root `npm audit --json`
+  reports zero vulnerabilities.
 - Vercel checks on 2026-08-21 show the project exists but direct deployment creation was
   quota-blocked.
 - Vercel automatic deploy on 2026-08-21 for `cd21de2` succeeded and reports Ready.

@@ -53,6 +53,7 @@
   import { createDeviceLinkRequest, linkPayload, parseDeviceLinkRequest, type DeviceLinkRequest } from "@/lib/device-link";
   import { expenseHistoryRows } from "@/lib/expense-history";
   import { findParticipantNameMatch, groupParticipantsForClaim, type ParticipantNameMatch } from "@/lib/participants";
+  import { reattestationStatus } from "@/lib/reattestation";
   import { canVoidRecordedSettlement, settlementClaimView } from "@/lib/settlement-history";
   import { buildVerificationContext } from "@/lib/verification";
   import { syncOnce } from "@/relay/sync";
@@ -329,6 +330,20 @@
     if (match.kind === "exact") return `${match.name} already exists.`;
     if (match.kind === "prefix") return `${match.name} looks like the same person.`;
     return `${match.name} is within two edits of this name.`;
+  }
+
+  function reattestationMessage(eventId?: string): string {
+    const claim = participantClaimEvent(eventId);
+    if (!group || !claim) return "Peer re-attestation is required before this device can confirm settlements.";
+    const status = reattestationStatus({
+      events: group.events,
+      participants,
+      targetPid: claim.pid,
+      newDevice: claim.deviceId,
+      newClaimPk: claim.claimPk,
+    });
+    const base = `${status.attestedCount}/${status.threshold} peer re-attestation${status.threshold === 1 ? "" : "s"} recorded.`;
+    return status.caveat ? `${base} ${status.caveat}` : base;
   }
 
   function localPeerIdentityFor(pid: string) {
@@ -928,7 +943,7 @@
                 <span>{anomaly.message}</span>
               {:else if anomaly.code === "contested-participant-claim" && anomaly.pid}
                 <strong>{participantLabel(anomaly.pid)} has an unverified recovered device</strong>
-                <span>{participantClaimEvent(anomaly.eventId)?.deviceId ?? "A device"} needs peer re-attestation before it can confirm settlements.</span>
+                <span>{participantClaimEvent(anomaly.eventId)?.deviceId ?? "A device"} needs peer re-attestation before it can confirm settlements. {reattestationMessage(anomaly.eventId)}</span>
               {:else}
                 <strong>{anomaly.code}</strong>
                 <span>{anomaly.message}</span>

@@ -19,6 +19,7 @@ import { decryptEnvelope, encryptEnvelope, encryptEvents, type SnapshotEnvelope 
 import { relayWriteProof } from "@/crypto/group";
 import { HttpRelay } from "./http";
 import { NostrRelay } from "./nostr";
+import { classifyRelayIssue, isDuplicateRelayAck } from "./diagnostics";
 import type { Relay, SyncResult } from "./types";
 
 export function createRelays(group: GroupRecord): Relay[] {
@@ -44,15 +45,31 @@ export async function syncOnce(groupId: string, relayOverride?: Relay[]): Promis
     snapshotsPublished: 0,
     snapshotsSeen: 0,
     errors: [],
+    diagnostics: [],
   };
 
   if (batch.length > 0) {
     const blob = await encryptEvents(key, batch);
-    const acks = await Promise.allSettled(relays.map((relay) => relay.publish(group.tagHex, group.deviceId, blob, writeProof)));
-    const ok = acks.filter((ack) => ack.status === "fulfilled" && ack.value.ok).length;
+    const acks = await Promise.all(
+      relays.map(async (relay) => {
+        try {
+          return { relay: relay.name, ack: await relay.publish(group.tagHex, group.deviceId, blob, writeProof) };
+        } catch (reason) {
+          return { relay: relay.name, reason };
+        }
+      }),
+    );
+    const ok = acks.filter((result) => "ack" in result && (result.ack.ok || isDuplicateRelayAck(result.ack.reason))).length;
     for (const ack of acks) {
-      if (ack.status === "rejected") result.errors.push(String(ack.reason));
-      else if (!ack.value.ok && ack.value.reason) result.errors.push(ack.value.reason);
+      if ("reason" in ack) {
+        const reason = ack.reason instanceof Error ? ack.reason.message : String(ack.reason);
+        result.errors.push(reason);
+        result.diagnostics.push(classifyRelayIssue({ relay: ack.relay, operation: "publish", reason }));
+      } else if (!ack.ack.ok && ack.ack.reason) {
+        const diagnostic = classifyRelayIssue({ relay: ack.relay, operation: "publish", reason: ack.ack.reason });
+        result.diagnostics.push(diagnostic);
+        if (diagnostic.severity !== "info") result.errors.push(ack.ack.reason);
+      }
     }
     if (ok > 0) {
       await markEvents(groupId, batch.map((event) => event.id), "published");
@@ -60,16 +77,26 @@ export async function syncOnce(groupId: string, relayOverride?: Relay[]): Promis
     }
   }
 
-  const fetched = await Promise.allSettled(relays.map((relay) => relay.fetch(group.tagHex, { limit: 500 })));
+  const fetched = await Promise.all(
+    relays.map(async (relay) => {
+      try {
+        return { relay: relay.name, entries: await relay.fetch(group.tagHex, { limit: 500 }) };
+      } catch (reason) {
+        return { relay: relay.name, reason };
+      }
+    }),
+  );
   const remoteEvents: Event[] = [];
   const snapshots: SnapshotEnvelope[] = [];
   const readBackCounts = new Map<string, number>();
   for (const relayResult of fetched) {
-    if (relayResult.status === "rejected") {
-      result.errors.push(String(relayResult.reason));
+    if ("reason" in relayResult) {
+      const reason = relayResult.reason instanceof Error ? relayResult.reason.message : String(relayResult.reason);
+      result.errors.push(reason);
+      result.diagnostics.push(classifyRelayIssue({ relay: relayResult.relay, operation: "fetch", reason }));
       continue;
     }
-    for (const entry of relayResult.value) {
+    for (const entry of relayResult.entries) {
       try {
         const envelope = await decryptEnvelope(key, entry.blob);
         if (envelope.type === "events") {
@@ -124,8 +151,27 @@ export async function syncOnce(groupId: string, relayOverride?: Relay[]): Promis
       createdAt: Date.now(),
     };
     const blob = await encryptEnvelope(key, snapshot);
-    const acks = await Promise.allSettled(relays.map((relay) => relay.publish(group.tagHex, group.deviceId, blob, writeProof)));
-    const ok = acks.some((ack) => ack.status === "fulfilled" && ack.value.ok);
+    const acks = await Promise.all(
+      relays.map(async (relay) => {
+        try {
+          return { relay: relay.name, ack: await relay.publish(group.tagHex, group.deviceId, blob, writeProof) };
+        } catch (reason) {
+          return { relay: relay.name, reason };
+        }
+      }),
+    );
+    const ok = acks.some((ack) => "ack" in ack && (ack.ack.ok || isDuplicateRelayAck(ack.ack.reason)));
+    for (const ack of acks) {
+      if ("reason" in ack) {
+        const reason = ack.reason instanceof Error ? ack.reason.message : String(ack.reason);
+        result.errors.push(reason);
+        result.diagnostics.push(classifyRelayIssue({ relay: ack.relay, operation: "snapshot", reason }));
+      } else if (!ack.ack.ok && ack.ack.reason) {
+        const diagnostic = classifyRelayIssue({ relay: ack.relay, operation: "snapshot", reason: ack.ack.reason });
+        result.diagnostics.push(diagnostic);
+        if (diagnostic.severity !== "info") result.errors.push(ack.ack.reason);
+      }
+    }
     if (ok) {
       await markSnapshotPublished(groupId, snapshotSeq);
       result.snapshotsPublished = 1;

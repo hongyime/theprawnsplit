@@ -252,6 +252,35 @@ textarea {
   color: #7c2d12;
 }
 
+.relay-diagnostics {
+  margin-bottom: 12px;
+  padding: 0.75rem 0;
+  border-top: 1px solid #fed7aa;
+  border-bottom: 1px solid #fed7aa;
+}
+
+.relay-diagnostics h2 {
+  margin: 0 0 0.45rem;
+  font-size: 1rem;
+}
+
+.diagnostic-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.45rem 0;
+  border-top: 1px solid #ffedd5;
+  color: #7c2d12;
+}
+
+.diagnostic-row span {
+  color: #9a3412;
+}
+
+.diagnostic-row.error-diagnostic {
+  color: #b42318;
+}
+
 .prompt-banner {
   display: flex;
   justify-content: space-between;
@@ -611,6 +640,7 @@ button.secondary {
   .sync-strip,
   .reconcile-row,
   .reconcile-actions,
+  .diagnostic-row,
   .recovery-panel,
   .recovery-actions,
   .prompt-banner,

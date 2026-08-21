@@ -141,9 +141,12 @@ Progress:
 - Added REQ-ID-08 roster ordering. Unclaimed participants now render first with primary
   claim emphasis, claimed participants are grouped in a collapsed section, and create-new
   sits last with secondary styling.
+- Started relay diagnostics for Phase 4. Sync results now carry structured relay
+  diagnostics parsed from NIP-01-style failure prefixes, and the app renders them below
+  the sync strip.
 
 Next step:
-- Latest pushed commit before this slice is `d58d7eb` on `main`.
+- Latest pushed commit before this slice is `3de5aa9` on `main`.
 - GitHub/Vercel automatic production deployment for `cd21de2` completed Ready on
   2026-08-21.
 - Remaining deployment work: configure Vercel env vars and verify custom-domain runtime.
@@ -228,6 +231,9 @@ Notes:
   vulnerabilities.
 - Latest verification on 2026-08-21 after REQ-ID-08 roster ordering: `npm run build`
   passed with 41 core tests and 18 root tests, and root `npm audit --json` reports zero
+  vulnerabilities.
+- Latest verification on 2026-08-21 after relay diagnostics: `npm run build` passed
+  with 41 core tests and 21 root tests, and root `npm audit --json` reports zero
   vulnerabilities.
 - Vercel checks on 2026-08-21 show the project exists but direct deployment creation was
   quota-blocked.

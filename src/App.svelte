@@ -577,7 +577,8 @@
       await refreshState();
       await refreshCounts();
       await refreshDurabilityPrompts();
-      syncStatus = `${result.published} published, ${result.confirmed} confirmed, ${result.received} received, ${result.buffered} buffered, ${result.dropped} dropped, ${result.snapshotsSeen} snapshots seen, ${result.snapshotsPublished} snapshots published${result.errors.length ? `; ${result.errors[0]}` : "."}`;
+      const relayIssues = result.diagnostics.filter((diagnostic) => diagnostic.severity !== "info").length;
+      syncStatus = `${result.published} published, ${result.confirmed} confirmed, ${result.received} received, ${result.buffered} buffered, ${result.dropped} dropped, ${result.snapshotsSeen} snapshots seen, ${result.snapshotsPublished} snapshots published${relayIssues ? `; ${relayIssues} relay issue${relayIssues === 1 ? "" : "s"}.` : result.errors.length ? `; ${result.errors[0]}` : "."}`;
     } catch (err) {
       syncStatus = "Sync failed. Manual export/import is still available.";
       error = err instanceof Error ? err.message : String(err);
@@ -838,6 +839,17 @@
         <span>Claim a person before adding expenses.</span>
       {/if}
     </section>
+    {#if lastSyncResult?.diagnostics.length}
+      <section class="relay-diagnostics" aria-label="Relay diagnostics">
+        <h2>Relay Diagnostics</h2>
+        {#each lastSyncResult.diagnostics as diagnostic}
+          <div class:error-diagnostic={diagnostic.severity === "error"} class="diagnostic-row">
+            <strong>{diagnostic.relay} {diagnostic.operation}: {diagnostic.code}</strong>
+            <span>{diagnostic.action}</span>
+          </div>
+        {/each}
+      </section>
+    {/if}
 
     {#if reconciliationAnomalies.length}
       <section class="reconcile-panel" aria-label="Reconciliation issues">

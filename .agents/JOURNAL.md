@@ -33,3 +33,4 @@
 - 2026-08-21: Peer re-attestation is treated as real claim authority for anomaly clearing; without this, recovered devices could gain keys but remain permanently contested.
 - 2026-08-21: Implemented participant claim UX as append-only identity context: adding a person now interrupts on normalized fuzzy matches instead of silently creating a likely duplicate, and claiming a participant is gated by an in-app provenance/balance review.
 - 2026-08-21: REQ-ID-08 is implemented in the roster/join surface by prioritising unclaimed participant claims first, collapsing already claimed people, and demoting create-new behind existing identities.
+- 2026-08-21: Relay diagnostics parse NIP-01 OK failure prefixes into user-visible actions; duplicate publish replies are treated as already-stored success while rate-limit, auth, blocked, invalid, pow, and error replies remain visible sync issues.

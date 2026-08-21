@@ -49,3 +49,4 @@
 - 2026-08-21: Phase 5 archive acceptance requires TripLedgerExport to reconstruct the GroupArchived event and its outstanding transfers on a fresh store.
 - 2026-08-21: Multi-currency conversion must use the entered decimal rate as exact rational input for base minor units; `Financials.rate.toBase` remains the frozen display/audit value.
 - 2026-08-21: Archive transition ordering is a testable lifecycle contract: present `TripLedgerExport` first, then append `GroupArchived` with a copied outstanding-transfer snapshot.
+- 2026-08-21: Editable money defaults must be formatted from integer minor units, not via `Number(minor)`, so large ledgers keep exact cents in prompts and preserved split/payer inputs.

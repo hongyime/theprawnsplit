@@ -49,7 +49,7 @@
   import { signClaim } from "@/crypto/claim";
   import { config } from "@/config";
   import { defaultExpenseDate, defaultParticipant, makeEvent, makeExpenseFinancials, type EventFactory } from "@/lib/events";
-  import { formatMinor, parseMinor, type SplitMode } from "@/lib/money";
+  import { formatMinor, formatMinorInput, formatPercentageInput, parseMinor, type SplitMode } from "@/lib/money";
   import { isArchivedEventLog } from "@/lib/archive";
   import { createDeviceLinkRequest, linkPayload, parseDeviceLinkRequest, type DeviceLinkRequest } from "@/lib/device-link";
   import { expenseHistoryRows } from "@/lib/expense-history";
@@ -482,17 +482,15 @@
       }
       return;
     }
-    exactShares = Object.fromEntries(preview.shares.map((share) => [share.pid, (Number(share.minor) / 100).toFixed(2)]));
+    exactShares = Object.fromEntries(preview.shares.map((share) => [share.pid, formatMinorInput(share.minor)]));
     shareWeights = Object.fromEntries(preview.shares.map((share) => [share.pid, share.minor > 0n ? share.minor.toString() : "0"]));
-    percentages = Object.fromEntries(
-      preview.shares.map((share) => [share.pid, ((Number(share.minor) / Number(total)) * 100).toFixed(2)]),
-    );
+    percentages = Object.fromEntries(preview.shares.map((share) => [share.pid, formatPercentageInput(share.minor, total)]));
   }
 
   function changePayerMode(nextMode: PayerMode): void {
     payerMode = nextMode;
     if (nextMode === "multiple") {
-      if (amountPreview.ok && payerPid) payerAmounts = { ...payerAmounts, [payerPid]: (Number(amountPreview.baseMinor) / 100).toFixed(2) };
+      if (amountPreview.ok && payerPid) payerAmounts = { ...payerAmounts, [payerPid]: formatMinorInput(amountPreview.baseMinor) };
     }
   }
 
@@ -543,7 +541,7 @@
     if (!expense) return;
     const desc = window.prompt("Description", expense.desc);
     if (desc === null) return;
-    const amount = window.prompt("Total", (Number(expense.financials.minor) / 100).toFixed(2));
+    const amount = window.prompt("Total", formatMinorInput(expense.financials.minor));
     if (amount === null) return;
     const minor = parseMinor(amount);
     if (minor === null) return;
@@ -1370,7 +1368,7 @@
           <p class="warning compact-warning">Settlement is frozen until the newer retained event can be folded.</p>
         {:else}
           {#each suggestedSettlements as transfer}
-            <button type="button" class="settle-suggestion" disabled={archived} on:click={() => recordSettlement(transfer.from, transfer.to, String(Number(transfer.minor) / 100))}>
+            <button type="button" class="settle-suggestion" disabled={archived} on:click={() => recordSettlement(transfer.from, transfer.to, formatMinorInput(transfer.minor))}>
               {participantLabel(transfer.from)} pays {participantLabel(transfer.to)} {formatMinor(transfer.minor, group.currency)}
             </button>
           {/each}

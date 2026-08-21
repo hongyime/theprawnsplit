@@ -775,6 +775,11 @@ Notes:
   repeated dropped-event fetch on the following sync. Latest verification on 2026-08-22
   passed with `npm run build` (62 core tests, 145 root tests), root `npm audit --json`,
   protected-string scan, and `git diff --check`.
+- Added REQ-MON-18 FNV collision fallback coverage in the core money suite. A known
+  32-bit FNV-1a collision now proves largest-remainder tie-breaking falls through to
+  lexicographic participant-id order, including reversed input order. Latest
+  verification on 2026-08-22 passed with `npm run build` (63 core tests, 145 root
+  tests), root `npm audit --json`, protected-string scan, and `git diff --check`.
 - Vercel checks on 2026-08-21 show the current `main` production deployment is Ready
   and has the requested aliases attached. Vercel env listing still shows no env vars
   configured, so the operated relay runtime remains unconfigured.

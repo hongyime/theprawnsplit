@@ -26,4 +26,10 @@ describe("REQ-MON-03/14/18 allocate", () => {
     const second = allocate(1n, [1n, 1n, 1n], "same", ["c", "b", "a"]);
     expect(second).toEqual(first);
   });
+
+  it("falls back to participant id order when FNV-1a hashes collide", () => {
+    expect(fnv1a("collision:p4tzl")).toBe(fnv1a("collision:pj3ap"));
+    expect(allocate(1n, [1n, 1n], "collision:", ["p4tzl", "pj3ap"])).toEqual([1n, 0n]);
+    expect(allocate(1n, [1n, 1n], "collision:", ["pj3ap", "p4tzl"])).toEqual([0n, 1n]);
+  });
 });

@@ -142,3 +142,4 @@
 - 2026-08-22: REQ-SYN-24 property coverage asserts future-drift events buffer without HLC mutation and admit at computed retry time.
 - 2026-08-22: REQ-SEC-04 replay coverage uses real browser signatures to prove group-tag-bound claims and confirmations cannot be replayed across groups.
 - 2026-08-22: REQ-SYN-27 refetch-loop coverage proves surplus dropped relay events advance discard state and stop repeating after author cursor catch-up.
+- 2026-08-22: REQ-MON-18 coverage pins a real FNV-1a collision so allocation tie-breaking must fall back to participant-id order.

@@ -54,6 +54,7 @@
   } from "@/lib/durability";
   import { signClaim } from "@/crypto/claim";
   import { config } from "@/config";
+  import { peerClockSkewWarning } from "@/lib/clock-skew";
   import { defaultExpenseDate, defaultParticipant, makeEvent, makeExpenseFinancials, type EventFactory } from "@/lib/events";
   import { formatMinor, formatMinorInput, parseMinor, parsePercentageBasisPoints, parseShareWeight, type SplitMode } from "@/lib/money";
   import { isArchivedEventLog } from "@/lib/archive";
@@ -183,6 +184,7 @@
   $: settledView = state ? isSettledViewPredicate(state.balances, archived) : false;
   $: archiveSummary = group ? latestArchiveEvent(group.events) : undefined;
   $: frozenPolicy = frozenViewPolicy(state);
+  $: clockSkewWarning = group ? peerClockSkewWarning({ events: group.events, localDeviceId: group.deviceId, now: nowMs }) : undefined;
   $: showInstallHint = !isStandalone && !isDesktop && isOnline && !archived;
   $: relaySettings = currentRelaySettings();
   $: relayTargetLabel = `${relaySettingsTargetCount(relaySettings)} relay target${relaySettingsTargetCount(relaySettings) === 1 ? "" : "s"}`;
@@ -1155,6 +1157,7 @@
 
     {#if error}<p class="error">{error}</p>{/if}
     {#if archived}<p class="warning">This trip is archived. The ledger remains readable and exportable. Relay retention is outside this app's control; archiving does not delete relay data.</p>{/if}
+    {#if clockSkewWarning}<p class="warning">{clockSkewWarning}</p>{/if}
     {#if settledView}
       <section class="prompt-banner settled-banner">
         <div>

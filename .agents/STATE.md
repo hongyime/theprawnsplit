@@ -647,6 +647,11 @@ Notes:
   v2-only `rate` data under a v1 event, and also rejects malformed v2 rate payloads.
   Latest verification on 2026-08-22 passed with `npm run build` (51 core tests, 129 root
   tests), root `npm audit --json`, protected-string scan, and `git diff --check`.
+- Added Q7 ambient clock-skew warning coverage. The app now compares local time with the
+  median HLC wall time of the last 10 peer events and shows a non-blocking warning when
+  the difference exceeds 10 minutes, without mutating HLC values. Latest verification on
+  2026-08-22 passed with `npm run build` (51 core tests, 132 root tests), root `npm
+  audit --json`, protected-string scan, and `git diff --check`.
 - Vercel checks on 2026-08-21 show the current `main` production deployment is Ready
   and has the requested aliases attached. Vercel env listing still shows no env vars
   configured, so the operated relay runtime remains unconfigured.

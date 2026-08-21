@@ -26,7 +26,6 @@ import { NostrRelay } from "./nostr";
 import { classifyRelayIssue, isDuplicateRelayAck } from "./diagnostics";
 import type { Relay, SyncResult } from "./types";
 
-const PUBLISH_QUORUM_ACKS = 2;
 const FETCH_LIMIT = 500;
 
 interface RelayFetchPlan {
@@ -44,6 +43,10 @@ function fetchOpts(cursor: string | null | undefined, author?: string): RelayFet
     ...(cursor ? { cursor } : {}),
     limit: FETCH_LIMIT,
   };
+}
+
+export function publishQuorumReached(ackCount: number, ackQuorum = config.ackQuorum): boolean {
+  return ackCount >= ackQuorum;
 }
 
 export function relayFetchPlans(group: GroupRecord, relayName: string): RelayFetchPlan[] {
@@ -119,12 +122,13 @@ export async function syncOnce(groupId: string, relayOverride?: Relay[]): Promis
         if (diagnostic.severity !== "info") result.errors.push(ack.ack.reason);
       }
     }
-    const publishQuorumMet = ok >= PUBLISH_QUORUM_ACKS;
+    const ackQuorum = config.ackQuorum;
+    const publishQuorumMet = publishQuorumReached(ok, ackQuorum);
     if (publishQuorumMet) {
       await markEvents(groupId, localBatchRows.map((row) => row.event.id), "published");
       result.published = localBatchRows.length;
     } else if (localBatchRows.length > 0) {
-      result.errors.push(`relay quorum not reached (${ok}/${PUBLISH_QUORUM_ACKS} acknowledgements)`);
+      result.errors.push(`relay quorum not reached (${ok}/${ackQuorum} acknowledgements)`);
     }
   }
 

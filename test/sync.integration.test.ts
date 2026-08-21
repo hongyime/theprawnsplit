@@ -5,7 +5,7 @@ import { decryptEnvelope, encryptEnvelope, encryptEvents, type RelayEnvelope } f
 import { createGroupSecret, groupKey, groupTag, secretFromBase64, secretToBase64 } from "@/crypto/group";
 import { appendEvents, createJoinSeed, ensureGroup, markEvents, readGroup, resetRepositoryForTests, syncCounts } from "@/db/repo";
 import { defaultParticipant, makeEvent, makeExpenseFinancials, type EventFactory } from "@/lib/events";
-import { relayFetchPlans, syncOnce } from "@/relay/sync";
+import { publishQuorumReached, relayFetchPlans, syncOnce } from "@/relay/sync";
 import type { AckResult, Relay, RelayEntry } from "@/relay/types";
 
 type ParticipantAdded = Extract<Event, { t: "ParticipantAdded" }>;
@@ -84,6 +84,12 @@ async function readEvents(relays: MemoryRelay[], key: CryptoKey, tag: string): P
 }
 
 describe("Phase 2 sync integration", () => {
+  it("uses the configured acknowledgement quorum for publish success", () => {
+    expect(publishQuorumReached(1, 1)).toBe(true);
+    expect(publishQuorumReached(1, 2)).toBe(false);
+    expect(publishQuorumReached(2, 2)).toBe(true);
+  });
+
   it("plans topic bootstrap for empty logs and author-cursor fetches for populated operated logs", () => {
     const empty = {
       groupId: "g_empty",

@@ -40,6 +40,15 @@ describe("platform boundaries", () => {
     expect(source).not.toMatch(/\.(?:sync|pushManager)\.(?:register|subscribe)\b/);
   });
 
+  it("keeps account and third-party authentication flows out of the client", () => {
+    const source = readSources();
+
+    expect(source).not.toMatch(
+      /\b(?:signIn|signOut|signUp|login|logout|OAuth|oauth|auth0|firebase|supabase|clerk|nextAuth|magicLink|passwordReset)\b/,
+    );
+    expect(source).not.toMatch(/\b(?:email|phoneNumber|phone number|sms|otp|one-time password)\b/i);
+  });
+
   it("keeps settlements as ledger records without payment rails", () => {
     const source = readSources();
 

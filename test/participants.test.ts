@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { defaultSplitSelection, findParticipantNameMatch, groupParticipantsForClaim, levenshteinDistance, normalizeParticipantName } from "@/lib/participants";
+import {
+  claimAttributionText,
+  defaultSplitSelection,
+  findParticipantNameMatch,
+  groupParticipantsForClaim,
+  levenshteinDistance,
+  normalizeParticipantName,
+} from "@/lib/participants";
 
 const people = [
   { pid: "alice", name: "Alice Tan" },
@@ -49,5 +56,16 @@ describe("participant name matching", () => {
     );
 
     expect(selected).toEqual({ active: true, "manually-off": false, inactive: false });
+  });
+
+  it("renders TOFU claim attribution with device, time, and current balance", () => {
+    expect(
+      claimAttributionText({
+        name: "Ben",
+        device: "device abc12345",
+        claimedAt: "Aug 21, 2026, 8:30 PM",
+        balance: "USD 12.00",
+      }),
+    ).toBe("Ben was claimed by device abc12345 on Aug 21, 2026, 8:30 PM. Current balance: USD 12.00.");
   });
 });

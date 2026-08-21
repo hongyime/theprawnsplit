@@ -466,6 +466,11 @@ Notes:
   tabs and archived groups still suspend polling. Latest verification on 2026-08-21
   passed with `npm run build` (43 core tests, 88 root tests), root `npm audit --json`,
   protected-string scan, and `git diff --check`.
+- Hardened REQ-SEC-07 claim surfacing. Claimed participant rows now render tested TOFU
+  attribution including claiming device, time, and current balance, and peers can void a
+  disputed genesis claim through an append-only `EventVoided`. Latest verification on
+  2026-08-21 passed with `npm run build` (43 core tests, 89 root tests), root
+  `npm audit --json`, protected-string scan, and `git diff --check`.
 - Vercel checks on 2026-08-21 show the current `main` production deployment is Ready
   and has the requested aliases attached. Vercel env listing still shows no env vars
   configured, so the operated relay runtime remains unconfigured.

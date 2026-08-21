@@ -81,3 +81,4 @@
 - 2026-08-21: Snapshots must cover confirmed raw history only; local events beyond the confirmed read-back frontier cannot enter a snapshot `vv` or folded snapshot state.
 - 2026-08-21: Unsupported schema relay events are transport-retained but semantically frozen: they advance sync cursors/vectors to avoid stable refetch loops while old folds quarantine them out of balances.
 - 2026-08-21: Adaptive polling is a three-stage lifecycle policy: recent activity uses the active cadence, short inactivity uses a middle backoff cadence, and only post-threshold idle uses the longest cadence; hidden or archived trips still poll never.
+- 2026-08-21: Genesis participant claims are TOFU, so roster copy must show who claimed, when, and the current balance, and peer challenge must be an append-only void of the claim event rather than a mutation.

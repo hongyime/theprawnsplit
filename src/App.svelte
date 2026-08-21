@@ -74,7 +74,7 @@
   } from "@/lib/lifecycle";
   import { currencyAmountPreview, normalizeCurrency } from "@/lib/multicurrency";
   import { buildPayerPreview, type PayerMode } from "@/lib/payers";
-  import { defaultSplitSelection, findParticipantNameMatch, groupParticipantsForClaim, type ParticipantNameMatch } from "@/lib/participants";
+  import { claimAttributionText, defaultSplitSelection, findParticipantNameMatch, groupParticipantsForClaim, type ParticipantNameMatch } from "@/lib/participants";
   import { normalizeRelaySettings, parseNostrRelayText, relaySettingsTargetCount, type RelaySettings } from "@/lib/relay-settings";
   import { reattestationStatus } from "@/lib/reattestation";
   import { canVoidRecordedSettlement, settlementClaimView } from "@/lib/settlement-history";
@@ -349,6 +349,15 @@
     await commit([makeEvent(f, "EventVoided", { targetId })], f);
   }
 
+  async function voidParticipantClaim(pid: string): Promise<void> {
+    if (!group || archived || localClaimPids.has(pid)) return;
+    const claim = firstParticipantClaim(pid);
+    if (!claim) return;
+    const ok = window.confirm(`${participantLabel(pid)} was claimed by ${shortDevice(claim.deviceId)} on ${formatEventTime(claim.hlc.wall)}. Void this claim so the participant can be reclaimed?`);
+    if (!ok) return;
+    await voidEvent(claim.id);
+  }
+
   function participantClaimEvent(eventId?: string): Extract<Event, { t: "ParticipantClaimed" }> | undefined {
     return group?.events.find((event): event is Extract<Event, { t: "ParticipantClaimed" }> => event.t === "ParticipantClaimed" && event.id === eventId);
   }
@@ -384,7 +393,12 @@
   function participantClaimAttribution(pid: string): string {
     const claim = firstParticipantClaim(pid);
     if (!claim) return "Not claimed yet";
-    return `Claimed by ${shortDevice(claim.deviceId)} on ${formatEventTime(claim.hlc.wall)}`;
+    return claimAttributionText({
+      name: participantLabel(pid),
+      device: shortDevice(claim.deviceId),
+      claimedAt: formatEventTime(claim.hlc.wall),
+      balance: claimBalance(pid),
+    });
   }
 
   function participantAddAttribution(pid: string): string {
@@ -1381,6 +1395,9 @@
                         <button type="button" class="secondary" on:click={() => requestDeviceLink(participant.pid)} title="Request device link"><Link size={15} /> Link</button>
                       {/if}
                       {#if !archived}
+                        {#if !localClaimPids.has(participant.pid)}
+                          <button type="button" class="secondary danger-action" on:click={() => voidParticipantClaim(participant.pid)} title="Void disputed claim">Void claim</button>
+                        {/if}
                         {#if hiddenEvent}
                           <button type="button" class="secondary" on:click={() => voidEvent(hiddenEvent.id)} title="Restore default splits">Restore</button>
                         {:else}

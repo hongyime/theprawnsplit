@@ -13,6 +13,17 @@ export interface ParticipantClaimGroups<T extends Pick<ParticipantState, "device
   claimed: T[];
 }
 
+export interface ClaimAttributionInput {
+  name: string;
+  device: string;
+  claimedAt: string;
+  balance: string;
+}
+
+export function claimAttributionText(input: ClaimAttributionInput): string {
+  return `${input.name} was claimed by ${input.device} on ${input.claimedAt}. Current balance: ${input.balance}.`;
+}
+
 export function normalizeParticipantName(name: string): string {
   return name
     .normalize("NFD")

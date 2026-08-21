@@ -89,3 +89,4 @@
 - 2026-08-22: Contested settlement-confirmation display remains authority-gated: unverified self-claims may surface as contested, but invalid delegated-key events must not make a forged confirmation look like a contested payee response.
 - 2026-08-22: REQ-MON-17 correction history needs event-winner identity, not value equality; folded expense state carries the active history index so duplicate-value corrections do not produce multiple active rows.
 - 2026-08-22: REQ-ID-17 contradiction repair must preserve the full merge path: anomalies keep all involved merge event ids so UI can offer one append-only undo per edge instead of hiding transitive repairs behind the first edge.
+- 2026-08-22: Relay diagnostics should expose operator-relevant timing, not just policy labels; backoff diagnostics include the concrete retry window in the UI action text.

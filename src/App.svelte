@@ -74,6 +74,7 @@
   import { currencyAmountPreview, normalizeCurrency } from "@/lib/multicurrency";
   import { buildPayerPreview, type PayerMode } from "@/lib/payers";
   import { claimAttributionText, defaultSplitSelection, findParticipantNameMatch, groupParticipantsForClaim, type ParticipantNameMatch } from "@/lib/participants";
+  import { relayDiagnosticActionText } from "@/lib/relay-diagnostics";
   import { normalizeRelaySettings, parseNostrRelayText, relaySettingsTargetCount, type RelaySettings } from "@/lib/relay-settings";
   import { reattestationStatus } from "@/lib/reattestation";
   import { canVoidRecordedSettlement, settlementClaimView } from "@/lib/settlement-history";
@@ -1277,7 +1278,7 @@
         {#each lastSyncResult.diagnostics as diagnostic}
           <div class:error-diagnostic={diagnostic.severity === "error"} class="diagnostic-row">
             <strong>{diagnostic.relay} {diagnostic.operation}: {diagnostic.code}</strong>
-            <span>{diagnostic.action}</span>
+            <span>{relayDiagnosticActionText(diagnostic)}</span>
           </div>
         {/each}
       </section>

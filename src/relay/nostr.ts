@@ -3,9 +3,38 @@ import { bytesToHex, hexToBytes } from "@/crypto/bytes";
 import { config } from "@/config";
 import type { AckResult, Relay, RelayEntry } from "./types";
 
+const GROUP_TAG_RE = /^[0-9a-f]{64}$/;
+
 function secretFromHex(hex?: string): Uint8Array {
   if (hex && /^[0-9a-f]{64}$/i.test(hex)) return hexToBytes(hex);
   return generateSecretKey();
+}
+
+export function assertLowercaseGroupTag(tag: string): void {
+  if (!GROUP_TAG_RE.test(tag)) throw new Error("invalid lowercase group tag");
+}
+
+export function nostrEventTemplate(tag: string, blob: string, kind: number, nowMs = Date.now()) {
+  assertLowercaseGroupTag(tag);
+  return {
+    kind,
+    created_at: Math.floor(nowMs / 1000),
+    tags: [
+      ["t", tag],
+      ["s", String(nowMs)],
+    ],
+    content: blob,
+  };
+}
+
+export function nostrFetchFilter(tag: string, kind: number, opts: { author?: string; limit?: number }) {
+  assertLowercaseGroupTag(tag);
+  return {
+    kinds: [kind],
+    "#t": [tag],
+    ...(opts.author ? { authors: [opts.author] } : {}),
+    limit: opts.limit ?? 500,
+  };
 }
 
 export class NostrRelay implements Relay {
@@ -25,18 +54,7 @@ export class NostrRelay implements Relay {
 
   async publish(tag: string, _author: string, blob: string): Promise<AckResult> {
     try {
-      const event = finalizeEvent(
-        {
-          kind: this.kind,
-          created_at: Math.floor(Date.now() / 1000),
-          tags: [
-            ["t", tag],
-            ["s", String(Date.now())],
-          ],
-          content: blob,
-        },
-        this.sk,
-      );
+      const event = finalizeEvent(nostrEventTemplate(tag, blob, this.kind), this.sk);
       const pubs = this.pool.publish(this.relayUrls, event);
       const settled = await Promise.allSettled(pubs);
       const ok = settled.filter((result) => result.status === "fulfilled").length;
@@ -47,12 +65,7 @@ export class NostrRelay implements Relay {
   }
 
   async fetch(tag: string, opts: { author?: string; cursor?: string | null; limit?: number }): Promise<RelayEntry[]> {
-    const filter = {
-      kinds: [this.kind],
-      "#t": [tag],
-      limit: opts.limit ?? 500,
-    };
-    if (opts.author) Object.assign(filter, { authors: [opts.author] });
+    const filter = nostrFetchFilter(tag, this.kind, opts);
     const events = await this.pool.querySync(this.relayUrls, filter);
     return events
       .sort((a, b) => a.created_at - b.created_at || a.id.localeCompare(b.id))

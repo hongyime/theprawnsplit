@@ -77,3 +77,4 @@
 - 2026-08-21: REQ-SYN-16 requires banner actions, not just banner copy; overdue relay confirmation now promotes Share delta, Export, and Copy link directly in the banner.
 - 2026-08-21: Manual fallback timing must be driven by a ticking app clock; a bare `Date.now()` reactive expression will not update the REQ-SYN-16 banner as time passes. The REQ-SYN-12 property test keeps its case count but has an explicit timeout for slow harness runs.
 - 2026-08-21: Operated relay write eligibility is proof-commitment based: the function stores only a hash of the secret-derived write proof per tag and rejects mismatched later proofs, preserving blind ciphertext storage while separating tag visibility from write access.
+- 2026-08-21: Nostr group addressing must stay in tested helper code: lowercase 64-hex tags only, with the indexed single-letter `t` tag used for both publish templates and fetch filters.

@@ -500,6 +500,11 @@ Notes:
   multiple history rows appear active. Latest verification on 2026-08-22 passed with `npm
   run build` (44 core tests, 94 root tests), root `npm audit --json`,
   protected-string scan, and `git diff --check`.
+- Tightened REQ-ID-17 transitive marked-distinct contradictions so the anomaly carries
+  every merge edge in the path and the UI exposes an undo action for each involved merge,
+  not just the first edge. Latest verification on 2026-08-22 passed with `npm run build`
+  (45 core tests, 95 root tests), root `npm audit --json`, protected-string scan, and
+  `git diff --check`.
 - Vercel checks on 2026-08-21 show the current `main` production deployment is Ready
   and has the requested aliases attached. Vercel env listing still shows no env vars
   configured, so the operated relay runtime remains unconfigured.

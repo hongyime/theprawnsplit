@@ -286,13 +286,15 @@ export function fold(events: Event[], opts: FoldOptions, ctx?: VerificationConte
   for (const mark of markedDistinct.values()) {
     if (canonical(mark.a) === canonical(mark.b)) {
       const path = mergePath(mark.a, mark.b, mergeEdges);
+      const relatedEventIds = path.map((edge) => edge.eventId);
       const anomaly: Anomaly = {
         code: "distinct-participants-merged",
         pid: canonical(mark.a),
         eventId: mark.eventId,
+        relatedEventIds,
         message: `Participants marked distinct are merged via ${path.map((edge) => `${edge.from}->${edge.into}`).join(", ")}`,
       };
-      if (path[0]) anomaly.relatedEventId = path[0].eventId;
+      if (relatedEventIds[0]) anomaly.relatedEventId = relatedEventIds[0];
       anomalies.push(anomaly);
     }
   }

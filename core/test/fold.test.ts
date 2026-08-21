@@ -315,6 +315,26 @@ describe("REQ-MON-15/REQ-SYN-12 fold", () => {
     expect(state.balances.get("alice")).toBe(0n);
   });
 
+  it("surfaces every merge edge involved in transitive marked-distinct contradictions", () => {
+    const state = fold(
+      [
+        base("ParticipantAdded", { pid: "alice", name: "Alice" } as never),
+        base("ParticipantAdded", { pid: "dave", name: "Dave" } as never),
+        base("ParticipantAdded", { pid: "mika", name: "Mika" } as never),
+        base("ParticipantMerged", { id: "merge-1", from: "dave", into: "alice" } as never),
+        base("ParticipantMerged", { id: "merge-2", from: "mika", into: "dave" } as never),
+        base("ParticipantsMarkedDistinct", { id: "distinct-1", a: "alice", b: "mika" } as never),
+      ],
+      { supportedVersion: 1 },
+    );
+
+    const anomaly = state.anomalies.find((candidate) => candidate.code === "distinct-participants-merged");
+    expect(anomaly?.relatedEventId).toBe("merge-1");
+    expect(anomaly?.relatedEventIds).toEqual(["merge-1", "merge-2"]);
+    expect(state.participants.has("dave")).toBe(false);
+    expect(state.participants.has("mika")).toBe(false);
+  });
+
   it("undoes merges by voiding the merge event", () => {
     const merge = base("ParticipantMerged", { id: "merge-1", from: "bob", into: "alice" } as never);
     const state = fold(

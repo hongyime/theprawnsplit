@@ -115,6 +115,7 @@ export interface Anomaly {
   sid?: string;
   eventId?: string;
   relatedEventId?: string;
+  relatedEventIds?: string[];
   message: string;
 }
 

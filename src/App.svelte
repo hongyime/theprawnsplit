@@ -389,6 +389,10 @@
     return `device ${deviceId.slice(0, 8)}`;
   }
 
+  function mergeUndoEventIds(anomaly: State["anomalies"][number]): string[] {
+    return anomaly.relatedEventIds ?? (anomaly.relatedEventId ? [anomaly.relatedEventId] : []);
+  }
+
   function participantClaimAttribution(pid: string): string {
     const claim = firstParticipantClaim(pid);
     if (!claim) return "Not claimed yet";
@@ -1304,9 +1308,9 @@
                 <button type="button" disabled={archived} on:click={() => mergeParticipants(anomaly.relatedPid!, anomaly.pid!)}>Merge</button>
                 <button type="button" class="secondary" disabled={archived} on:click={() => markParticipantsDistinct(anomaly.pid!, anomaly.relatedPid!)}>Not same</button>
               {:else if anomaly.code === "distinct-participants-merged"}
-                {#if anomaly.relatedEventId}
-                  <button type="button" disabled={archived} on:click={() => voidEvent(anomaly.relatedEventId!)}>Undo merge</button>
-                {/if}
+                {#each mergeUndoEventIds(anomaly) as mergeEventId, index}
+                  <button type="button" disabled={archived} on:click={() => voidEvent(mergeEventId)}>Undo merge {index + 1}</button>
+                {/each}
                 {#if anomaly.eventId}
                   <button type="button" class="secondary" disabled={archived} on:click={() => voidEvent(anomaly.eventId!)}>Remove mark</button>
                 {/if}

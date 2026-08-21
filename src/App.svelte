@@ -78,6 +78,7 @@
   import { reattestationStatus } from "@/lib/reattestation";
   import { canVoidRecordedSettlement, settlementClaimView } from "@/lib/settlement-history";
   import { applySubgroupSelection, deleteSubgroupPreset, upsertSubgroupPreset } from "@/lib/subgroups";
+  import { isEventCoveredByEveryKnownDevice } from "@/lib/sync-coverage";
   import { buildVerificationContext } from "@/lib/verification";
   import { syncOnce } from "@/relay/sync";
   import type { SyncResult } from "@/relay/types";
@@ -520,6 +521,16 @@
   function payerSummary(payers: { pid: string; minor: bigint }[]): string {
     if (payers.length <= 1) return `${participantLabel(payers[0]?.pid ?? "")} paid`;
     return payers.map((payer) => `${participantLabel(payer.pid)} ${formatMinor(payer.minor, group?.currency ?? "USD")}`).join(" · ");
+  }
+
+  function expenseCoverageLabel(xid: string): string {
+    if (!group) return "sync status unknown";
+    const event = [...group.events]
+      .filter((candidate) => (candidate.t === "ExpenseAdded" || candidate.t === "ExpenseEdited") && candidate.xid === xid)
+      .sort(eventSortKey)
+      .at(-1);
+    if (!event) return "sync status unknown";
+    return isEventCoveredByEveryKnownDevice(group.events, event) ? "everyone has this" : "not yet on every known device";
   }
 
   function rateSummary(rate: Financials["rate"]): string {
@@ -1517,10 +1528,12 @@
     <section class="panel ledger">
       <h2>Ledger</h2>
       {#each expenses as expense}
+        {@const coverage = expenseCoverageLabel(expense.xid)}
         <div class="ledger-row">
           <div>
             <strong>{expense.desc}</strong>
             <span>{expense.date}</span>
+            <span class="sync-coverage" class:ok-coverage={coverage === "everyone has this"}>{coverage}</span>
             <span class="payer-summary">{payerSummary(expense.financials.payers)}</span>
             {#if expense.financials.rate}<span class="payer-summary">{rateSummary(expense.financials.rate)}</span>{/if}
             {#if expense.financialHistory.length > 1}

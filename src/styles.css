@@ -736,6 +736,15 @@ button.secondary {
   font-size: 0.84rem;
 }
 
+.sync-coverage {
+  color: #607068;
+  font-size: 0.78rem;
+}
+
+.sync-coverage.ok-coverage {
+  color: #087f5b;
+}
+
 .expense-history summary {
   cursor: pointer;
   color: #607068;

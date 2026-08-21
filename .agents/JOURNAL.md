@@ -69,3 +69,4 @@
 - 2026-08-21: QR join sharing reuses the same URL-fragment join token as copy-link; the token helper is tested so `groupSecret` stays out of the request URL/query path.
 - 2026-08-21: `unsyncedSince` is an outbox-level clock, not a per-event confirmation flag; it clears only when no local or published outbound events remain.
 - 2026-08-21: Snapshot bootstrap remains transport-only: `VV_snap` may advance the transport vector on an empty joined device, but snapshot `state` is never installed as semantic ledger state.
+- 2026-08-21: The "everyone has this" label is a version-vector proof over every known device's latest event, not a synonym for the local outbox being empty.

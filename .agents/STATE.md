@@ -216,6 +216,9 @@ Progress:
 - Added REQ-SYN-25/26 snapshot-only bootstrap coverage. A relay snapshot can seed the
   transport version vector for an empty joined device, but it does not create semantic
   ledger events or folded participant state without raw event history.
+- Added REQ-SYN-10 delivery-coverage surfacing. Expense rows now say "everyone has
+  this" only when every known device's latest version vector covers the relevant expense
+  event; otherwise they show that it is not yet on every known device.
 
 Next step:
 - Automatic production deploy for current `main` commit `805e6e9` is Ready on
@@ -402,6 +405,9 @@ Notes:
 - Latest verification on 2026-08-21 after REQ-SYN-25/26 snapshot-only bootstrap
   coverage: `npm run build` passed with 43 core tests and 71 root tests; root `npm
   audit --json`, protected-string scan, and `git diff --check` passed.
+- Latest verification on 2026-08-21 after REQ-SYN-10 delivery coverage surfacing: `npm
+  run build` passed with 43 core tests and 73 root tests; root `npm audit --json`,
+  protected-string scan, and `git diff --check` passed.
 - Vercel checks on 2026-08-21 show the current `main` production deployment is Ready
   and has the requested aliases attached. Vercel env listing still shows no env vars
   configured, so the operated relay runtime remains unconfigured.

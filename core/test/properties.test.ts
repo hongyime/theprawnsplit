@@ -2,8 +2,9 @@ import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import { canonicalStateBytes } from "../src/canonical";
 import { fold } from "../src/fold";
+import { authorisedKeys } from "../src/identity";
 import type { Event } from "../src/types";
-import { base, financials, hlc, resetIds } from "./helpers";
+import { base, financials, groupTag, hlc, resetIds, sig, verifier } from "./helpers";
 
 const shuffleWithSeed = <T>(items: T[], seed: number): T[] => {
   const out = [...items];
@@ -108,6 +109,45 @@ describe("REQ-SYN-12 property convergence", () => {
         expect(duplicated).toBe(reference);
       }),
       { seed: Number(process.env.FAST_CHECK_SEED ?? 20260822), numRuns: 75, verbose: true },
+    );
+  }, 20_000);
+
+  it("keeps authorised key delegation convergent across arrival order", () => {
+    fc.assert(
+      fc.property(fc.integer({ min: 1, max: 6 }), (linkCount) => {
+        const events: Event[] = [
+          base("ParticipantClaimed", {
+            id: "claim-0",
+            hlc: hlc(1),
+            pid: "alice",
+            deviceId: "device-0",
+            claimPk: "key-0",
+            alg: "ed25519",
+            sig: sig("key-0", `${groupTag}:alice:device-0:key-0`),
+          } as never),
+          ...Array.from({ length: linkCount }, (_, index) => {
+            const next = index + 1;
+            const payload = `${groupTag}:link:alice:device-${next}:key-${next}:nonce-${next}`;
+            return base("DeviceLinked", {
+              id: `link-${next}`,
+              hlc: hlc(next + 1),
+              pid: "alice",
+              parentDevice: `device-${index}`,
+              newDevice: `device-${next}`,
+              newClaimPk: `key-${next}`,
+              alg: "ed25519",
+              nonce: `nonce-${next}`,
+              sig: sig(`key-${index}`, payload),
+            } as never);
+          }),
+        ];
+        const expected = Array.from({ length: linkCount + 1 }, (_, index) => `key-${index}`);
+
+        for (let seed = 1; seed <= 20; seed += 1) {
+          expect([...authorisedKeys(shuffleWithSeed(events, seed), "alice", verifier)]).toEqual(expected);
+        }
+      }),
+      { seed: Number(process.env.FAST_CHECK_SEED ?? 20260822), numRuns: 50, verbose: true },
     );
   }, 20_000);
 });

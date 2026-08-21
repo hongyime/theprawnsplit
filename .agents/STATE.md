@@ -721,6 +721,11 @@ Notes:
   order or duplicated, covering commutative and idempotent merge behavior. Latest
   verification on 2026-08-22 passed with `npm run build` (54 core tests, 143 root
   tests), root `npm audit --json`, protected-string scan, and `git diff --check`.
+- Added §9.11/§16.2 authorised-key convergence coverage in the core property suite.
+  Generated DeviceLinked delegation chains now assert the same `authorisedKeys(pid)`
+  result across multiple deterministic arrival orders. Latest verification on
+  2026-08-22 passed with `npm run build` (55 core tests, 143 root tests), root
+  `npm audit --json`, protected-string scan, and `git diff --check`.
 - Vercel checks on 2026-08-21 show the current `main` production deployment is Ready
   and has the requested aliases attached. Vercel env listing still shows no env vars
   configured, so the operated relay runtime remains unconfigured.

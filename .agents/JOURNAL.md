@@ -61,3 +61,4 @@
 - 2026-08-21: Custom relay settings must drive adapter construction directly; disabling relay targets is respected instead of falling back to defaults behind the user's back.
 - 2026-08-21: Phase 5 money acceptance must prove the combined path, not only helper units: v2 rate data and multi-payer rows must survive TripLedgerExport restore and still fold to base-currency balances.
 - 2026-08-21: Current `main` now auto-deploys to Ready with the requested production aliases attached; operated relay runtime still requires the two server-only Upstash env vars before it can function.
+- 2026-08-21: Operated relay API tests should document the env-var blocker explicitly: malformed requests fail before storage, valid writes without storage env return a configuration error, and unsupported methods stay explicit.

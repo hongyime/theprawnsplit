@@ -38,4 +38,20 @@ describe("re-attestation display status", () => {
     expect(status).toMatchObject({ claimedPeerCount: 2, threshold: 1, attestedCount: 1 });
     expect(status.caveat).toContain("Small group caveat");
   });
+
+  it("ignores matching re-attestations from non-peer attestors", () => {
+    const status = reattestationStatus({
+      targetPid: "alice",
+      newDevice: "recovered",
+      newClaimPk: "recovered-key",
+      participants: [
+        { pid: "alice", devices: ["old"] },
+        { pid: "bob", devices: ["bob-phone"] },
+        { pid: "shadow", devices: [] },
+      ],
+      events: [claim("mallory"), claim("shadow"), claim("bob")],
+    });
+
+    expect(status).toMatchObject({ claimedPeerCount: 1, threshold: 1, attestedCount: 1 });
+  });
 });

@@ -509,6 +509,10 @@ Notes:
   concrete retry window instead of generic action copy. Latest verification on
   2026-08-22 passed with `npm run build` (45 core tests, 97 root tests), root `npm
   audit --json`, protected-string scan, and `git diff --check`.
+- Tightened REQ-SEC-06 re-attestation status display so non-peer `ClaimReattested` events
+  cannot inflate the shown attestation count for an unverified recovered device. Latest
+  verification on 2026-08-22 passed with `npm run build` (45 core tests, 98 root tests),
+  root `npm audit --json`, protected-string scan, and `git diff --check`.
 - Vercel checks on 2026-08-21 show the current `main` production deployment is Ready
   and has the requested aliases attached. Vercel env listing still shows no env vars
   configured, so the operated relay runtime remains unconfigured.

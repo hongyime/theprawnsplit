@@ -18,7 +18,12 @@ export function reattestationStatus(input: {
   newDevice?: string;
   newClaimPk?: string;
 }): ReattestationStatus {
-  const claimedPeerCount = input.participants.filter((participant) => participant.pid !== input.targetPid && participant.devices.length > 0).length;
+  const claimedPeers = new Set(
+    input.participants
+      .filter((participant) => participant.pid !== input.targetPid && participant.devices.length > 0)
+      .map((participant) => participant.pid),
+  );
+  const claimedPeerCount = claimedPeers.size;
   const threshold = reattestationThreshold(claimedPeerCount);
   const attestors = new Set<string>();
 
@@ -26,6 +31,7 @@ export function reattestationStatus(input: {
     if (event.t !== "ClaimReattested" || event.pid !== input.targetPid) continue;
     if (input.newDevice && event.newDevice !== input.newDevice) continue;
     if (input.newClaimPk && event.newClaimPk !== input.newClaimPk) continue;
+    if (!claimedPeers.has(event.attestor)) continue;
     attestors.add(event.attestor);
   }
 

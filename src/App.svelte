@@ -475,6 +475,7 @@
   }
 
   function changeSplitMode(nextMode: SplitMode): void {
+    if (archived) return;
     const preview = sharePreview;
     const total = parseMinor(expenseTotal);
     splitMode = nextMode;
@@ -491,6 +492,7 @@
   }
 
   function changePayerMode(nextMode: PayerMode): void {
+    if (archived) return;
     payerMode = nextMode;
     if (nextMode === "multiple") {
       if (amountPreview.ok && payerPid) payerAmounts = { ...payerAmounts, [payerPid]: formatMinorInput(amountPreview.baseMinor) };
@@ -829,7 +831,7 @@
   }
 
   async function saveSubgroupPreset(): Promise<void> {
-    if (!group) return;
+    if (!group || archived) return;
     const pids = selectedPidList();
     const id = crypto.randomUUID();
     const meta = await updateMeta(group.groupId, (current) => ({
@@ -841,11 +843,12 @@
   }
 
   async function deleteSubgroup(id: string): Promise<void> {
-    if (!group) return;
+    if (!group || archived) return;
     group = { ...group, meta: await updateMeta(group.groupId, (current) => ({ ...current, subgroups: deleteSubgroupPreset(current.subgroups, id) })) };
   }
 
   function applySubgroup(id: string): void {
+    if (archived) return;
     const preset = subgroupPresets.find((candidate) => candidate.id === id);
     if (!preset) return;
     selectedPids = applySubgroupSelection(preset, participantPids);
@@ -1209,7 +1212,7 @@
                   {@const hiddenEvent = activeDeactivationEvent(participant.pid)}
                   <li class:inactive-person={participant.deactivated}>
                     <label>
-                      <input type="checkbox" bind:checked={selectedPids[participant.pid]} />
+                      <input type="checkbox" bind:checked={selectedPids[participant.pid]} disabled={archived} />
                       <span>
                         <strong>{participant.name}</strong>
                         <small>{participantStatusText(participant.pid)}</small>
@@ -1239,7 +1242,7 @@
                   {@const hiddenEvent = activeDeactivationEvent(participant.pid)}
                   <li class:inactive-person={participant.deactivated}>
                     <label>
-                      <input type="checkbox" bind:checked={selectedPids[participant.pid]} />
+                      <input type="checkbox" bind:checked={selectedPids[participant.pid]} disabled={archived} />
                       <span>
                         <strong>{participant.name}</strong>
                         <small>{participant.deactivated ? participantStatusText(participant.pid) : participantClaimAttribution(participant.pid)}</small>
@@ -1267,7 +1270,7 @@
           {/if}
         {/if}
         <form class="row create-person" on:submit|preventDefault={addParticipant}>
-          <input bind:value={participantName} placeholder="Add shadow participant" />
+          <input bind:value={participantName} placeholder="Add shadow participant" disabled={archived} />
           <button type="submit" disabled={joinBlocked || archived}><Plus size={17} /> Add</button>
         </form>
         {#if participantNameMatch}
@@ -1292,20 +1295,20 @@
       <article class="panel expense">
         <h2><ReceiptText size={18} /> Expense</h2>
         <div class="form-grid">
-          <input bind:value={expenseDesc} placeholder="Description" />
-          <input bind:value={expenseTotal} inputmode="decimal" placeholder="Total" />
+          <input bind:value={expenseDesc} placeholder="Description" disabled={archived} />
+          <input bind:value={expenseTotal} inputmode="decimal" placeholder="Total" disabled={archived} />
           <div class="currency-row">
-            <input class="currency" bind:value={expenseCurrency} aria-label="Expense currency" on:change={() => (expenseCurrency = normalizeCurrency(expenseCurrency || group!.currency))} />
+            <input class="currency" bind:value={expenseCurrency} aria-label="Expense currency" disabled={archived} on:change={() => (expenseCurrency = normalizeCurrency(expenseCurrency || group!.currency))} />
             {#if normalizeCurrency(expenseCurrency || group.currency) !== group.currency}
-              <input bind:value={exchangeRate} inputmode="decimal" placeholder={`1 ${normalizeCurrency(expenseCurrency)} to ${group.currency}`} aria-label="Exchange rate to group currency" />
+              <input bind:value={exchangeRate} inputmode="decimal" placeholder={`1 ${normalizeCurrency(expenseCurrency)} to ${group.currency}`} aria-label="Exchange rate to group currency" disabled={archived} />
             {/if}
           </div>
           <div class="segmented payer-mode" aria-label="Payer mode">
-            <button type="button" class:active={payerMode === "single"} on:click={() => changePayerMode("single")}>one paid</button>
-            <button type="button" class:active={payerMode === "multiple"} on:click={() => changePayerMode("multiple")}>many paid</button>
+            <button type="button" class:active={payerMode === "single"} disabled={archived} on:click={() => changePayerMode("single")}>one paid</button>
+            <button type="button" class:active={payerMode === "multiple"} disabled={archived} on:click={() => changePayerMode("multiple")}>many paid</button>
           </div>
           {#if payerMode === "single"}
-            <select bind:value={payerPid}>
+            <select bind:value={payerPid} disabled={archived}>
               {#each participants as participant}<option value={participant.pid}>{participant.name} paid</option>{/each}
             </select>
           {:else}
@@ -1313,14 +1316,14 @@
               {#each participants as participant}
                 <label>
                   <span>{participant.name}</span>
-                  <input bind:value={payerAmounts[participant.pid]} inputmode="decimal" placeholder="0.00" />
+                  <input bind:value={payerAmounts[participant.pid]} inputmode="decimal" placeholder="0.00" disabled={archived} />
                 </label>
               {/each}
             </div>
           {/if}
           <div class="segmented">
             {#each ["equal", "exact", "shares", "percentage"] as mode}
-              <button type="button" class:active={splitMode === mode} on:click={() => changeSplitMode(mode as SplitMode)}>{mode}</button>
+              <button type="button" class:active={splitMode === mode} disabled={archived} on:click={() => changeSplitMode(mode as SplitMode)}>{mode}</button>
             {/each}
           </div>
         </div>
@@ -1331,11 +1334,11 @@
               <label>
                 <span>{participant.name}</span>
                 {#if splitMode === "exact"}
-                  <input bind:value={exactShares[participant.pid]} inputmode="decimal" placeholder="0.00" />
+                  <input bind:value={exactShares[participant.pid]} inputmode="decimal" placeholder="0.00" disabled={archived} />
                 {:else if splitMode === "shares"}
-                  <input bind:value={shareWeights[participant.pid]} inputmode="numeric" placeholder="1" />
+                  <input bind:value={shareWeights[participant.pid]} inputmode="numeric" placeholder="1" disabled={archived} />
                 {:else if splitMode === "percentage"}
-                  <input bind:value={percentages[participant.pid]} inputmode="decimal" placeholder="%" />
+                  <input bind:value={percentages[participant.pid]} inputmode="decimal" placeholder="%" disabled={archived} />
                 {:else}
                   <span>{sharePreview.ok ? formatMinor(sharePreview.shares.find((s) => s.pid === participant.pid)?.minor ?? 0n, group.currency) : "—"}</span>
                 {/if}
@@ -1345,15 +1348,15 @@
         {/if}
         <div class="subgroup-tools">
           <div class="row subgroup-save">
-            <input bind:value={subgroupName} placeholder="Save subgroup" />
-            <button type="button" class="secondary" disabled={!subgroupName.trim() || selectedParticipants.length === 0} on:click={saveSubgroupPreset}>Save</button>
+            <input bind:value={subgroupName} placeholder="Save subgroup" disabled={archived} />
+            <button type="button" class="secondary" disabled={archived || !subgroupName.trim() || selectedParticipants.length === 0} on:click={saveSubgroupPreset}>Save</button>
           </div>
           {#if subgroupPresets.length}
             <div class="subgroup-list" aria-label="Subgroups">
               {#each subgroupPresets as preset}
                 <span>
-                  <button type="button" class="secondary" on:click={() => applySubgroup(preset.id)}>{preset.name}</button>
-                  <button type="button" class="secondary" on:click={() => deleteSubgroup(preset.id)} title="Delete subgroup">x</button>
+                  <button type="button" class="secondary" disabled={archived} on:click={() => applySubgroup(preset.id)}>{preset.name}</button>
+                  <button type="button" class="secondary" disabled={archived} on:click={() => deleteSubgroup(preset.id)} title="Delete subgroup">x</button>
                 </span>
               {/each}
             </div>

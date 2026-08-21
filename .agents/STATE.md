@@ -663,6 +663,12 @@ Notes:
   by type/version only. Latest verification on 2026-08-22 passed with `npm run build`
   (51 core tests, 134 root tests), root `npm audit --json`, protected-string scan, and
   `git diff --check`.
+- Hardened the PWA service-worker cache boundary for REQ-SYN-13/23. The service worker
+  now caches only app shell/static assets and bypasses `/api/` relay reads and other
+  dynamic GET responses, preventing stale relay fetches from being replayed out of the
+  offline cache. Latest verification on 2026-08-22 passed with `npm run build` (51 core
+  tests, 135 root tests), root `npm audit --json`, protected-string scan, and `git diff
+  --check`.
 - Vercel checks on 2026-08-21 show the current `main` production deployment is Ready
   and has the requested aliases attached. Vercel env listing still shows no env vars
   configured, so the operated relay runtime remains unconfigured.

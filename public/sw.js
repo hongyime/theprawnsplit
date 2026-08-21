@@ -1,5 +1,14 @@
 const CACHE_NAME = "theprawnsplit-v1";
 const APP_SHELL = ["/", "/manifest.webmanifest", "/icons/icon.svg"];
+const CACHEABLE_PREFIXES = ["/assets/", "/icons/"];
+
+function isCacheable(request) {
+  if (request.method !== "GET") return false;
+  const url = new URL(request.url);
+  if (url.origin !== self.location.origin) return false;
+  if (url.pathname.startsWith("/api/")) return false;
+  return APP_SHELL.includes(url.pathname) || CACHEABLE_PREFIXES.some((prefix) => url.pathname.startsWith(prefix));
+}
 
 self.addEventListener("install", (event) => {
   event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(APP_SHELL)));
@@ -16,7 +25,7 @@ self.addEventListener("activate", (event) => {
 });
 
 self.addEventListener("fetch", (event) => {
-  if (event.request.method !== "GET") return;
+  if (!isCacheable(event.request)) return;
   event.respondWith(
     caches.match(event.request).then((cached) => {
       if (cached) return cached;

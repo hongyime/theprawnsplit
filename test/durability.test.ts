@@ -1,4 +1,6 @@
+import "fake-indexeddb/auto";
 import { describe, expect, it } from "vitest";
+import { createJoinSeed, ensureGroup, readGroup, recordAppLaunch, resetRepositoryForTests, updateMeta } from "@/db/repo";
 import {
   dismissInstallPrompt,
   emptyDurabilityPromptState,
@@ -50,6 +52,31 @@ describe("durability prompt policy", () => {
   it("shows the pin-link prompt only until it is marked handled", () => {
     expect(shouldPromptPinLink(emptyDurabilityPromptState())).toBe(true);
     expect(shouldPromptPinLink({ ...emptyDurabilityPromptState(), pinLinkPromptedAt: now })).toBe(false);
+  });
+
+  it("starts created and joined groups with a durable one-time pin-link prompt", async () => {
+    await resetRepositoryForTests(`durability-create-${crypto.randomUUID()}`);
+    const created = await ensureGroup();
+    expect(created.meta.durability).toBeDefined();
+    expect(shouldPromptPinLink(created.meta.durability!)).toBe(true);
+
+    await recordAppLaunch(created.groupId, now);
+    const launched = await readGroup(created.groupId);
+    expect(launched.meta.durability?.sessionCount).toBe(1);
+    expect(shouldPromptPinLink(launched.meta.durability!)).toBe(true);
+
+    await updateMeta(created.groupId, (meta) => ({
+      ...meta,
+      durability: { ...meta.durability!, pinLinkPromptedAt: now },
+    }));
+    const handled = await readGroup(created.groupId);
+    expect(shouldPromptPinLink(handled.meta.durability!)).toBe(false);
+
+    const seed = createJoinSeed(created);
+    await resetRepositoryForTests(`durability-join-${crypto.randomUUID()}`);
+    const joined = await ensureGroup(seed);
+    expect(joined.meta.durability).toBeDefined();
+    expect(shouldPromptPinLink(joined.meta.durability!)).toBe(true);
   });
 
   it("shows the identity-backup prompt only after a local claim until handled", () => {

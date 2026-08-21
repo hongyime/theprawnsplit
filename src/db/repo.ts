@@ -4,7 +4,7 @@ import { bigintReplacer, bigintReviver } from "@/lib/money";
 import { inferCurrency, newId } from "@/lib/ids";
 import { createGroupSecret, groupKey, groupTag, secretFromBase64, secretToBase64 } from "@/crypto/group";
 import { mintClaimKey, type ClaimAlg } from "@/crypto/claim";
-import { normalizeDurabilityPromptState, type DurabilityPromptState } from "@/lib/durability";
+import { emptyDurabilityPromptState, normalizeDurabilityPromptState, type DurabilityPromptState } from "@/lib/durability";
 import type { RelaySettings } from "@/lib/relay-settings";
 import type { SubgroupPreset } from "@/lib/subgroups";
 
@@ -255,6 +255,7 @@ export async function ensureGroup(seed?: JoinSeed): Promise<GroupRecord> {
     discardVector: {},
     cursors: {},
     nostrSk: crypto.randomUUID().replaceAll("-", ""),
+    durability: emptyDurabilityPromptState(),
   };
   const tx = database.transaction(["groups", "events", "meta"], "readwrite");
   await tx.objectStore("groups").put(group);
@@ -342,6 +343,7 @@ export async function replaceFromExport(exported: TripLedgerExport): Promise<Gro
     discardVector: {},
     cursors: {},
     nostrSk: crypto.randomUUID().replaceAll("-", ""),
+    durability: emptyDurabilityPromptState(),
   });
   await tx.done;
   return readGroup(group.groupId);

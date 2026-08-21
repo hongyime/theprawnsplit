@@ -64,3 +64,4 @@
 - 2026-08-21: Operated relay API tests should document the env-var blocker explicitly: malformed requests fail before storage, valid writes without storage env return a configuration error, and unsupported methods stay explicit.
 - 2026-08-21: Claiming a participant creates settlement authority, so the app must immediately nudge a separate DeviceIdentityBackup; the prompt is durable metadata and does not put claim keys into TripLedgerExport.
 - 2026-08-21: The unpaired recovered-device anomaly code now uses the PRD term `unverified-reclaim`; settlement confirmation authority remains withheld until DeviceLinked or ClaimReattested authority exists.
+- 2026-08-21: Pin-link prompting is initialized in group metadata at creation/join/restore time, so REQ-DUR-08 does not depend on a later metadata normalization pass before it becomes durable.

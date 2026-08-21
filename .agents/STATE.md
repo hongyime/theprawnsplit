@@ -207,6 +207,9 @@ Progress:
 - Added REQ-SYN-13 Web Share delta fallback. The app can package pending outbound events
   as a `TripLedgerDelta`, share it through Web Share with JSON download fallback, and
   import that delta into a matching joined trip without exposing identity or group secrets.
+- Added REQ-SYN-13 QR join-token sharing. Join-link encoding now lives in a tested helper
+  that keeps the token in the URL fragment, and the app exposes a QR modal using the same
+  join token as the copy-link action.
 
 Next step:
 - Automatic production deploy for current `main` commit `805e6e9` is Ready on
@@ -383,6 +386,9 @@ Notes:
   protected-string scan, and `git diff --check` passed.
 - Latest verification on 2026-08-21 after REQ-SYN-13 Web Share delta fallback: `npm
   run build` passed with 43 core tests and 68 root tests; root `npm audit --json`,
+  protected-string scan, and `git diff --check` passed.
+- Latest verification on 2026-08-21 after REQ-SYN-13 QR join-token sharing: `npm run
+  build` passed with 43 core tests and 69 root tests; root `npm audit --json`,
   protected-string scan, and `git diff --check` passed.
 - Vercel checks on 2026-08-21 show the current `main` production deployment is Ready
   and has the requested aliases attached. Vercel env listing still shows no env vars

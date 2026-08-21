@@ -410,6 +410,16 @@ button.secondary {
   margin-top: 1rem;
 }
 
+.join-qr {
+  display: block;
+  width: min(15rem, 100%);
+  aspect-ratio: 1;
+  margin: 1rem auto 0;
+  border: 1px solid #dce4df;
+  border-radius: 6px;
+  background: white;
+}
+
 .claim-details {
   display: grid;
   gap: 0.65rem;

@@ -6,6 +6,7 @@
     RefreshCcw,
     KeyRound,
     Link,
+    QrCode,
     ShieldCheck,
     Trash2,
     Upload,
@@ -16,6 +17,7 @@
     Share2,
     Settings,
   } from "@lucide/svelte";
+  import * as QRCode from "qrcode";
   import { allocate, eventSortKey, fold, greedySettlement, type Event, type Financials, type VerificationContext, type State } from "@theprawnsplit/core";
   import {
     appendEvents,
@@ -59,6 +61,7 @@
   import { createDeviceLinkRequest, linkPayload, parseDeviceLinkRequest, type DeviceLinkRequest } from "@/lib/device-link";
   import { expenseHistoryRows } from "@/lib/expense-history";
   import { frozenViewPolicy } from "@/lib/freeze-policy";
+  import { buildJoinLink, decodeJoinSeed } from "@/lib/join-link";
   import {
     archiveConfirmationText,
     canEditGroupProfile,
@@ -101,6 +104,7 @@
   let settleTo = "";
   let settleAmount = "";
   let importText = "";
+  let joinQrDataUrl = "";
   let syncStatus = "Not synced yet.";
   let syncing = false;
   let joiningFromLink = false;
@@ -717,21 +721,12 @@
     return event.outstanding.map((transfer) => `${participantLabel(transfer.from)} pays ${participantLabel(transfer.to)} ${formatMinor(transfer.minor, group?.currency ?? "USD")}`);
   }
 
-  function encodeJoinSeed(seed: JoinSeed): string {
-    return btoa(JSON.stringify(seed)).replaceAll("+", "-").replaceAll("/", "_").replaceAll("=", "");
-  }
-
-  function decodeJoinSeed(value: string): JoinSeed {
-    const padded = value.replaceAll("-", "+").replaceAll("_", "/").padEnd(Math.ceil(value.length / 4) * 4, "=");
-    return JSON.parse(atob(padded)) as JoinSeed;
-  }
-
   function readJoinSeed(): JoinSeed | undefined {
     const params = new URLSearchParams(window.location.hash.slice(1));
     const encoded = params.get("join");
     if (!encoded) return undefined;
     try {
-      return decodeJoinSeed(encoded);
+      return decodeJoinSeed(encoded) as JoinSeed;
     } catch {
       error = "Join link is malformed.";
       return undefined;
@@ -745,14 +740,19 @@
 
   async function copyJoinLink(): Promise<void> {
     if (!group) return;
-    const url = new URL(window.location.href);
-    url.hash = `join=${encodeJoinSeed(createJoinSeed(group))}`;
+    const url = buildJoinLink(window.location.href, createJoinSeed(group));
     try {
-      await navigator.clipboard.writeText(url.toString());
+      await navigator.clipboard.writeText(url);
       syncStatus = "Join link copied.";
     } catch {
-      window.prompt("Copy join link", url.toString());
+      window.prompt("Copy join link", url);
     }
+  }
+
+  async function showJoinQrCode(): Promise<void> {
+    if (!group) return;
+    const link = buildJoinLink(window.location.href, createJoinSeed(group));
+    joinQrDataUrl = await QRCode.toDataURL(link, { margin: 2, width: 240, errorCorrectionLevel: "M" });
   }
 
   async function importExport(): Promise<void> {
@@ -1090,6 +1090,7 @@
         <input class="currency" value={group.currency} aria-label="Currency" disabled={!groupProfileEditable} on:change={(e) => setCurrency((e.currentTarget as HTMLInputElement).value)} />
         <button type="button" disabled={syncing} on:click={runSync} title="Sync now"><RefreshCcw size={18} /> {syncing ? "Syncing" : "Sync"}</button>
         <button type="button" on:click={copyJoinLink} title="Copy join link"><Link size={18} /> Link</button>
+        <button type="button" on:click={showJoinQrCode} title="Show join QR"><QrCode size={18} /> QR</button>
         <button type="button" on:click={shareDelta} title="Share unsynced delta"><Share2 size={18} /> Share</button>
         <button type="button" on:click={() => downloadExport()} title="Export ledger"><Download size={18} /> Export</button>
         {#if archived}
@@ -1545,7 +1546,7 @@
 
     <section class="panel import-panel" id="manual-import">
       <h2><Upload size={18} /> Import Recovery JSON</h2>
-      <textarea bind:value={importText} placeholder="Paste a TripLedgerExport, DeviceIdentityBackup, or DeviceLinkRequest JSON file here"></textarea>
+      <textarea bind:value={importText} placeholder="Paste a TripLedgerExport, TripLedgerDelta, DeviceIdentityBackup, or DeviceLinkRequest JSON file here"></textarea>
       <button type="button" disabled={!importText.trim()} on:click={importExport}>Import</button>
     </section>
     {#if claimCandidate}
@@ -1580,6 +1581,18 @@
           <p>{activeInstallLevel === 4 ? "This trip returned after more than 7 days. Keep a fresh export and install the app when possible." : "Install the app so the browser can give this trip stronger storage protection."}</p>
           <div class="prompt-actions">
             <button type="button" class="secondary" on:click={dismissActiveInstallPrompt}>Dismiss</button>
+          </div>
+        </div>
+      </div>
+    {/if}
+    {#if joinQrDataUrl}
+      <div class="modal-backdrop" role="presentation">
+        <div class="modal" role="dialog" aria-modal="true" aria-label="Join QR code">
+          <h2>Join QR</h2>
+          <img class="join-qr" src={joinQrDataUrl} alt="Join QR code" />
+          <div class="prompt-actions">
+            <button type="button" class="secondary" on:click={() => (joinQrDataUrl = "")}>Close</button>
+            <button type="button" on:click={copyJoinLink}><Link size={16} /> Copy link</button>
           </div>
         </div>
       </div>

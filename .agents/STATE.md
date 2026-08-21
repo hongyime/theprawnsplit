@@ -790,6 +790,11 @@ Notes:
   diagnostics, and do not leave local outbound events stuck when read-back succeeds.
   Latest verification on 2026-08-22 passed with `npm run build` (64 core tests, 146
   root tests), root `npm audit --json`, protected-string scan, and `git diff --check`.
+- Added REQ-PLT-09 adaptive polling boundary coverage. The lifecycle helper now asserts
+  no-group suppression plus exact active/backoff/idle cadence boundaries at 10 s,
+  just after 10 s, 120 s, and just after 120 s. Latest verification on 2026-08-22
+  passed with `npm run build` (64 core tests, 147 root tests), root `npm audit --json`,
+  protected-string scan, and `git diff --check`.
 - Vercel checks on 2026-08-21 show the current `main` production deployment is Ready
   and has the requested aliases attached. Vercel env listing still shows no env vars
   configured, so the operated relay runtime remains unconfigured.

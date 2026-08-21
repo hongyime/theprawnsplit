@@ -100,6 +100,33 @@ describe("lifecycle copy", () => {
     expect(shouldPollGroup({ ...base, lastActivityAt: 0, lastSyncAt: 59_000 })).toBe(true);
   });
 
+  it("uses exact adaptive polling boundaries from active to backoff to idle", () => {
+    const base = {
+      hasGroup: true,
+      documentHidden: false,
+      archived: false,
+      now: 200_000,
+      lastActivityAt: 190_000,
+      lastSyncAt: 190_001,
+      idleAfterMs: 120_000,
+      pollActiveMs: 10_000,
+      pollBackoffMs: 60_000,
+      pollIdleMs: 120_000,
+    };
+
+    expect(shouldPollGroup({ ...base, hasGroup: false })).toBe(false);
+    expect(shouldPollGroup(base)).toBe(false);
+    expect(shouldPollGroup({ ...base, lastSyncAt: 190_000 })).toBe(true);
+
+    expect(shouldPollGroup({ ...base, lastActivityAt: 189_999, lastSyncAt: 140_001 })).toBe(false);
+    expect(shouldPollGroup({ ...base, lastActivityAt: 189_999, lastSyncAt: 140_000 })).toBe(true);
+    expect(shouldPollGroup({ ...base, lastActivityAt: 80_000, lastSyncAt: 140_001 })).toBe(false);
+    expect(shouldPollGroup({ ...base, lastActivityAt: 80_000, lastSyncAt: 140_000 })).toBe(true);
+
+    expect(shouldPollGroup({ ...base, lastActivityAt: 79_999, lastSyncAt: 80_001 })).toBe(false);
+    expect(shouldPollGroup({ ...base, lastActivityAt: 79_999, lastSyncAt: 80_000 })).toBe(true);
+  });
+
   it("returns the archive event that currently controls archived display", () => {
     const first = event("e_archive_1", 1, "GroupArchived", [{ from: "p_bob", to: "p_alice", minor: 1200n }]);
     const unarchive = event("e_unarchive_2", 2, "GroupUnarchived");

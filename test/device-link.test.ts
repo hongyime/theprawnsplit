@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { createDeviceLinkRequest, linkPayload, parseDeviceLinkRequest } from "@/lib/device-link";
+import { createDeviceLinkRequest, isDeviceLinkReplay, linkPayload, parseDeviceLinkRequest } from "@/lib/device-link";
+import { makeEvent, type EventFactory } from "@/lib/events";
 
 const tagHex = "a".repeat(64);
 const nonce = "b".repeat(32);
@@ -48,5 +49,30 @@ describe("device link artifacts", () => {
     expect(() => createDeviceLinkRequest({ ...request, deviceId: request.newDevice, identity: { claimPk: request.newClaimPk, alg: request.alg }, nonce: "short" })).toThrow(
       "Device link nonce must be lowercase 128-bit hex",
     );
+  });
+
+  it("detects replayed device-link nonces for the same delegated device", () => {
+    const request = createDeviceLinkRequest({
+      tagHex,
+      pid: "alice",
+      deviceId: "new-phone",
+      identity: { claimPk: "new-key", alg: "ecdsa-p256" },
+      nonce,
+      createdAt: 1,
+    });
+    const factory: EventFactory = { deviceId: "alice-phone", nextCounter: 1 };
+    const linked = makeEvent(factory, "DeviceLinked", {
+      pid: request.pid,
+      parentDevice: "alice-phone",
+      newDevice: request.newDevice,
+      newClaimPk: request.newClaimPk,
+      alg: request.alg,
+      nonce: request.nonce,
+      sig: "sig",
+    });
+
+    expect(isDeviceLinkReplay([linked], request)).toBe(true);
+    expect(isDeviceLinkReplay([linked], { ...request, nonce: "c".repeat(32) })).toBe(false);
+    expect(isDeviceLinkReplay([linked], { ...request, newDevice: "tablet" })).toBe(false);
   });
 });

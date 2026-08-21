@@ -1,3 +1,4 @@
+import type { Event } from "@theprawnsplit/core";
 import type { StoredIdentity } from "@/db/repo";
 
 const GROUP_TAG_RE = /^[0-9a-f]{64}$/;
@@ -40,6 +41,17 @@ export function createDeviceLinkRequest(input: {
 
 export function linkPayload(request: Pick<DeviceLinkRequest, "tagHex" | "pid" | "newDevice" | "newClaimPk" | "nonce">): string {
   return `${request.tagHex}:link:${request.pid}:${request.newDevice}:${request.newClaimPk}:${request.nonce}`;
+}
+
+export function isDeviceLinkReplay(events: Event[], request: Pick<DeviceLinkRequest, "pid" | "newDevice" | "newClaimPk" | "nonce">): boolean {
+  return events.some(
+    (event) =>
+      event.t === "DeviceLinked" &&
+      event.pid === request.pid &&
+      event.newDevice === request.newDevice &&
+      event.newClaimPk === request.newClaimPk &&
+      event.nonce === request.nonce,
+  );
 }
 
 export function parseDeviceLinkRequest(text: string): DeviceLinkRequest {

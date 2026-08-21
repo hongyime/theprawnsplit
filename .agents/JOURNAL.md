@@ -119,3 +119,4 @@
 - 2026-08-22: Operated relay runtime limits are defensive configuration: malformed, zero, or negative RELAY_MAX_* values fall back to documented defaults instead of producing NaN limits.
 - 2026-08-22: Multi-currency rate data is a schema boundary: any `Financials.rate` must be carried by a v2+ event with a valid uppercase currency and positive finite rate, otherwise fold quarantines it.
 - 2026-08-22: Ambient clock skew is display-only: compare local time with the median HLC wall time of the last 10 peer events and warn after 10 minutes, but never mutate or reject events from that comparison.
+- 2026-08-22: Remote device-pairing nonces are single-use at acceptance: a `DeviceLinkRequest` whose nonce/device/key tuple already appears in a retained `DeviceLinked` event is rejected as replay.

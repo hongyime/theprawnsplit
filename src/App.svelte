@@ -58,7 +58,7 @@
   import { defaultExpenseDate, defaultParticipant, makeEvent, makeExpenseFinancials, type EventFactory } from "@/lib/events";
   import { formatMinor, formatMinorInput, parseMinor, parsePercentageBasisPoints, parseShareWeight, type SplitMode } from "@/lib/money";
   import { isArchivedEventLog } from "@/lib/archive";
-  import { createDeviceLinkRequest, linkPayload, parseDeviceLinkRequest, type DeviceLinkRequest } from "@/lib/device-link";
+  import { createDeviceLinkRequest, isDeviceLinkReplay, linkPayload, parseDeviceLinkRequest, type DeviceLinkRequest } from "@/lib/device-link";
   import { canAppendExpense } from "@/lib/expense-command";
   import { editFinancialsForTotal } from "@/lib/expense-edit";
   import { expenseDisplayRows } from "@/lib/expense-display";
@@ -319,6 +319,7 @@
   async function acceptDeviceLinkRequest(request: DeviceLinkRequest): Promise<void> {
     if (!group || archived) return;
     if (request.tagHex !== group.tagHex) throw new Error("Device link request does not match this trip");
+    if (isDeviceLinkReplay(group.events, request)) throw new Error("Device link request was already used");
     const signer = localIdentityForPid(request.pid);
     if (!signer) throw new Error(`Claim ${participantLabel(request.pid)} on this device before authorising another device`);
     const f = factory();

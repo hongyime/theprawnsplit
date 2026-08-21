@@ -652,6 +652,11 @@ Notes:
   the difference exceeds 10 minutes, without mutating HLC values. Latest verification on
   2026-08-22 passed with `npm run build` (51 core tests, 132 root tests), root `npm
   audit --json`, protected-string scan, and `git diff --check`.
+- Hardened Q13/REQ-SEC-02 device-link replay handling. `DeviceLinkRequest` acceptance now
+  rejects a request whose nonce/device/key tuple already appears in a retained
+  `DeviceLinked` event, keeping remote pairing nonces single-use at the ledger boundary.
+  Latest verification on 2026-08-22 passed with `npm run build` (51 core tests, 133 root
+  tests), root `npm audit --json`, protected-string scan, and `git diff --check`.
 - Vercel checks on 2026-08-21 show the current `main` production deployment is Ready
   and has the requested aliases attached. Vercel env listing still shows no env vars
   configured, so the operated relay runtime remains unconfigured.

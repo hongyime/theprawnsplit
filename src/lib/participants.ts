@@ -86,3 +86,8 @@ export function defaultSplitSelection<T extends Pick<ParticipantState, "pid" | "
   }
   return next;
 }
+
+export function defaultPayerPid<T extends Pick<ParticipantState, "pid">>(participants: T[], current: string, localClaimPids: ReadonlySet<string>): string {
+  if (current && participants.some((participant) => participant.pid === current)) return current;
+  return participants.find((participant) => localClaimPids.has(participant.pid))?.pid ?? participants[0]?.pid ?? "";
+}

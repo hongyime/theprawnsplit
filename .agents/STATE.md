@@ -553,6 +553,10 @@ Notes:
   one share per included participant instead of rounded minor-unit amounts, and
   amount-to-percentage transitions remain populated through a tested helper. Latest
   verification on 2026-08-22 passed with `npm run build` (48 core tests, 109 root tests).
+- Hardened REQ-UX-01 common-case expense flow. The default single payer now prefers this
+  device's locally claimed participant when no valid payer is selected, while preserving
+  an existing valid manual payer choice. Latest verification on 2026-08-22 passed with
+  `npm run build` (48 core tests, 110 root tests).
 - Vercel checks on 2026-08-21 show the current `main` production deployment is Ready
   and has the requested aliases attached. Vercel env listing still shows no env vars
   configured, so the operated relay runtime remains unconfigured.

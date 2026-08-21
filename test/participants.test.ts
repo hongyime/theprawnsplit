@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   claimAttributionText,
+  defaultPayerPid,
   defaultSplitSelection,
   findParticipantNameMatch,
   groupParticipantsForClaim,
@@ -56,6 +57,15 @@ describe("participant name matching", () => {
     );
 
     expect(selected).toEqual({ active: true, "manually-off": false, inactive: false });
+  });
+
+  it("defaults the payer to a local claimed participant for the common paid-by-self expense", () => {
+    const participants = [{ pid: "shadow" }, { pid: "self" }, { pid: "other" }];
+
+    expect(defaultPayerPid(participants, "", new Set(["self"]))).toBe("self");
+    expect(defaultPayerPid(participants, "other", new Set(["self"]))).toBe("other");
+    expect(defaultPayerPid(participants, "missing", new Set(["self"]))).toBe("self");
+    expect(defaultPayerPid(participants, "", new Set())).toBe("shadow");
   });
 
   it("renders TOFU claim attribution with device, time, and current balance", () => {

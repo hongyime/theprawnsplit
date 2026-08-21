@@ -74,7 +74,7 @@
   } from "@/lib/lifecycle";
   import { currencyAmountPreview, normalizeCurrency } from "@/lib/multicurrency";
   import { buildPayerPreview, type PayerMode } from "@/lib/payers";
-  import { claimAttributionText, defaultSplitSelection, findParticipantNameMatch, groupParticipantsForClaim, type ParticipantNameMatch } from "@/lib/participants";
+  import { claimAttributionText, defaultPayerPid, defaultSplitSelection, findParticipantNameMatch, groupParticipantsForClaim, type ParticipantNameMatch } from "@/lib/participants";
   import { relayDiagnosticActionText } from "@/lib/relay-diagnostics";
   import { normalizeRelaySettings, parseNostrRelayText, relaySettingsTargetCount, type RelaySettings } from "@/lib/relay-settings";
   import { reattestationStatus } from "@/lib/reattestation";
@@ -212,7 +212,7 @@
     verificationContext = await buildVerificationContext(group);
     state = fold(group.events, { supportedVersion: config.schemaVersion }, verificationContext);
     selectedPids = defaultSplitSelection([...state.participants.values()], selectedPids);
-    payerPid ||= [...state.participants.keys()][0] ?? "";
+    payerPid = defaultPayerPid([...state.participants.values()], payerPid, new Set(group.identities.map((identity) => identity.pid)));
     for (const participant of state.participants.values()) {
       if (payerAmounts[participant.pid] === undefined) payerAmounts[participant.pid] = "";
     }

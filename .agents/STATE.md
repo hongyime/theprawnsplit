@@ -859,3 +859,8 @@ Notes:
   on 2026-08-22 passed with focused `npx vitest run test/device-id-privacy-ui.test.ts
   test/participants.test.ts`, `npm run build` (64 core tests, 158 root tests), root
   `npm audit --json`, protected-string scan, and `git diff --check`.
+- Added REQ-SYN-15/REQ-UX-06 sync-honesty UI coverage so the topbar persistently shows
+  local+published unconfirmed event count and success/ready copy stays behind
+  sync/quarantine-derived labels. Verification on 2026-08-22 passed with focused `npx
+  vitest run test/sync-honesty-ui.test.ts`, `npm run build` (64 core tests, 159 root
+  tests), root `npm audit --json`, protected-string scan, and `git diff --check`.

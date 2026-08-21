@@ -598,6 +598,12 @@ Notes:
   records relay writes and proves two live relay targets receive ciphertext, public tag,
   author id, and derived write proof without the raw stored `secretB64`. Latest
   verification on 2026-08-22 passed with `npm run build` (48 core tests, 122 root tests).
+- Hardened REQ-SYN-13/REQ-SEC-05 import artifact classification. `parseExport()` now
+  accepts only version-1 `TripLedgerExport`, `TripLedgerDelta`, or `DeviceIdentityBackup`
+  artifacts, leaving `DeviceLinkRequest` on the separate pairing path and rejecting
+  unknown/import-mismatched JSON before fallback import dispatch. Latest verification on
+  2026-08-22 passed with `npm run build` (48 core tests, 123 root tests), root `npm
+  audit --json`, protected-string scan, and `git diff --check`.
 - Vercel checks on 2026-08-21 show the current `main` production deployment is Ready
   and has the requested aliases attached. Vercel env listing still shows no env vars
   configured, so the operated relay runtime remains unconfigured.

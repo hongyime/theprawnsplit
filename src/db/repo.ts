@@ -416,7 +416,14 @@ export function stringifyExport(exported: TripLedgerExport | DeviceIdentityBacku
 export type ImportArtifact = TripLedgerExport | DeviceIdentityBackup | TripLedgerDelta;
 
 export function parseExport(text: string): ImportArtifact {
-  return JSON.parse(text, bigintReviver) as ImportArtifact;
+  const parsed = JSON.parse(text, bigintReviver) as Partial<ImportArtifact>;
+  if (
+    parsed.version === 1 &&
+    (parsed.type === "TripLedgerExport" || parsed.type === "DeviceIdentityBackup" || parsed.type === "TripLedgerDelta")
+  ) {
+    return parsed as ImportArtifact;
+  }
+  throw new Error("Unsupported import artifact");
 }
 
 export async function restoreIdentityBackup(backup: DeviceIdentityBackup): Promise<GroupRecord> {

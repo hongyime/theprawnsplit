@@ -110,3 +110,4 @@
 - 2026-08-22: Zero-value stored financial rows are still editable ledger shape: edit rescaling uses equal fallback weights only when all existing row amounts are zero.
 - 2026-08-22: REQ-SYN-02 remains a source boundary: direct network APIs and Nostr pool operations stay inside relay adapters, while adapter construction stays in the sync relay factory.
 - 2026-08-22: REQ-SYN-04 relay writes transmit only ciphertext, public tag, author id, and a derived write proof; raw `secretB64` must remain local/join-link material.
+- 2026-08-22: Import artifact classification is explicit: ledger imports accept only version-1 TripLedgerExport, TripLedgerDelta, or DeviceIdentityBackup; DeviceLinkRequest stays on the separate pairing path.

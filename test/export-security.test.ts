@@ -7,6 +7,7 @@ import {
   createIdentityBackup,
   createJoinSeed,
   ensureGroup,
+  parseExport,
   readGroup,
   replaceFromExport,
   resetRepositoryForTests,
@@ -116,6 +117,21 @@ describe("export artifact split", () => {
     expect(backup.identities).toHaveLength(1);
     expect(json).toContain("claimSkJwk");
     expect(json).toContain("private-d");
+  });
+
+  it("classifies only supported ledger import artifacts", () => {
+    const exported = createExport(groupWithIdentity());
+
+    expect(parseExport(stringifyExport(exported))).toEqual(exported);
+    expect(() => parseExport(JSON.stringify({ type: "DeviceLinkRequest", version: 1 }))).toThrow(
+      "Unsupported import artifact",
+    );
+    expect(() => parseExport(JSON.stringify({ type: "TripLedgerExport", version: 2 }))).toThrow(
+      "Unsupported import artifact",
+    );
+    expect(() => parseExport(JSON.stringify({ type: "SomethingElse", version: 1 }))).toThrow(
+      "Unsupported import artifact",
+    );
   });
 
   it("restores identity backup onto a matching recovered trip by tag", async () => {

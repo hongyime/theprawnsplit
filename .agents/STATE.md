@@ -691,6 +691,11 @@ Notes:
   freeze locally-created multi-currency events. Latest verification on 2026-08-22 passed
   with `npm run build` (52 core tests, 139 root tests), root `npm audit --json`,
   protected-string scan, and `git diff --check`.
+- Hardened TDD §3.2 client env sample coverage. `.env.example` now includes
+  `VITE_CAP_GROUP_TOTAL`, and config tests fail if any runtime `VITE_*` key in
+  `src/config.ts` is missing from the committed sample. Latest verification on
+  2026-08-22 passed with `npm run build` (52 core tests, 140 root tests), root
+  `npm audit --json`, protected-string scan, and `git diff --check`.
 - Vercel checks on 2026-08-21 show the current `main` production deployment is Ready
   and has the requested aliases attached. Vercel env listing still shows no env vars
   configured, so the operated relay runtime remains unconfigured.

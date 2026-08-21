@@ -126,3 +126,4 @@
 - 2026-08-22: Client numeric `VITE_*` runtime knobs are defensive configuration: malformed, zero, or negative values fall back to documented defaults instead of producing NaN sync/polling limits.
 - 2026-08-22: Group-total sync caps are transport admission policy, not fold policy: drop surplus incoming events and advance discard vectors, but keep already-retained events foldable.
 - 2026-08-22: Multi-currency support makes schema v2 the current deployment default; copied env samples must not pin clients to v1 while the app can create rate-bearing events.
+- 2026-08-22: Client runtime config and `.env.example` must stay in lockstep; every `VITE_*` key read by `src/config.ts` belongs in the committed sample.

@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { parseClientNumericConfig } from "@/config";
 
@@ -25,5 +26,14 @@ describe("client numeric config parsing", () => {
     const { config } = await import("@/config");
 
     expect(config.schemaVersion).toBe(2);
+  });
+
+  it("documents every runtime client environment key in .env.example", () => {
+    const configSource = readFileSync("src/config.ts", "utf8");
+    const envExample = readFileSync(".env.example", "utf8");
+    const runtimeKeys = [...new Set(configSource.match(/VITE_[A-Z0-9_]+/g) ?? [])].sort();
+    const sampleKeys = new Set(envExample.match(/^VITE_[A-Z0-9_]+(?==)/gm) ?? []);
+
+    expect(runtimeKeys.filter((key) => !sampleKeys.has(key))).toEqual([]);
   });
 });

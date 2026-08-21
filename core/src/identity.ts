@@ -163,15 +163,23 @@ export function matchesPayeeClaimSignature(events: Event[], sid: string, claimSi
   const settlement = events.find((event) => event.t === "SettlementRecorded" && event.sid === sid);
   if (!settlement || settlement.t !== "SettlementRecorded") return false;
   const voided = voidedEventIds(events);
-  const keys = [...events]
-    .filter((event) => !voided.has(event.id))
-    .flatMap((event) => {
-      if (event.t === "ParticipantClaimed" && event.pid === settlement.to && validSelfClaim(event, ctx)) return [{ publicKey: event.claimPk, alg: event.alg }];
-      if (event.t === "DeviceLinked" && event.pid === settlement.to) return [{ publicKey: event.newClaimPk, alg: event.alg }];
-      if (event.t === "ClaimReattested" && event.pid === settlement.to) return [{ publicKey: event.newClaimPk, alg: event.alg }];
-      return [];
-    });
-  return verifiesWithAny(ctx, `${ctx.groupTag}:confirm:${sid}`, claimSig, keys);
+  const keys = new Map<string, "ed25519" | "ecdsa-p256">();
+
+  for (const event of events) {
+    if (!voided.has(event.id) && event.t === "ParticipantClaimed" && event.pid === settlement.to && validSelfClaim(event, ctx)) {
+      keys.set(event.claimPk, event.alg);
+    }
+  }
+  for (const publicKey of authorisedKeys(events, settlement.to, ctx)) {
+    keys.set(publicKey, findAlg(events, publicKey) ?? "ed25519");
+  }
+
+  return verifiesWithAny(
+    ctx,
+    `${ctx.groupTag}:confirm:${sid}`,
+    claimSig,
+    [...keys.entries()].map(([publicKey, alg]) => ({ publicKey, alg })),
+  );
 }
 
 export function claimAnomalies(events: Event[], ctx: VerificationContext): Anomaly[] {

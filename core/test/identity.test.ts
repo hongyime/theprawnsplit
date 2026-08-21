@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { authorisedKeys, buildDSU, claimAnomalies, contestedClaimPids, verifyConfirmation } from "../src/identity";
+import { authorisedKeys, buildDSU, claimAnomalies, contestedClaimPids, matchesPayeeClaimSignature, verifyConfirmation } from "../src/identity";
 import { base, claim, confirm, groupTag, link, sig, verifier } from "./helpers";
 
 describe("REQ-ID-13/REQ-SEC-08 identity", () => {
@@ -87,6 +87,29 @@ describe("REQ-ID-13/REQ-SEC-08 identity", () => {
     expect(contestedClaimPids(events, verifier)).toEqual(new Set(["alice"]));
     if (tabletConfirm.t !== "SettlementConfirmed") throw new Error("test helper returned wrong event type");
     expect(verifyConfirmation([...events, tabletConfirm], "s1", tabletConfirm.claimSig, verifier)).toBe(false);
+  });
+
+  it("does not surface contested confirmations from invalid delegated keys", () => {
+    const forgedPayload = `${groupTag}:link:alice:evil-phone:evil-key:n1`;
+    const events = [
+      claim("alice", "phone", "alice-key"),
+      claim("alice", "tablet", "tablet-key"),
+      base("DeviceLinked", {
+        pid: "alice",
+        parentDevice: "phone",
+        newDevice: "evil-phone",
+        newClaimPk: "evil-key",
+        alg: "ed25519",
+        nonce: "n1",
+        sig: sig("not-alice-key", forgedPayload),
+      } as never),
+      base("SettlementRecorded", { sid: "s1", from: "bob", to: "alice", minor: 10n } as never),
+    ];
+    const forgedConfirm = confirm("s1", "evil-key");
+
+    expect(contestedClaimPids(events, verifier)).toEqual(new Set(["alice"]));
+    if (forgedConfirm.t !== "SettlementConfirmed") throw new Error("test helper returned wrong event type");
+    expect(matchesPayeeClaimSignature([...events, forgedConfirm], "s1", forgedConfirm.claimSig, verifier)).toBe(false);
   });
 
   it("allows DeviceLinked authority without raising a second-claim anomaly", () => {

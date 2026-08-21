@@ -86,3 +86,4 @@
 - 2026-08-22: Claim-key algorithm agility depends on executable fallback coverage: Ed25519 feature detection may fail, and P-256 must remain the automatic minting fallback.
 - 2026-08-22: REQ-DUR-07 export prompts are a closed policy set: archive remains an automatic export path, while UI prompt selection must resolve only to first-zero, seven-day-unprotected return, or no prompt.
 - 2026-08-22: REQ-DUR-09/10 recovery UX must keep manual JSON import in the blocking screen itself; suspected storage eviction promotes import as primary, while first-time join still offers it as the escape hatch.
+- 2026-08-22: Contested settlement-confirmation display remains authority-gated: unverified self-claims may surface as contested, but invalid delegated-key events must not make a forged confirmation look like a contested payee response.

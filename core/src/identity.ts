@@ -159,6 +159,21 @@ export function verifyConfirmation(events: Event[], sid: string, claimSig: strin
   return verifiesWithAny(ctx, `${ctx.groupTag}:confirm:${sid}`, claimSig, keyAlgs);
 }
 
+export function matchesPayeeClaimSignature(events: Event[], sid: string, claimSig: string, ctx: VerificationContext): boolean {
+  const settlement = events.find((event) => event.t === "SettlementRecorded" && event.sid === sid);
+  if (!settlement || settlement.t !== "SettlementRecorded") return false;
+  const voided = voidedEventIds(events);
+  const keys = [...events]
+    .filter((event) => !voided.has(event.id))
+    .flatMap((event) => {
+      if (event.t === "ParticipantClaimed" && event.pid === settlement.to && validSelfClaim(event, ctx)) return [{ publicKey: event.claimPk, alg: event.alg }];
+      if (event.t === "DeviceLinked" && event.pid === settlement.to) return [{ publicKey: event.newClaimPk, alg: event.alg }];
+      if (event.t === "ClaimReattested" && event.pid === settlement.to) return [{ publicKey: event.newClaimPk, alg: event.alg }];
+      return [];
+    });
+  return verifiesWithAny(ctx, `${ctx.groupTag}:confirm:${sid}`, claimSig, keys);
+}
+
 export function claimAnomalies(events: Event[], ctx: VerificationContext): Anomaly[] {
   const voided = voidedEventIds(events);
   const ordered = [...events].filter((event) => !voided.has(event.id)).sort(eventSortKey);

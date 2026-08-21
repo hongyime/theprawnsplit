@@ -118,9 +118,13 @@ Progress:
   union claimed devices across merged participants, include valid `DeviceLinked` and
   `ClaimReattested` devices when claim verification context is available, exclude voided
   link events, and do not change literal-payee settlement authority.
+- Added Phase 4 contested-confirmation surfacing. A valid `SettlementConfirmed` signature
+  for a payee with an active claim anomaly now leaves the settlement pending, marks the
+  settlement as contested, and records `contested-settlement-confirmation`; invalid
+  signatures remain ignored.
 
 Next step:
-- Latest pushed commit before this slice is `5c4df6f` on `main`.
+- Latest pushed commit before this slice is `43e6b37` on `main`.
 - GitHub/Vercel automatic production deployment for `cd21de2` completed Ready on
   2026-08-21.
 - Remaining deployment work: configure Vercel env vars and verify custom-domain runtime.
@@ -184,6 +188,9 @@ Notes:
   root tests, and root `npm audit --json` reports zero vulnerabilities.
 - Latest verification on 2026-08-21 after merged-device display semantics: `npm
   --prefix core test` passed with 38 tests, `npm run build` passed with 38 core tests
+  and 11 root tests, and root `npm audit --json` reports zero vulnerabilities.
+- Latest verification on 2026-08-21 after contested-confirmation surfacing: `npm
+  --prefix core test` passed with 39 tests, `npm run build` passed with 39 core tests
   and 11 root tests, and root `npm audit --json` reports zero vulnerabilities.
 - Vercel checks on 2026-08-21 show the project exists but direct deployment creation was
   quota-blocked.

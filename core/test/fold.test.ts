@@ -96,6 +96,26 @@ describe("REQ-MON-15/REQ-SYN-12 fold", () => {
     expect(state.anomalies.map((anomaly) => anomaly.code)).toContain("contested-participant-claim");
     expect(state.settlements.get("s1")?.pending).toBe(true);
     expect(state.settlements.get("s1")?.confirmed).toBe(false);
+    expect(state.settlements.get("s1")?.contestedConfirmation).toBe(true);
+    expect(state.anomalies.map((anomaly) => anomaly.code)).toContain("contested-settlement-confirmation");
+  });
+
+  it("ignores invalid confirmations for contested payees", () => {
+    const state = fold(
+      [
+        claim("alice", "phone", "alice-key"),
+        claim("alice", "tablet", "tablet-key"),
+        base("SettlementRecorded", { sid: "s1", from: "bob", to: "alice", minor: 100n } as never),
+        base("SettlementConfirmed", { sid: "s1", pid: "alice", claimSig: "not-a-valid-signature" } as never),
+      ],
+      { supportedVersion: 1 },
+      verifier,
+    );
+
+    expect(state.settlements.get("s1")?.pending).toBe(true);
+    expect(state.settlements.get("s1")?.confirmed).toBe(false);
+    expect(state.settlements.get("s1")?.contestedConfirmation).toBe(false);
+    expect(state.anomalies.map((anomaly) => anomaly.code)).not.toContain("contested-settlement-confirmation");
   });
 
   it("marks settlements recorded by an uncontested payee device born confirmed", () => {

@@ -805,8 +805,8 @@
             {#each settlements as settlement}
               <div class="settlement-row">
                 <span>{participantLabel(settlement.from)} paid {participantLabel(settlement.to)} {formatMinor(settlement.minor, group.currency)}</span>
-                <strong class:positive={settlement.confirmed} class:negative={settlement.disputed}>
-                  {settlement.disputed ? "disputed" : settlement.confirmed ? "confirmed" : settlement.cashUnconfirmable ? "cash" : "pending"}
+                <strong class:positive={settlement.confirmed} class:negative={settlement.disputed || settlement.contestedConfirmation}>
+                  {settlement.disputed ? "disputed" : settlement.contestedConfirmation ? "contested" : settlement.confirmed ? "confirmed" : settlement.cashUnconfirmable ? "cash" : "pending"}
                 </strong>
               </div>
             {/each}

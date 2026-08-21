@@ -102,6 +102,7 @@ export interface SettlementState {
   minor: Money;
   confirmed: boolean;
   disputed: boolean;
+  contestedConfirmation: boolean;
   pending: boolean;
   cashUnconfirmable: boolean;
 }

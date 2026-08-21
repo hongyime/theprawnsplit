@@ -1,4 +1,12 @@
-import { authorisedDevices, buildDSU, claimAnomalies, contestedClaimPids, verifyConfirmation, voidedEventIds } from "./identity";
+import {
+  authorisedDevices,
+  buildDSU,
+  claimAnomalies,
+  contestedClaimPids,
+  matchesPayeeClaimSignature,
+  verifyConfirmation,
+  voidedEventIds,
+} from "./identity";
 import type {
   Anomaly,
   Event,
@@ -222,6 +230,7 @@ export function fold(events: Event[], opts: FoldOptions, ctx?: VerificationConte
         minor: event.minor,
         confirmed: bornConfirmed,
         disputed: false,
+        contestedConfirmation: false,
         pending: !bornConfirmed && !cashUnconfirmable,
         cashUnconfirmable,
       });
@@ -230,6 +239,15 @@ export function fold(events: Event[], opts: FoldOptions, ctx?: VerificationConte
       const settlement = settlements.get(event.sid);
       if (settlement && ctx && verifyConfirmation(supported, event.sid, event.claimSig, ctx)) {
         settlements.set(event.sid, { ...settlement, confirmed: true, pending: false });
+      } else if (settlement && ctx && contestedPids.has(settlement.to) && matchesPayeeClaimSignature(supported, event.sid, event.claimSig, ctx)) {
+        settlements.set(event.sid, { ...settlement, contestedConfirmation: true, pending: true });
+        anomalies.push({
+          code: "contested-settlement-confirmation",
+          pid: settlement.to,
+          sid: event.sid,
+          eventId: event.id,
+          message: "Settlement confirmation came from a payee with an active claim anomaly",
+        });
       }
     }
     if (event.t === "SettlementDisputed") {

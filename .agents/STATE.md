@@ -113,8 +113,10 @@ Progress:
   identity backup separate from `TripLedgerExport` while restoring claim keys.
 
 Next step:
-- Commit and push `main` when ready; GitHub push is expected to trigger Vercel deployment.
-- Remaining deployment work: configure Vercel env vars and verify the automatic deployment.
+- Latest pushed commit is `cd21de2` on `main`.
+- GitHub/Vercel automatic production deployment for `cd21de2` completed Ready on
+  2026-08-21.
+- Remaining deployment work: configure Vercel env vars and verify custom-domain runtime.
 - Direct Vercel CLI deploy remains blocked by the daily free-tier API deployment limit.
   Attempted production deploy on 2026-08-21 failed with `api-deployments-free-per-day`
   (>100 deployments).
@@ -172,6 +174,7 @@ Notes:
   zero vulnerabilities.
 - Vercel checks on 2026-08-21 show the project exists but direct deployment creation was
   quota-blocked.
+- Vercel automatic deploy on 2026-08-21 for `cd21de2` succeeded and reports Ready.
 - Retried a production Vercel CLI deploy on 2026-08-21; it is still blocked with
   `api-deployments-free-per-day` (>100 deployments). Vercel env check still shows no
   env vars configured. Domain verification remains OK with `dns_change_recommended`.

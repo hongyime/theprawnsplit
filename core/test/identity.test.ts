@@ -83,7 +83,7 @@ describe("REQ-ID-13/REQ-SEC-08 identity", () => {
     const tabletConfirm = confirm("s1", "tablet-key");
     const anomalies = claimAnomalies(events, verifier);
 
-    expect(anomalies.map((anomaly) => anomaly.code)).toContain("contested-participant-claim");
+    expect(anomalies.map((anomaly) => anomaly.code)).toContain("unverified-reclaim");
     expect(contestedClaimPids(events, verifier)).toEqual(new Set(["alice"]));
     if (tabletConfirm.t !== "SettlementConfirmed") throw new Error("test helper returned wrong event type");
     expect(verifyConfirmation([...events, tabletConfirm], "s1", tabletConfirm.claimSig, verifier)).toBe(false);
@@ -97,7 +97,7 @@ describe("REQ-ID-13/REQ-SEC-08 identity", () => {
     ];
     const tabletConfirm = confirm("s1", "tablet-key");
 
-    expect(claimAnomalies(events, verifier).map((anomaly) => anomaly.code)).not.toContain("contested-participant-claim");
+    expect(claimAnomalies(events, verifier).map((anomaly) => anomaly.code)).not.toContain("unverified-reclaim");
     if (tabletConfirm.t !== "SettlementConfirmed") throw new Error("test helper returned wrong event type");
     expect(verifyConfirmation([...events, tabletConfirm], "s1", tabletConfirm.claimSig, verifier)).toBe(true);
   });
@@ -120,7 +120,7 @@ describe("REQ-ID-13/REQ-SEC-08 identity", () => {
     ];
     const recoveredConfirm = confirm("s1", "recovered-key");
 
-    expect(claimAnomalies(events, verifier).map((anomaly) => anomaly.code)).not.toContain("contested-participant-claim");
+    expect(claimAnomalies(events, verifier).map((anomaly) => anomaly.code)).not.toContain("unverified-reclaim");
     if (recoveredConfirm.t !== "SettlementConfirmed") throw new Error("test helper returned wrong event type");
     expect(verifyConfirmation([...events, recoveredConfirm], "s1", recoveredConfirm.claimSig, verifier)).toBe(true);
   });

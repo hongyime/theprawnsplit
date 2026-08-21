@@ -90,7 +90,7 @@ describe("app verification context", () => {
     const ctx = await buildVerificationContext({ tagHex: groupTag, events });
     const state = fold(events, { supportedVersion: 1 }, ctx);
 
-    expect(state.anomalies.map((anomaly) => anomaly.code)).not.toContain("contested-participant-claim");
+    expect(state.anomalies.map((anomaly) => anomaly.code)).not.toContain("unverified-reclaim");
     expect(state.settlements.get("s1")?.confirmed).toBe(true);
     expect(state.settlements.get("s1")?.pending).toBe(false);
   });

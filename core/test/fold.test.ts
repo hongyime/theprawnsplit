@@ -176,7 +176,7 @@ describe("REQ-MON-15/REQ-SYN-12 fold", () => {
     ];
     const state = fold(events, { supportedVersion: 1 }, verifier);
 
-    expect(state.anomalies.map((anomaly) => anomaly.code)).toContain("contested-participant-claim");
+    expect(state.anomalies.map((anomaly) => anomaly.code)).toContain("unverified-reclaim");
     expect(state.settlements.get("s1")?.pending).toBe(true);
     expect(state.settlements.get("s1")?.confirmed).toBe(false);
     expect(state.settlements.get("s1")?.contestedConfirmation).toBe(true);

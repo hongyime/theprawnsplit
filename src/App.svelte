@@ -130,7 +130,7 @@
   $: settlements = state ? [...state.settlements.values()] : [];
   $: anomalies = state ? state.anomalies : [];
   $: reconciliationAnomalies = anomalies.filter((anomaly) =>
-    ["possible-duplicate-participants", "distinct-participants-merged", "contested-participant-claim"].includes(anomaly.code),
+    ["possible-duplicate-participants", "distinct-participants-merged", "unverified-reclaim"].includes(anomaly.code),
   );
   $: selectedParticipants = participants.filter((p) => selectedPids[p.pid]);
   $: participantPids = participants.map((participant) => participant.pid);
@@ -1203,7 +1203,7 @@
               {:else if anomaly.code === "distinct-participants-merged"}
                 <strong>People marked distinct are currently merged</strong>
                 <span>{anomaly.message}</span>
-              {:else if anomaly.code === "contested-participant-claim" && anomaly.pid}
+              {:else if anomaly.code === "unverified-reclaim" && anomaly.pid}
                 <strong>{participantLabel(anomaly.pid)} has an unverified recovered device</strong>
                 <span>{participantClaimEvent(anomaly.eventId)?.deviceId ?? "A device"} needs peer re-attestation before it can confirm settlements. {reattestationMessage(anomaly.eventId)}</span>
               {:else}
@@ -1222,7 +1222,7 @@
                 {#if anomaly.eventId}
                   <button type="button" class="secondary" disabled={archived} on:click={() => voidEvent(anomaly.eventId!)}>Remove mark</button>
                 {/if}
-              {:else if anomaly.code === "contested-participant-claim" && anomaly.pid}
+              {:else if anomaly.code === "unverified-reclaim" && anomaly.pid}
                 {#if localPeerIdentityFor(anomaly.pid)}
                   <button type="button" disabled={archived} on:click={() => reattestClaim(anomaly.eventId)}>Re-attest</button>
                 {/if}

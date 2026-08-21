@@ -94,7 +94,7 @@ Progress:
   based on the ordered event log.
 - Started Phase 4 trust work in the pure core. Settlement authority now comes only from
   the first valid participant claim plus `DeviceLinked`/threshold `ClaimReattested`
-  keys; unpaired second claims surface `contested-participant-claim`, one device claiming
+  keys; unpaired second claims surface `unverified-reclaim`, one device claiming
   multiple participants surfaces `device-claims-multiple-participants`, and contested
   claims cannot clear settlement pending state.
 - Added adversarial Phase 4 tests for forged/unpaired second-device claims, valid
@@ -368,6 +368,9 @@ Notes:
   protected-string scan, and `git diff --check` passed.
 - Latest verification on 2026-08-21 after identity-backup prompt hardening: `npm run
   build` passed with 43 core tests and 66 root tests; root `npm audit --json`,
+  protected-string scan, and `git diff --check` passed.
+- Latest verification on 2026-08-21 after unverified-reclaim anomaly alignment: `npm
+  run build` passed with 43 core tests and 66 root tests; root `npm audit --json`,
   protected-string scan, and `git diff --check` passed.
 - Vercel checks on 2026-08-21 show the current `main` production deployment is Ready
   and has the requested aliases attached. Vercel env listing still shows no env vars

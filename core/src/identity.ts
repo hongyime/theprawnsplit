@@ -196,7 +196,7 @@ export function claimAnomalies(events: Event[], ctx: VerificationContext): Anoma
     for (const claim of claims.slice(1)) {
       if (!delegated.has(claim.claimPk) && !authorised.has(claim.claimPk)) {
         anomalies.push({
-          code: "contested-participant-claim",
+          code: "unverified-reclaim",
           pid,
           eventId: claim.id,
           relatedEventId: genesis.id,

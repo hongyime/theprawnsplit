@@ -63,3 +63,4 @@
 - 2026-08-21: Current `main` now auto-deploys to Ready with the requested production aliases attached; operated relay runtime still requires the two server-only Upstash env vars before it can function.
 - 2026-08-21: Operated relay API tests should document the env-var blocker explicitly: malformed requests fail before storage, valid writes without storage env return a configuration error, and unsupported methods stay explicit.
 - 2026-08-21: Claiming a participant creates settlement authority, so the app must immediately nudge a separate DeviceIdentityBackup; the prompt is durable metadata and does not put claim keys into TripLedgerExport.
+- 2026-08-21: The unpaired recovered-device anomaly code now uses the PRD term `unverified-reclaim`; settlement confirmation authority remains withheld until DeviceLinked or ClaimReattested authority exists.

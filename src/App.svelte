@@ -59,6 +59,7 @@
   import { isArchivedEventLog } from "@/lib/archive";
   import { createDeviceLinkRequest, linkPayload, parseDeviceLinkRequest, type DeviceLinkRequest } from "@/lib/device-link";
   import { canAppendExpense } from "@/lib/expense-command";
+  import { editFinancialsForTotal } from "@/lib/expense-edit";
   import { expenseDisplayRows } from "@/lib/expense-display";
   import { expenseHistoryRows } from "@/lib/expense-history";
   import { frozenViewPolicy } from "@/lib/freeze-policy";
@@ -617,12 +618,9 @@
     if (minor === null) return;
     const f = factory();
     const id = `${f.deviceId}:${f.nextCounter}`;
-    const pids = expense.financials.shares.map((share) => share.pid);
-    const weights = expense.financials.shares.map((share) => (share.minor > 0n ? share.minor : 1n));
-    const shares = allocate(minor, weights, id, pids).map((shareMinor, index) => ({ pid: pids[index]!, minor: shareMinor }));
     const event = makeEvent(f, "ExpenseEdited", {
       xid,
-      financials: makeExpenseFinancials(minor, expense.financials.payers[0]?.pid ?? payerPid, shares),
+      financials: editFinancialsForTotal({ current: expense.financials, nextMinor: minor, eventId: id }),
       meta: { desc: desc.trim() || expense.desc },
     });
     await commit([event], f);

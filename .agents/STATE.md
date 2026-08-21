@@ -580,6 +580,11 @@ Notes:
   then appends the same event so the automatic archive export reconstructs the archived
   state. Latest verification on 2026-08-22 passed with `npm run build` (48 core tests,
   116 root tests).
+- Hardened REQ-MON-08/11/16 expense edit preservation. Editing an expense total now
+  uses a tested helper that rescales existing payer and share rows with deterministic
+  allocation while preserving the frozen `rate`, instead of collapsing multi-payer or
+  multi-currency expenses into a single-payer base-currency shape. Latest verification on
+  2026-08-22 passed with `npm run build` (48 core tests, 118 root tests).
 - Vercel checks on 2026-08-21 show the current `main` production deployment is Ready
   and has the requested aliases attached. Vercel env listing still shows no env vars
   configured, so the operated relay runtime remains unconfigured.

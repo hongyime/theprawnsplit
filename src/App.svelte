@@ -53,6 +53,7 @@
   import { createDeviceLinkRequest, linkPayload, parseDeviceLinkRequest, type DeviceLinkRequest } from "@/lib/device-link";
   import { expenseHistoryRows } from "@/lib/expense-history";
   import { frozenViewPolicy } from "@/lib/freeze-policy";
+  import { archiveConfirmationText, unarchiveConfirmationText } from "@/lib/lifecycle";
   import { findParticipantNameMatch, groupParticipantsForClaim, type ParticipantNameMatch } from "@/lib/participants";
   import { reattestationStatus } from "@/lib/reattestation";
   import { canVoidRecordedSettlement, settlementClaimView } from "@/lib/settlement-history";
@@ -554,10 +555,8 @@
 
   async function archiveGroup(): Promise<void> {
     if (!group || archived) return;
-    const label = suggestedSettlements.length
-      ? suggestedSettlements.map((transfer) => `${participantLabel(transfer.from)} pays ${participantLabel(transfer.to)} ${formatMinor(transfer.minor, group!.currency)}`).join("\n")
-      : "All balances are zero.";
-    const ok = window.confirm(`Archive this trip?\n\nOutstanding balances:\n${label}\n\nA ledger export will download before the archive event is recorded.`);
+    const outstanding = suggestedSettlements.map((transfer) => `${participantLabel(transfer.from)} pays ${participantLabel(transfer.to)} ${formatMinor(transfer.minor, group!.currency)}`);
+    const ok = window.confirm(archiveConfirmationText(outstanding));
     if (!ok) return;
     downloadExport();
     const f = factory();
@@ -569,6 +568,14 @@
       ],
       f,
     );
+  }
+
+  async function unarchiveGroup(): Promise<void> {
+    if (!group || !archived) return;
+    const ok = window.confirm(unarchiveConfirmationText());
+    if (!ok) return;
+    const f = factory();
+    await commit([makeEvent(f, "GroupUnarchived", {})], f);
   }
 
   function encodeJoinSeed(seed: JoinSeed): string {
@@ -842,12 +849,16 @@
         <button type="button" disabled={syncing} on:click={runSync} title="Sync now"><RefreshCcw size={18} /> {syncing ? "Syncing" : "Sync"}</button>
         <button type="button" on:click={copyJoinLink} title="Copy join link"><Link size={18} /> Link</button>
         <button type="button" on:click={() => downloadExport()} title="Export ledger"><Download size={18} /> Export</button>
-        <button type="button" disabled={archived} on:click={archiveGroup} title="Archive trip"><Archive size={18} /> Archive</button>
+        {#if archived}
+          <button type="button" on:click={unarchiveGroup} title="Unarchive trip"><RefreshCcw size={18} /> Unarchive</button>
+        {:else}
+          <button type="button" on:click={archiveGroup} title="Archive trip"><Archive size={18} /> Archive</button>
+        {/if}
       </div>
     </header>
 
     {#if error}<p class="error">{error}</p>{/if}
-    {#if archived}<p class="warning">This trip is archived. The ledger remains readable and exportable.</p>{/if}
+    {#if archived}<p class="warning">This trip is archived. The ledger remains readable and exportable. Relay retention is outside this app's control; archiving does not delete relay data.</p>{/if}
     {#if frozenPolicy.message}<p class="warning">{frozenPolicy.message}</p>{/if}
     {#if manualFallbackDue}<p class="warning">Relay confirmation is still pending. Export the ledger or copy the join link to share manually.</p>{/if}
     {#if showPinLinkPrompt}

@@ -1,0 +1,16 @@
+import type { Money } from "@theprawnsplit/core";
+
+export interface OutstandingTransfer {
+  from: string;
+  to: string;
+  minor: Money;
+}
+
+export function archiveConfirmationText(outstanding: string[]): string {
+  const label = outstanding.length ? outstanding.join("\n") : "All balances are zero.";
+  return `Archive this trip?\n\nOutstanding balances:\n${label}\n\nA ledger export will download before the archive event is recorded. Relay retention is outside this app's control; archiving does not delete relay data.`;
+}
+
+export function unarchiveConfirmationText(): string {
+  return "Unarchive this trip?\n\nThe ledger will become editable again and sync polling can resume. The archive event remains in history.";
+}

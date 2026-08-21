@@ -39,3 +39,4 @@
 - 2026-08-21: Device pairing uses a shareable DeviceLinkRequest containing the joining device key and nonce; an authorised device signs the PRD DeviceLinked payload and appends the delegation event.
 - 2026-08-21: Re-attestation UI mirrors the Q14 threshold formula and explicitly warns that in two-peer groups one peer can restore authority, so the decision is social as well as cryptographic.
 - 2026-08-21: Quarantine freeze now applies at the app money surface: balances are hidden and settlement controls are disabled while newer retained events cannot be folded.
+- 2026-08-21: Phase 5 lifecycle keeps archive/unarchive as explicit append-only events; archive copy states that relay retention is outside app control and no relay data is deleted.

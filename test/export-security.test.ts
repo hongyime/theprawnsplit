@@ -134,6 +134,24 @@ describe("export artifact split", () => {
     );
   });
 
+  it("rejects malformed version-1 import artifacts before restore dispatch", () => {
+    const exported = createExport(groupWithIdentity());
+    const backup = createIdentityBackup(groupWithIdentity());
+
+    expect(() => parseExport(JSON.stringify({ type: "TripLedgerExport", version: 1 }))).toThrow(
+      "Import artifact is missing group metadata",
+    );
+    expect(() => parseExport(stringifyExport({ ...exported, events: [{ t: "ExpenseAdded" }] } as never))).toThrow(
+      "Import artifact contains malformed events",
+    );
+    expect(() => parseExport(stringifyExport({ ...exported, exportedAt: Number.NaN }))).toThrow(
+      "Import artifact is missing exportedAt",
+    );
+    expect(() => parseExport(stringifyExport({ ...backup, identities: [{ pid: "alice" }] } as never))).toThrow(
+      "Identity backup contains malformed identities",
+    );
+  });
+
   it("restores identity backup onto a matching recovered trip by tag", async () => {
     const source = groupWithIdentity();
     const ledger = createExport(source);

@@ -430,13 +430,67 @@ export function stringifyExport(exported: TripLedgerExport | DeviceIdentityBacku
 
 export type ImportArtifact = TripLedgerExport | DeviceIdentityBackup | TripLedgerDelta;
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function assertString(value: unknown, message: string): asserts value is string {
+  if (typeof value !== "string" || value.length === 0) throw new Error(message);
+}
+
+function assertNumber(value: unknown, message: string): asserts value is number {
+  if (typeof value !== "number" || !Number.isFinite(value)) throw new Error(message);
+}
+
+function assertImportGroup(value: unknown): void {
+  if (!isRecord(value)) throw new Error("Import artifact is missing group metadata");
+  assertString(value.groupId, "Import artifact group is missing groupId");
+  assertString(value.name, "Import artifact group is missing name");
+  assertString(value.currency, "Import artifact group is missing currency");
+  assertNumber(value.createdAt, "Import artifact group is missing createdAt");
+  assertString(value.tagHex, "Import artifact group is missing tagHex");
+}
+
+function assertImportEvents(value: unknown): void {
+  if (!Array.isArray(value)) throw new Error("Import artifact is missing events");
+  for (const event of value) {
+    if (!isRecord(event) || typeof event.t !== "string" || typeof event.id !== "string" || typeof event.dev !== "string" || typeof event.v !== "number") {
+      throw new Error("Import artifact contains malformed events");
+    }
+    if (!isRecord(event.hlc) || typeof event.hlc.wall !== "number" || typeof event.hlc.ctr !== "number" || typeof event.hlc.dev !== "string") {
+      throw new Error("Import artifact contains malformed events");
+    }
+  }
+}
+
+function assertIdentityBackup(value: unknown): void {
+  if (!isRecord(value)) throw new Error("Unsupported import artifact");
+  assertString(value.groupId, "Identity backup is missing groupId");
+  assertString(value.tagHex, "Identity backup is missing tagHex");
+  if (!Array.isArray(value.identities)) throw new Error("Identity backup is missing identities");
+  for (const identity of value.identities) {
+    if (!isRecord(identity)) throw new Error("Identity backup contains malformed identities");
+    assertString(identity.pid, "Identity backup contains malformed identities");
+    assertString(identity.deviceId, "Identity backup contains malformed identities");
+    assertString(identity.claimPk, "Identity backup contains malformed identities");
+    if (identity.alg !== "ed25519" && identity.alg !== "ecdsa-p256") throw new Error("Identity backup contains malformed identities");
+    if (!isRecord(identity.claimPkJwk) || !isRecord(identity.claimSkJwk)) throw new Error("Identity backup contains malformed identities");
+  }
+}
+
 export function parseExport(text: string): ImportArtifact {
   const parsed = JSON.parse(text, bigintReviver) as Partial<ImportArtifact>;
-  if (
-    parsed.version === 1 &&
-    (parsed.type === "TripLedgerExport" || parsed.type === "DeviceIdentityBackup" || parsed.type === "TripLedgerDelta")
-  ) {
-    return parsed as ImportArtifact;
+  if (parsed.version !== 1) throw new Error("Unsupported import artifact");
+  if (parsed.type === "TripLedgerExport" || parsed.type === "TripLedgerDelta") {
+    assertImportGroup(parsed.group);
+    assertImportEvents(parsed.events);
+    assertNumber(parsed.exportedAt, "Import artifact is missing exportedAt");
+    return parsed as TripLedgerExport | TripLedgerDelta;
+  }
+  if (parsed.type === "DeviceIdentityBackup") {
+    assertIdentityBackup(parsed);
+    assertNumber(parsed.exportedAt, "Identity backup is missing exportedAt");
+    return parsed as DeviceIdentityBackup;
   }
   throw new Error("Unsupported import artifact");
 }

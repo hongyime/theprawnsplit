@@ -657,6 +657,12 @@ Notes:
   `DeviceLinked` event, keeping remote pairing nonces single-use at the ledger boundary.
   Latest verification on 2026-08-22 passed with `npm run build` (51 core tests, 133 root
   tests), root `npm audit --json`, protected-string scan, and `git diff --check`.
+- Hardened REQ-SYN-13/REQ-SEC-05 import artifact structure checks. `parseExport()` now
+  rejects malformed version-1 `TripLedgerExport`, `TripLedgerDelta`, and
+  `DeviceIdentityBackup` artifacts before restore/apply dispatch instead of classifying
+  by type/version only. Latest verification on 2026-08-22 passed with `npm run build`
+  (51 core tests, 134 root tests), root `npm audit --json`, protected-string scan, and
+  `git diff --check`.
 - Vercel checks on 2026-08-21 show the current `main` production deployment is Ready
   and has the requested aliases attached. Vercel env listing still shows no env vars
   configured, so the operated relay runtime remains unconfigured.

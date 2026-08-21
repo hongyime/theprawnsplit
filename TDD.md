@@ -140,7 +140,7 @@ VITE_RELAY_ENDPOINT=/api/relay
  
 # Ledger schema version (REQ-MON-12). Bump ONLY with a migration plan:
 # older clients quarantine anything above their supported version.
-VITE_SCHEMA_VERSION=1
+VITE_SCHEMA_VERSION=2
  
 # Sync tuning (REQ-PLT-09 adaptive polling).
 VITE_POLL_ACTIVE_MS=10000

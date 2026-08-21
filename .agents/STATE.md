@@ -685,6 +685,12 @@ Notes:
   already-retained events remain foldable. Latest verification on 2026-08-22 passed with
   `npm run build` (52 core tests, 138 root tests), root `npm audit --json`,
   protected-string scan, and `git diff --check`.
+- Aligned TDD §3.2 and `.env.example` with Phase 5 multi-currency schema support. The
+  committed environment sample now sets `VITE_SCHEMA_VERSION=2`, matching the runtime
+  default and v2 rate-bearing expense creation path so copied deployment config does not
+  freeze locally-created multi-currency events. Latest verification on 2026-08-22 passed
+  with `npm run build` (52 core tests, 139 root tests), root `npm audit --json`,
+  protected-string scan, and `git diff --check`.
 - Vercel checks on 2026-08-21 show the current `main` production deployment is Ready
   and has the requested aliases attached. Vercel env listing still shows no env vars
   configured, so the operated relay runtime remains unconfigured.

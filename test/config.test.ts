@@ -20,4 +20,10 @@ describe("client numeric config parsing", () => {
 
     expect(config.capGroupTotal).toBeGreaterThan(0);
   });
+
+  it("defaults to the v2 schema needed for rate-bearing multi-currency events", async () => {
+    const { config } = await import("@/config");
+
+    expect(config.schemaVersion).toBe(2);
+  });
 });

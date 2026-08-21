@@ -573,6 +573,15 @@ button.secondary {
   font-size: 0.9rem;
 }
 
+.settlement-claims {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.settlement-claims span {
+  color: #9a3412;
+}
+
 .settlement-state {
   display: inline-flex;
   align-items: center;
@@ -585,6 +594,16 @@ button.secondary {
   min-height: 1.85rem;
   padding: 0.2rem 0.5rem;
   font-size: 0.84rem;
+}
+
+.settlement-state button.secondary {
+  color: #394940;
+  border-color: #b8c6bf;
+}
+
+.settlement-state button.danger-action {
+  color: #b42318;
+  border-color: #f2b8b5;
 }
 
 .ledger,

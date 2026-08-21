@@ -52,6 +52,7 @@
   import { isArchivedEventLog } from "@/lib/archive";
   import { expenseHistoryRows } from "@/lib/expense-history";
   import { findParticipantNameMatch, groupParticipantsForClaim, type ParticipantNameMatch } from "@/lib/participants";
+  import { canVoidRecordedSettlement, settlementClaimView } from "@/lib/settlement-history";
   import { buildVerificationContext } from "@/lib/verification";
   import { syncOnce } from "@/relay/sync";
   import type { SyncResult } from "@/relay/types";
@@ -452,6 +453,21 @@
     const f = factory();
     const claimSig = await signClaim(identity.claimSkJwk, identity.alg, `${group.tagHex}:confirm:${sid}`);
     await commit([makeEvent(f, "SettlementConfirmed", { sid, pid: settlement.to, claimSig })], f);
+  }
+
+  async function disputeSettlement(sid: string): Promise<void> {
+    if (!group || archived) return;
+    const note = window.prompt("Dispute note", "Payment not received");
+    if (note === null) return;
+    const f = factory();
+    const trimmed = note.trim();
+    await commit([makeEvent(f, "SettlementDisputed", trimmed ? { sid, note: trimmed } : { sid })], f);
+  }
+
+  async function voidSettlement(sid: string): Promise<void> {
+    if (!group || archived || !canVoidRecordedSettlement(group.events, sid, group.deviceId)) return;
+    const f = factory();
+    await commit([makeEvent(f, "SettlementVoided", { sid })], f);
   }
 
   function downloadExport(reason?: ExportPromptReason): void {
@@ -1033,14 +1049,26 @@
         {#if settlements.length}
           <div class="settlement-list">
             {#each settlements as settlement}
+              {@const claims = settlementClaimView(group.events, settlement.sid)}
               <div class="settlement-row">
-                <span>{participantLabel(settlement.from)} paid {participantLabel(settlement.to)} {formatMinor(settlement.minor, group.currency)}</span>
+                <span class="settlement-claims">
+                  <strong>{participantLabel(settlement.from)} paid {participantLabel(settlement.to)} {formatMinor(settlement.minor, group.currency)}</strong>
+                  {#if claims.dispute}
+                    <span>Dispute: {claims.dispute.note || "Payment disputed"}</span>
+                  {/if}
+                </span>
                 <span class="settlement-state">
                   <strong class:positive={settlement.confirmed} class:negative={settlement.disputed || settlement.contestedConfirmation}>
                     {settlement.disputed ? "disputed" : settlement.contestedConfirmation ? "contested" : settlement.confirmed ? "confirmed" : settlement.cashUnconfirmable ? "cash" : "pending"}
                   </strong>
                   {#if settlement.pending && localIdentityForPid(settlement.to)}
                     <button type="button" disabled={archived} on:click={() => confirmSettlement(settlement.sid)}>Confirm</button>
+                  {/if}
+                  {#if !settlement.disputed}
+                    <button type="button" class="secondary" disabled={archived} on:click={() => disputeSettlement(settlement.sid)}>Dispute</button>
+                  {/if}
+                  {#if canVoidRecordedSettlement(group.events, settlement.sid, group.deviceId)}
+                    <button type="button" class="secondary danger-action" disabled={archived} on:click={() => voidSettlement(settlement.sid)}>Void</button>
                   {/if}
                 </span>
               </div>

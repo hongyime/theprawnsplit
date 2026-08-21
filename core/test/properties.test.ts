@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { canonicalStateBytes } from "../src/canonical";
 import { fold } from "../src/fold";
 import type { Event } from "../src/types";
-import { base, financials, resetIds } from "./helpers";
+import { base, financials, hlc, resetIds } from "./helpers";
 
 const shuffleWithSeed = <T>(items: T[], seed: number): T[] => {
   const out = [...items];
@@ -71,6 +71,41 @@ describe("REQ-SYN-12 property convergence", () => {
           expect(balanceSum).toBe(0n);
           expect(state.anomalies.map((anomaly) => anomaly.code)).not.toContain("balance-not-zero");
         }
+      }),
+      { seed: Number(process.env.FAST_CHECK_SEED ?? 20260822), numRuns: 75, verbose: true },
+    );
+  }, 20_000);
+
+  it("keeps participant merges commutative and idempotent", () => {
+    const pids = ["alice", "bob", "chris", "dave"] as const;
+    const pairArbitrary = fc.tuple(fc.constantFrom(...pids), fc.constantFrom(...pids)).filter(([from, into]) => from !== into);
+
+    fc.assert(
+      fc.property(fc.array(pairArbitrary, { minLength: 1, maxLength: 8 }), (pairs) => {
+        const participants: Event[] = pids.map((pid, index) =>
+          base("ParticipantAdded", {
+            id: `participant-${pid}`,
+            hlc: hlc(index + 1),
+            pid,
+            name: pid,
+          } as never),
+        );
+        const mergeEvents = (orderedPairs: typeof pairs, offset: number): Event[] =>
+          orderedPairs.map(([from, into], index) =>
+            base("ParticipantMerged", {
+              id: `merge-${offset}-${index}`,
+              hlc: hlc(offset + index + 1),
+              from,
+              into,
+            } as never),
+          );
+
+        const reference = canonicalStateBytes(fold([...participants, ...mergeEvents(pairs, 10)], { supportedVersion: 1 }));
+        const reversed = canonicalStateBytes(fold([...participants, ...mergeEvents([...pairs].reverse(), 100)], { supportedVersion: 1 }));
+        const duplicated = canonicalStateBytes(fold([...participants, ...mergeEvents([...pairs, ...pairs], 200)], { supportedVersion: 1 }));
+
+        expect(reversed).toBe(reference);
+        expect(duplicated).toBe(reference);
       }),
       { seed: Number(process.env.FAST_CHECK_SEED ?? 20260822), numRuns: 75, verbose: true },
     );

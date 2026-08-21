@@ -716,6 +716,11 @@ Notes:
   anomaly appears at every event prefix, not only at the final state. Latest verification
   on 2026-08-22 passed with `npm run build` (53 core tests, 143 root tests), root
   `npm audit --json`, protected-string scan, and `git diff --check`.
+- Added REQ-SYN-12/REQ-ID-13 merge algebra coverage in the core property suite. Random
+  participant merge sets now fold to the same canonical state when applied in reverse
+  order or duplicated, covering commutative and idempotent merge behavior. Latest
+  verification on 2026-08-22 passed with `npm run build` (54 core tests, 143 root
+  tests), root `npm audit --json`, protected-string scan, and `git diff --check`.
 - Vercel checks on 2026-08-21 show the current `main` production deployment is Ready
   and has the requested aliases attached. Vercel env listing still shows no env vars
   configured, so the operated relay runtime remains unconfigured.

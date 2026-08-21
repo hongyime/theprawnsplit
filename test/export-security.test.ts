@@ -10,6 +10,7 @@ import {
   stringifyExport,
   type GroupRecord,
 } from "@/db/repo";
+import { latestArchiveEvent } from "@/lib/lifecycle";
 
 function groupWithIdentity(): GroupRecord {
   return {
@@ -95,5 +96,28 @@ describe("export artifact split", () => {
     expect(restored.groupId).toBe(joined.groupId);
     expect(restored.identities).toHaveLength(1);
     expect(restored.identities[0]?.claimSkJwk).toEqual(source.identities[0]?.claimSkJwk);
+  });
+
+  it("reconstructs archived groups with recorded outstanding balances from TripLedgerExport", async () => {
+    const source: GroupRecord = {
+      ...groupWithIdentity(),
+      events: [
+        ...groupWithIdentity().events,
+        {
+          v: 1,
+          id: "d_test:2",
+          hlc: { wall: 1_787_280_001_000, ctr: 2, dev: "d_test" },
+          dev: "d_test",
+          t: "GroupArchived",
+          outstanding: [{ from: "p_bob", to: "p_alice", minor: 1250n }],
+        },
+      ],
+    };
+
+    await resetRepositoryForTests(`archive-export-${crypto.randomUUID()}`);
+    const recovered = await replaceFromExport(createExport(source));
+    const archive = latestArchiveEvent(recovered.events);
+
+    expect(archive?.outstanding).toEqual([{ from: "p_bob", to: "p_alice", minor: 1250n }]);
   });
 });

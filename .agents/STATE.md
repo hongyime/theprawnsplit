@@ -177,9 +177,12 @@ Progress:
   `Financials.rate` in the expense event.
 - Started Phase 5 subgroup presets. Expense split selections can be saved, applied, and
   deleted as local metadata presets; expenses still persist concrete payer/share rows.
+- Added Phase 5 archive export acceptance coverage. `TripLedgerExport` restore now has
+  a regression proving archived state and recorded outstanding balances reconstruct on a
+  fresh local store.
 
 Next step:
-- Latest pushed commit before this slice is `5fba653` on `main`.
+- Latest pushed commit before this slice is `acc92e9` on `main`.
 - GitHub/Vercel automatic production deployment for `cd21de2` completed Ready on
   2026-08-21.
 - Remaining deployment work: configure Vercel env vars and verify custom-domain runtime.
@@ -303,6 +306,9 @@ Notes:
   protected-string scan, and `git diff --check` passed.
 - Latest verification on 2026-08-21 after subgroup presets slice: `npm run build`
   passed with 43 core tests and 49 root tests; root `npm audit --json`,
+  protected-string scan, and `git diff --check` passed.
+- Latest verification on 2026-08-21 after archive export acceptance coverage: `npm run
+  build` passed with 43 core tests and 50 root tests; root `npm audit --json`,
   protected-string scan, and `git diff --check` passed.
 - Vercel checks on 2026-08-21 show the project exists but direct deployment creation was
   quota-blocked.

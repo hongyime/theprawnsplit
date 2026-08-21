@@ -86,6 +86,48 @@ describe("REQ-ID-13/REQ-SEC-08 identity", () => {
     expect([...authorisedKeys(events, "lost", verifier)]).toEqual(["lost-new"]);
   });
 
+  it("requires the re-attestation majority on the same recovered key", () => {
+    const keyOnePayloadA = `${groupTag}:reattest:lost:phone-1:lost-key-1`;
+    const keyTwoPayloadB = `${groupTag}:reattest:lost:phone-2:lost-key-2`;
+    const keyOnePayloadC = `${groupTag}:reattest:lost:phone-1:lost-key-1`;
+    const events = [
+      claim("peer-a", "a", "peer-a-key"),
+      claim("peer-b", "b", "peer-b-key"),
+      claim("peer-c", "c", "peer-c-key"),
+      base("ClaimReattested", {
+        pid: "lost",
+        newDevice: "phone-1",
+        newClaimPk: "lost-key-1",
+        alg: "ed25519",
+        attestor: "peer-a",
+        sig: sig("peer-a-key", keyOnePayloadA),
+      } as never),
+      base("ClaimReattested", {
+        pid: "lost",
+        newDevice: "phone-2",
+        newClaimPk: "lost-key-2",
+        alg: "ed25519",
+        attestor: "peer-b",
+        sig: sig("peer-b-key", keyTwoPayloadB),
+      } as never),
+    ];
+
+    expect([...authorisedKeys(events, "lost", verifier)]).toEqual([]);
+
+    events.push(
+      base("ClaimReattested", {
+        pid: "lost",
+        newDevice: "phone-1",
+        newClaimPk: "lost-key-1",
+        alg: "ed25519",
+        attestor: "peer-c",
+        sig: sig("peer-c-key", keyOnePayloadC),
+      } as never),
+    );
+
+    expect([...authorisedKeys(events, "lost", verifier)]).toEqual(["lost-key-1"]);
+  });
+
   it("flags an unpaired second claim and withholds confirmation authority", () => {
     const events = [
       claim("alice", "phone", "alice-key"),

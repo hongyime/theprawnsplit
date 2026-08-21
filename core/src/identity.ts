@@ -88,8 +88,7 @@ export function authorisedKeys(events: Event[], pid: string, ctx: VerificationCo
     .filter((peerPid) => peerPid !== pid && authorisedKeysWithoutReattestation(ordered, peerPid, ctx).size > 0)
     .sort();
   const threshold = Math.max(1, Math.floor((claimedPeers.length - 1) / 2) + 1);
-  const validAttestors = new Set<string>();
-  const reattestedKeys: { key: string; alg: "ed25519" | "ecdsa-p256" }[] = [];
+  const reattestedTargets = new Map<string, { key: string; alg: "ed25519" | "ecdsa-p256"; attestors: Set<string> }>();
 
   for (const event of ordered) {
     if (event.t !== "ClaimReattested" || event.pid !== pid) continue;
@@ -99,13 +98,15 @@ export function authorisedKeys(events: Event[], pid: string, ctx: VerificationCo
     );
     const payload = `${ctx.groupTag}:reattest:${event.pid}:${event.newDevice}:${event.newClaimPk}`;
     if (verifiesWithAny(ctx, payload, event.sig, attestorKeys)) {
-      validAttestors.add(event.attestor);
-      reattestedKeys.push({ key: event.newClaimPk, alg: event.alg });
+      const targetKey = `${event.newDevice}\0${event.newClaimPk}`;
+      const target = reattestedTargets.get(targetKey) ?? { key: event.newClaimPk, alg: event.alg, attestors: new Set<string>() };
+      target.attestors.add(event.attestor);
+      reattestedTargets.set(targetKey, target);
     }
   }
 
-  if (validAttestors.size >= threshold) {
-    for (const key of reattestedKeys) keys.set(key.key, key.alg);
+  for (const target of reattestedTargets.values()) {
+    if (target.attestors.size >= threshold) keys.set(target.key, target.alg);
   }
 
   return new Set([...keys.keys()].sort());

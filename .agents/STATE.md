@@ -518,6 +518,11 @@ Notes:
   pending or surface a contested confirmation. Latest verification on 2026-08-22 passed
   with `npm run build` (47 core tests, 98 root tests), root `npm audit --json`,
   protected-string scan, and `git diff --check`.
+- Tightened REQ-SEC-06 core re-attestation authority so the claimed-peer majority is
+  counted per recovered key/device, not globally across unrelated `ClaimReattested`
+  targets for the same participant. Latest verification on 2026-08-22 passed with `npm
+  run build` (48 core tests, 98 root tests), root `npm audit --json`,
+  protected-string scan, and `git diff --check`.
 - Vercel checks on 2026-08-21 show the current `main` production deployment is Ready
   and has the requested aliases attached. Vercel env listing still shows no env vars
   configured, so the operated relay runtime remains unconfigured.

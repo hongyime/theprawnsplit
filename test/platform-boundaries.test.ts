@@ -68,4 +68,18 @@ describe("platform boundaries", () => {
 
     expect(offenders).toEqual([]);
   });
+
+  it("keeps Nostr transport signatures out of ledger authorization", () => {
+    const ledgerAuthFiles = [
+      join(process.cwd(), "core", "src", "identity.ts"),
+      join(sourceRoot, "lib", "verification.ts"),
+      join(sourceRoot, "crypto", "claim.ts"),
+    ];
+    const offenders = ledgerAuthFiles
+      .map((path) => ({ path, source: readFileSync(path, "utf8") }))
+      .filter((entry) => /\b(?:nostr|Nostr|nostr-tools|SimplePool|finalizeEvent|getPublicKey|pubkey|Schnorr)\b/.test(entry.source))
+      .map((entry) => relative(process.cwd(), entry.path));
+
+    expect(offenders).toEqual([]);
+  });
 });

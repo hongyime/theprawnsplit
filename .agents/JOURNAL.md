@@ -113,3 +113,4 @@
 - 2026-08-22: Import artifact classification is explicit: ledger imports accept only version-1 TripLedgerExport, TripLedgerDelta, or DeviceIdentityBackup; DeviceLinkRequest stays on the separate pairing path.
 - 2026-08-22: Device-local Nostr secrets are stored and migrated as lowercase 64-hex keys in repository metadata; invalid older local metadata is repaired on read before sync.
 - 2026-08-22: Claim verification must never assume a default signature algorithm; settlement confirmation checks use only alg values recovered from key-bearing ledger events.
+- 2026-08-22: Nostr signatures remain transport attribution only; ledger authorization code must not inspect Nostr pubkeys, relay classes, or nostr-tools outputs.

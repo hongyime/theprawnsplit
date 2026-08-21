@@ -821,3 +821,8 @@ Notes:
 - `vercel build --prod` currently fails locally before project
   code runs with `spawn cmd.exe ENOENT`; `cmd.exe` exists on PATH, so keep this as a
   local CLI runner issue unless reproduced remotely.
+- Added REQ-PLT-02 PWA installability boundary coverage for the linked Web App
+  Manifest, service-worker app shell, standalone detection, and iOS Add-to-Home-Screen
+  guidance. Verification on 2026-08-22 passed with focused `npx vitest run
+  test/pwa-install.test.ts`, `npm run build` (64 core tests, 152 root tests), root
+  `npm audit --json`, protected-string scan, and `git diff --check`.

@@ -150,3 +150,4 @@
 - 2026-08-22: REQ-UX-05 source-boundary coverage rejects client ads, paywalls, subscriptions, premium gates, billing, usage-limit, trial, and entitlement code.
 - 2026-08-22: Non-goal source-boundary coverage rejects client budgeting, categories, charts, recurring expenses, itemized splitting, Splitwise export, and cross-/multi-group workflows.
 - 2026-08-22: REQ-PLT-07 source-boundary coverage rejects relay subscribe, WebSocket/EventSource, Upgrade, and held-stream connection code.
+- 2026-08-22: REQ-PLT-02 installability coverage treats the linked Web App Manifest, app-shell caching, standalone detection, and iOS Add-to-Home-Screen guidance as one PWA boundary.

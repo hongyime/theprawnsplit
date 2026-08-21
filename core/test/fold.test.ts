@@ -54,6 +54,71 @@ describe("REQ-MON-15/REQ-SYN-12 fold", () => {
     expect(currentDevice.balances.get("bob")).toBe(-540n);
   });
 
+  it("quarantines rate-bearing financials that are mislabeled as schema v1", () => {
+    const v1RateAdded = base("ExpenseAdded", {
+      id: "v1-rate-add",
+      xid: "x1",
+      financials: {
+        ...financials(1080n, [["alice", 1080n]], [["alice", 540n], ["bob", 540n]]),
+        rate: { currency: "EUR", toBase: 1.08 },
+      },
+      desc: "Lunch",
+      at: 1,
+      date: "2026-08-21",
+    } as never);
+    const added = fold([v1RateAdded], { supportedVersion: 1 });
+    expect(added.quarantined).toEqual(["v1-rate-add"]);
+    expect(added.expenses.has("x1")).toBe(false);
+    expect(added.frozen).toBe(true);
+
+    const baseExpense = base("ExpenseAdded", {
+      id: "base-add",
+      xid: "x2",
+      financials: financials(100n, [["alice", 100n]], [["bob", 100n]]),
+      desc: "Lunch",
+      at: 1,
+      date: "2026-08-21",
+    } as never);
+    const v1RateEdit = base("ExpenseEdited", {
+      id: "v1-rate-edit",
+      xid: "x2",
+      financials: {
+        ...financials(1080n, [["alice", 1080n]], [["alice", 540n], ["bob", 540n]]),
+        rate: { currency: "EUR", toBase: 1.08 },
+      },
+    } as never);
+
+    const edited = fold([baseExpense, v1RateEdit], { supportedVersion: 1 });
+    expect(edited.quarantined).toEqual(["v1-rate-edit"]);
+    expect(edited.expenses.get("x2")?.financials.rate).toBeUndefined();
+    expect(edited.expenses.get("x2")?.financials.minor).toBe(100n);
+    expect(edited.frozen).toBe(true);
+  });
+
+  it("quarantines malformed schema v2 exchange rates", () => {
+    const state = fold(
+      [
+        base("ExpenseAdded", {
+          id: "bad-rate",
+          v: 2,
+          xid: "x1",
+          financials: {
+            ...financials(1080n, [["alice", 1080n]], [["alice", 540n], ["bob", 540n]]),
+            rate: { currency: "eur", toBase: Number.NaN },
+          },
+          desc: "Lunch",
+          at: 1,
+          date: "2026-08-21",
+        } as never),
+      ],
+      { supportedVersion: 2 },
+    );
+
+    expect(state.quarantined).toEqual(["bad-rate"]);
+    expect(state.expenses.has("x1")).toBe(false);
+    expect(state.frozen).toBe(true);
+  });
+
   it("void cascade removes edited expenses from balances", () => {
     const added = base("ExpenseAdded", {
       id: "add-x",

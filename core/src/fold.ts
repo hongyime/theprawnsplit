@@ -27,7 +27,15 @@ const add = (balances: Map<string, Money>, pid: string, minor: Money): void => {
 
 const sumRows = (rows: { minor: Money }[]): Money => rows.reduce((a, row) => a + row.minor, 0n);
 
-const validateFinancials = (financials: Financials): boolean =>
+const validateRate = (financials: Financials, eventVersion: number): boolean =>
+  financials.rate === undefined ||
+  (eventVersion >= 2 &&
+    /^[A-Z]{3}$/.test(financials.rate.currency) &&
+    Number.isFinite(financials.rate.toBase) &&
+    financials.rate.toBase > 0);
+
+const validateFinancials = (financials: Financials, eventVersion: number): boolean =>
+  validateRate(financials, eventVersion) &&
   financials.minor >= 0n &&
   financials.payers.every((payer) => payer.minor >= 0n) &&
   financials.shares.every((share) => share.minor >= 0n) &&
@@ -207,7 +215,7 @@ export function fold(events: Event[], opts: FoldOptions, ctx?: VerificationConte
       participants.set(root, { ...existing, deactivated: true });
     }
     if (event.t === "ExpenseAdded" && !expenseVoids.has(event.xid)) {
-      if (!validateFinancials(event.financials)) {
+      if (!validateFinancials(event.financials, event.v)) {
         quarantined.push(event.id);
         continue;
       }
@@ -226,7 +234,7 @@ export function fold(events: Event[], opts: FoldOptions, ctx?: VerificationConte
       if (!existing) continue;
       const next: ExpenseState = { ...existing };
       if (event.financials) {
-        if (!validateFinancials(event.financials)) {
+        if (!validateFinancials(event.financials, event.v)) {
           quarantined.push(event.id);
           continue;
         }

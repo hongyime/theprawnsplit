@@ -642,6 +642,11 @@ Notes:
   negative, instead of producing `NaN` relay limits. Latest verification on 2026-08-22
   passed with `npm run build` (49 core tests, 129 root tests), root `npm audit --json`,
   protected-string scan, and `git diff --check`.
+- Hardened REQ-MON-08/12 multi-currency schema admission. Core fold now quarantines
+  rate-bearing financials that are mislabeled as schema v1 instead of silently accepting
+  v2-only `rate` data under a v1 event, and also rejects malformed v2 rate payloads.
+  Latest verification on 2026-08-22 passed with `npm run build` (51 core tests, 129 root
+  tests), root `npm audit --json`, protected-string scan, and `git diff --check`.
 - Vercel checks on 2026-08-21 show the current `main` production deployment is Ready
   and has the requested aliases attached. Vercel env listing still shows no env vars
   configured, so the operated relay runtime remains unconfigured.

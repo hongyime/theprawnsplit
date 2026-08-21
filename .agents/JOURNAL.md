@@ -117,3 +117,4 @@
 - 2026-08-22: Upstash relay credentials are server-only: client code may use public VITE configuration, but Redis URL/token must stay out of src and be read only via api/relay process.env.
 - 2026-08-22: The operated relay remains blind append/read storage; api/relay must not import ledger core, repository code, envelope crypto, or ledger event/domain types.
 - 2026-08-22: Operated relay runtime limits are defensive configuration: malformed, zero, or negative RELAY_MAX_* values fall back to documented defaults instead of producing NaN limits.
+- 2026-08-22: Multi-currency rate data is a schema boundary: any `Financials.rate` must be carried by a v2+ event with a valid uppercase currency and positive finite rate, otherwise fold quarantines it.

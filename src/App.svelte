@@ -1074,6 +1074,7 @@
           lastSyncAt: group?.meta.lastSyncAt,
           idleAfterMs: config.idleAfterMs,
           pollActiveMs: config.pollActiveMs,
+          pollBackoffMs: config.pollBackoffMs,
           pollIdleMs: config.pollIdleMs,
         })
       ) {

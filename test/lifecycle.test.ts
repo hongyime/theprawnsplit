@@ -59,25 +59,30 @@ describe("lifecycle copy", () => {
     expect(canEditGroupProfile(true)).toBe(false);
   });
 
-  it("stops polling when archived or hidden and applies active/idle cadence otherwise", () => {
+  it("stops polling when archived or hidden and applies active/backoff/idle cadence otherwise", () => {
     const base = {
       hasGroup: true,
       documentHidden: false,
       archived: false,
-      now: 20_000,
-      lastActivityAt: 19_000,
-      lastSyncAt: 12_000,
-      idleAfterMs: 5_000,
+      now: 180_000,
+      lastActivityAt: 175_000,
+      lastSyncAt: 171_000,
+      idleAfterMs: 120_000,
       pollActiveMs: 10_000,
-      pollIdleMs: 60_000,
+      pollBackoffMs: 60_000,
+      pollIdleMs: 120_000,
     };
 
     expect(shouldPollGroup({ ...base, archived: true })).toBe(false);
     expect(shouldPollGroup({ ...base, documentHidden: true })).toBe(false);
     expect(shouldPollGroup(base)).toBe(false);
-    expect(shouldPollGroup({ ...base, lastSyncAt: 9_000 })).toBe(true);
-    expect(shouldPollGroup({ ...base, lastActivityAt: 0, lastSyncAt: 0 })).toBe(false);
-    expect(shouldPollGroup({ ...base, now: 70_000, lastActivityAt: 0, lastSyncAt: 0 })).toBe(true);
+    expect(shouldPollGroup({ ...base, lastSyncAt: 169_000 })).toBe(true);
+
+    expect(shouldPollGroup({ ...base, lastActivityAt: 120_000, lastSyncAt: 125_000 })).toBe(false);
+    expect(shouldPollGroup({ ...base, lastActivityAt: 120_000, lastSyncAt: 119_000 })).toBe(true);
+
+    expect(shouldPollGroup({ ...base, lastActivityAt: 0, lastSyncAt: 70_000 })).toBe(false);
+    expect(shouldPollGroup({ ...base, lastActivityAt: 0, lastSyncAt: 59_000 })).toBe(true);
   });
 
   it("returns the archive event that currently controls archived display", () => {

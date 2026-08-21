@@ -1726,7 +1726,7 @@ REQ-SEC-05 put `claimSk` in the export. REQ-SYN-13 uses exports as the manual sh
  
 - **REQ-SYN-27** — dropped surplus events now advance a `discardVector`. Without it, gap detection saw the peer ahead and re-requested dropped events every cycle, forever.
 - **`ParticipantDeactivated`** — was never specified. Now explicitly a UI-default hint only; historical balances and settlement participation are untouched, since removing them would break the zero-sum invariant.
-- **REQ-PLT-09** — adaptive polling (10 s active → 120 s idle, suspended when hidden).
+- **REQ-PLT-09** — adaptive polling (10 s active → 60 s backoff → 120 s idle, suspended when hidden).
 ### Reviewer error corrected
  
 The round-4 finding that Upstash caps at **10,000 commands/day is out of date.** Upstash moved to **500,000 commands/month** on 12 March 2025; guides still quoting the daily cap predate the change. Estimated need is ~80k commands per trip, comfortably inside the free tier. A18 updated and marked verified with a date.

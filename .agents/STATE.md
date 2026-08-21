@@ -461,6 +461,11 @@ Notes:
   relay cursors so it does not become a stable refetch loop. Latest verification on
   2026-08-21 passed with `npm run build` (43 core tests, 88 root tests), root
   `npm audit --json`, protected-string scan, and `git diff --check`.
+- Hardened REQ-PLT-09 adaptive polling. Runtime config and lifecycle policy now use
+  three cadences: active, backoff, then idle after the configured idle threshold; hidden
+  tabs and archived groups still suspend polling. Latest verification on 2026-08-21
+  passed with `npm run build` (43 core tests, 88 root tests), root `npm audit --json`,
+  protected-string scan, and `git diff --check`.
 - Vercel checks on 2026-08-21 show the current `main` production deployment is Ready
   and has the requested aliases attached. Vercel env listing still shows no env vars
   configured, so the operated relay runtime remains unconfigured.

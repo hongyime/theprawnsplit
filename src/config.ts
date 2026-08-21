@@ -10,6 +10,7 @@ export const config = {
   relayEndpoint: String(import.meta.env.VITE_RELAY_ENDPOINT ?? "/api/relay"),
   schemaVersion: Number(import.meta.env.VITE_SCHEMA_VERSION ?? 2),
   pollActiveMs: Number(import.meta.env.VITE_POLL_ACTIVE_MS ?? 10_000),
+  pollBackoffMs: Number(import.meta.env.VITE_POLL_BACKOFF_MS ?? 60_000),
   pollIdleMs: Number(import.meta.env.VITE_POLL_IDLE_MS ?? 120_000),
   idleAfterMs: Number(import.meta.env.VITE_IDLE_AFTER_MS ?? 120_000),
   ackQuorum: Number(import.meta.env.VITE_ACK_QUORUM ?? 2),

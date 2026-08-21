@@ -94,6 +94,19 @@ describe("platform boundaries", () => {
     expect(relaySource).not.toContain("import.meta.env");
   });
 
+  it("documents server runtime environment keys without publishing them as VITE values", () => {
+    const relaySource = readFileSync(join(process.cwd(), "api", "relay.ts"), "utf8");
+    const envExample = readFileSync(join(process.cwd(), ".env.example"), "utf8");
+    const serverKeys = [
+      ...new Set(relaySource.match(/process\.env\.([A-Z0-9_]+)/g)?.map((match) => match.split(".").at(-1) ?? "") ?? []),
+    ].sort();
+    const sampleKeys = new Set(envExample.match(/^[A-Z0-9_]+(?==)/gm) ?? []);
+    const viteKeys = new Set(envExample.match(/^VITE_[A-Z0-9_]+(?==)/gm) ?? []);
+
+    expect(serverKeys.filter((key) => !sampleKeys.has(key))).toEqual([]);
+    expect(serverKeys.filter((key) => viteKeys.has(`VITE_${key}`))).toEqual([]);
+  });
+
   it("keeps the operated relay blind to ledger payloads", () => {
     const relaySource = readFileSync(join(process.cwd(), "api", "relay.ts"), "utf8");
 

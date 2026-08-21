@@ -696,6 +696,11 @@ Notes:
   `src/config.ts` is missing from the committed sample. Latest verification on
   2026-08-22 passed with `npm run build` (52 core tests, 140 root tests), root
   `npm audit --json`, protected-string scan, and `git diff --check`.
+- Hardened TDD §3.1/§3.4 server env sample coverage. Platform-boundary tests now fail
+  if any `process.env.*` key read by `api/relay.ts` is absent from `.env.example`, or if
+  a server-only relay key is published as a `VITE_*` sample value. Latest verification on
+  2026-08-22 passed with `npm run build` (52 core tests, 141 root tests), root `npm
+  audit --json`, protected-string scan, and `git diff --check`.
 - Vercel checks on 2026-08-21 show the current `main` production deployment is Ready
   and has the requested aliases attached. Vercel env listing still shows no env vars
   configured, so the operated relay runtime remains unconfigured.

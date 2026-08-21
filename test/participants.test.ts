@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { findParticipantNameMatch, groupParticipantsForClaim, levenshteinDistance, normalizeParticipantName } from "@/lib/participants";
+import { defaultSplitSelection, findParticipantNameMatch, groupParticipantsForClaim, levenshteinDistance, normalizeParticipantName } from "@/lib/participants";
 
 const people = [
   { pid: "alice", name: "Alice Tan" },
@@ -36,5 +36,18 @@ describe("participant name matching", () => {
 
     expect(groups.unclaimed.map((person) => person.pid)).toEqual(["shadow", "also-shadow"]);
     expect(groups.claimed.map((person) => person.pid)).toEqual(["claimed"]);
+  });
+
+  it("removes deactivated participants from default split selection without changing active manual choices", () => {
+    const selected = defaultSplitSelection(
+      [
+        { pid: "active", deactivated: false },
+        { pid: "manually-off", deactivated: false },
+        { pid: "inactive", deactivated: true },
+      ],
+      { "manually-off": false, inactive: true },
+    );
+
+    expect(selected).toEqual({ active: true, "manually-off": false, inactive: false });
   });
 });

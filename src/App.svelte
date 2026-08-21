@@ -15,7 +15,7 @@
     GitMerge,
     Settings,
   } from "@lucide/svelte";
-  import { allocate, fold, greedySettlement, type Event, type VerificationContext, type State } from "@theprawnsplit/core";
+  import { allocate, eventSortKey, fold, greedySettlement, type Event, type VerificationContext, type State } from "@theprawnsplit/core";
   import {
     appendEvents,
     createExport,
@@ -56,7 +56,7 @@
   import { frozenViewPolicy } from "@/lib/freeze-policy";
   import { archiveConfirmationText, isSettledViewPredicate, latestArchiveEvent, unarchiveConfirmationText } from "@/lib/lifecycle";
   import { buildPayerPreview, type PayerMode } from "@/lib/payers";
-  import { findParticipantNameMatch, groupParticipantsForClaim, type ParticipantNameMatch } from "@/lib/participants";
+  import { defaultSplitSelection, findParticipantNameMatch, groupParticipantsForClaim, type ParticipantNameMatch } from "@/lib/participants";
   import { normalizeRelaySettings, parseNostrRelayText, relaySettingsTargetCount, type RelaySettings } from "@/lib/relay-settings";
   import { reattestationStatus } from "@/lib/reattestation";
   import { canVoidRecordedSettlement, settlementClaimView } from "@/lib/settlement-history";
@@ -172,11 +172,7 @@
     if (!group) return;
     verificationContext = await buildVerificationContext(group);
     state = fold(group.events, { supportedVersion: 1 }, verificationContext);
-    const nextSelected: Record<string, boolean> = { ...selectedPids };
-    for (const participant of state.participants.values()) {
-      if (nextSelected[participant.pid] === undefined) nextSelected[participant.pid] = true;
-    }
-    selectedPids = nextSelected;
+    selectedPids = defaultSplitSelection([...state.participants.values()], selectedPids);
     payerPid ||= [...state.participants.keys()][0] ?? "";
     for (const participant of state.participants.values()) {
       if (payerAmounts[participant.pid] === undefined) payerAmounts[participant.pid] = "";
@@ -304,6 +300,14 @@
     await commit([makeEvent(f, "ParticipantsMarkedDistinct", { a, b })], f);
   }
 
+  async function deactivateParticipant(pid: string): Promise<void> {
+    if (!group || archived) return;
+    const ok = window.confirm(`${participantLabel(pid)} will be removed from default new-expense split selections. Historical balances and settlements stay unchanged.`);
+    if (!ok) return;
+    const f = factory();
+    await commit([makeEvent(f, "ParticipantDeactivated", { pid })], f);
+  }
+
   async function voidEvent(targetId: string): Promise<void> {
     if (!group || archived) return;
     const f = factory();
@@ -316,6 +320,15 @@
 
   function participantAddedEvent(pid: string): Extract<Event, { t: "ParticipantAdded" }> | undefined {
     return group?.events.find((event): event is Extract<Event, { t: "ParticipantAdded" }> => event.t === "ParticipantAdded" && event.pid === pid);
+  }
+
+  function activeDeactivationEvent(pid: string): Extract<Event, { t: "ParticipantDeactivated" }> | undefined {
+    const events = group?.events ?? [];
+    const voided = new Set(events.filter((event): event is Extract<Event, { t: "EventVoided" }> => event.t === "EventVoided").map((event) => event.targetId));
+    return [...events]
+      .sort(eventSortKey)
+      .filter((event): event is Extract<Event, { t: "ParticipantDeactivated" }> => event.t === "ParticipantDeactivated" && event.pid === pid && !voided.has(event.id))
+      .at(-1);
   }
 
   function firstParticipantClaim(pid: string): Extract<Event, { t: "ParticipantClaimed" }> | undefined {
@@ -343,6 +356,11 @@
     const added = participantAddedEvent(pid);
     if (!added) return "Added by unknown device";
     return `Added by ${shortDevice(added.dev)} on ${formatEventTime(added.hlc.wall)}`;
+  }
+
+  function participantStatusText(pid: string): string {
+    const hidden = activeDeactivationEvent(pid);
+    return hidden ? `Hidden from default splits since ${formatEventTime(hidden.hlc.wall)}` : participantAddAttribution(pid);
   }
 
   function claimBalance(pid: string): string {
@@ -1138,18 +1156,24 @@
               <h3>Unclaimed</h3>
               <ul class="people-list">
                 {#each participantClaimGroups.unclaimed as participant}
-                  <li>
+                  {@const hiddenEvent = activeDeactivationEvent(participant.pid)}
+                  <li class:inactive-person={participant.deactivated}>
                     <label>
                       <input type="checkbox" bind:checked={selectedPids[participant.pid]} />
                       <span>
                         <strong>{participant.name}</strong>
-                        <small>{participantAddAttribution(participant.pid)}</small>
+                        <small>{participantStatusText(participant.pid)}</small>
                       </span>
                     </label>
                     <span class="person-actions">
-                      shadow
+                      {participant.deactivated ? "hidden" : "shadow"}
                       {#if !archived}
                         <button type="button" on:click={() => requestClaimParticipant(participant.pid)} title="Claim participant"><KeyRound size={15} /> Claim</button>
+                        {#if hiddenEvent}
+                          <button type="button" class="secondary" on:click={() => voidEvent(hiddenEvent.id)} title="Restore default splits">Restore</button>
+                        {:else}
+                          <button type="button" class="secondary" on:click={() => deactivateParticipant(participant.pid)} title="Hide from default splits">Hide</button>
+                        {/if}
                       {/if}
                     </span>
                   </li>
@@ -1162,20 +1186,28 @@
               <summary>Claimed people ({participantClaimGroups.claimed.length})</summary>
               <ul class="people-list">
                 {#each participantClaimGroups.claimed as participant}
-                  <li>
+                  {@const hiddenEvent = activeDeactivationEvent(participant.pid)}
+                  <li class:inactive-person={participant.deactivated}>
                     <label>
                       <input type="checkbox" bind:checked={selectedPids[participant.pid]} />
                       <span>
                         <strong>{participant.name}</strong>
-                        <small>{participantClaimAttribution(participant.pid)}</small>
+                        <small>{participant.deactivated ? participantStatusText(participant.pid) : participantClaimAttribution(participant.pid)}</small>
                       </span>
                     </label>
                     <span class="person-actions">
-                      {participant.devices.length} device
+                      {participant.deactivated ? "hidden" : `${participant.devices.length} device`}
                       {#if localClaimPids.has(participant.pid)}
                         <span>you</span>
                       {:else if !archived}
                         <button type="button" class="secondary" on:click={() => requestDeviceLink(participant.pid)} title="Request device link"><Link size={15} /> Link</button>
+                      {/if}
+                      {#if !archived}
+                        {#if hiddenEvent}
+                          <button type="button" class="secondary" on:click={() => voidEvent(hiddenEvent.id)} title="Restore default splits">Restore</button>
+                        {:else}
+                          <button type="button" class="secondary" on:click={() => deactivateParticipant(participant.pid)} title="Hide from default splits">Hide</button>
+                        {/if}
                       {/if}
                     </span>
                   </li>

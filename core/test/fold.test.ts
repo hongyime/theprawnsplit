@@ -44,6 +44,30 @@ describe("REQ-MON-15/REQ-SYN-12 fold", () => {
     expect([...state.balances.values()].reduce((a, b) => a + b, 0n)).toBe(0n);
   });
 
+  it("treats participant deactivation as a UI hint without changing balances", () => {
+    const deactivated = base("ParticipantDeactivated", { id: "hide-bob", pid: "bob" } as never);
+    const events = [
+      base("ParticipantAdded", { pid: "alice", name: "Alice" } as never),
+      base("ParticipantAdded", { pid: "bob", name: "Bob" } as never),
+      base("ExpenseAdded", {
+        xid: "x1",
+        financials: financials(100n, [["alice", 100n]], [["alice", 50n], ["bob", 50n]]),
+        desc: "Lunch",
+        at: 1,
+        date: "2026-08-21",
+      } as never),
+      deactivated,
+    ];
+
+    const hidden = fold(events, { supportedVersion: 1 });
+    expect(hidden.participants.get("bob")?.deactivated).toBe(true);
+    expect(hidden.balances.get("bob")).toBe(-50n);
+
+    const restored = fold([...events, base("EventVoided", { targetId: deactivated.id } as never)], { supportedVersion: 1 });
+    expect(restored.participants.get("bob")?.deactivated).toBe(false);
+    expect(restored.balances.get("bob")).toBe(-50n);
+  });
+
   it("keeps concurrent financial edits visible in history", () => {
     const added = base("ExpenseAdded", {
       xid: "x1",

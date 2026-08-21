@@ -536,6 +536,14 @@ button.secondary {
   font-size: 0.78rem;
 }
 
+.people-list li.inactive-person {
+  background: #f8faf9;
+}
+
+.people-list li.inactive-person strong {
+  color: #607068;
+}
+
 .duplicate-hint {
   margin: 0.55rem 0 0;
 }

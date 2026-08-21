@@ -63,3 +63,15 @@ export function groupParticipantsForClaim<T extends Pick<ParticipantState, "devi
     { unclaimed: [], claimed: [] },
   );
 }
+
+export function defaultSplitSelection<T extends Pick<ParticipantState, "pid" | "deactivated">>(
+  participants: T[],
+  current: Record<string, boolean>,
+): Record<string, boolean> {
+  const next: Record<string, boolean> = {};
+  for (const participant of participants) {
+    if (participant.deactivated) next[participant.pid] = false;
+    else next[participant.pid] = current[participant.pid] ?? true;
+  }
+  return next;
+}

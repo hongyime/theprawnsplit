@@ -731,6 +731,12 @@ Notes:
   contribution remains across deterministic delivery orders. Latest verification on
   2026-08-22 passed with `npm run build` (56 core tests, 143 root tests), root
   `npm audit --json`, protected-string scan, and `git diff --check`.
+- Added REQ-MON-16/§16.2 atomic financial edit coverage in the core property suite.
+  Generated v2 financial edits with distinct payer/share/rate shapes now assert the
+  winning expense financials and history are whole `Financials` structs across
+  deterministic delivery orders. Latest verification on 2026-08-22 passed with
+  `npm run build` (57 core tests, 143 root tests), root `npm audit --json`,
+  protected-string scan, and `git diff --check`.
 - Vercel checks on 2026-08-21 show the current `main` production deployment is Ready
   and has the requested aliases attached. Vercel env listing still shows no env vars
   configured, so the operated relay runtime remains unconfigured.

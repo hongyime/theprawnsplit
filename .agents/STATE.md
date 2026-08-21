@@ -894,3 +894,10 @@ Notes:
   2026-08-22 passed with `npx vitest run test/lifecycle-ui.test.ts`; full verification
   passed with `npm run build` (64 core tests, 166 root tests), root `npm audit --json`,
   protected-string scan, and `git diff --check`.
+- Added REQ-MON-06/09/10/11/13 expense workflow UI boundary coverage so split-mode
+  switches preserve entered intent, multi-payer rows feed schema `payers[]`, rounding
+  remainder stays visible, expenses store/display local `date`, and edit/void remain
+  append-only events. Focused verification on 2026-08-22 passed with `npx vitest run
+  test/expense-workflow-ui.test.ts`; full verification passed with `npm run build` (64
+  core tests, 167 root tests), root `npm audit --json`, protected-string scan, and `git
+  diff --check`.

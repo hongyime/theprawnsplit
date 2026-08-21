@@ -94,3 +94,4 @@
 - 2026-08-22: Settlement confirmation admission binds both signature authority and event payload to the literal payee: a valid `groupTag:confirm:sid` signature is ignored if `SettlementConfirmed.pid` does not equal `SettlementRecorded.to`.
 - 2026-08-22: Peer re-attestation majority is per recovered device/key target; attestations for different `newClaimPk` values cannot be pooled to authorize all recovered keys for one participant.
 - 2026-08-22: Browser verification coverage keeps valid `DeviceLinked` delegation and unpaired same-participant reclaim in separate logs: a mixed log would correctly leave the payee contested under REQ-SET-09, while the paired-only path must confirm.
+- 2026-08-22: Expense ledger display treats `date` as the calendar-day source of truth; UTC `at` remains audit/order metadata and must not be used to derive the shown day.

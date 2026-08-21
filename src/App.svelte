@@ -58,6 +58,7 @@
   import { formatMinor, formatMinorInput, formatPercentageInput, parseMinor, parsePercentageBasisPoints, parseShareWeight, type SplitMode } from "@/lib/money";
   import { isArchivedEventLog } from "@/lib/archive";
   import { createDeviceLinkRequest, linkPayload, parseDeviceLinkRequest, type DeviceLinkRequest } from "@/lib/device-link";
+  import { expenseDisplayRows } from "@/lib/expense-display";
   import { expenseHistoryRows } from "@/lib/expense-history";
   import { frozenViewPolicy } from "@/lib/freeze-policy";
   import { buildJoinLink, decodeJoinSeed } from "@/lib/join-link";
@@ -137,7 +138,7 @@
 
   $: participants = state ? [...state.participants.values()].sort((a, b) => a.name.localeCompare(b.name)) : [];
   $: balances = state && group ? [...state.balances.entries()].sort(([a], [b]) => participantLabel(a).localeCompare(participantLabel(b))) : [];
-  $: expenses = state ? [...state.expenses.values()].sort((a, b) => b.date.localeCompare(a.date)) : [];
+  $: expenses = state ? expenseDisplayRows(state.expenses.values()) : [];
   $: settlements = state ? [...state.settlements.values()] : [];
   $: anomalies = state ? state.anomalies : [];
   $: reconciliationAnomalies = anomalies.filter((anomaly) =>

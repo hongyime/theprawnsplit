@@ -527,6 +527,10 @@ Notes:
   regression proves an authorised paired second device can confirm settlement while a
   separate unpaired same-participant claim remains contested and pending. Latest
   verification on 2026-08-22 passed with `npm run build` (48 core tests, 99 root tests).
+- Added REQ-MON-13 expense display coverage. Ledger rows now use a tested helper that
+  orders by the stored local `date`, preserving wall-clock day display even when UTC
+  `at` would sort the opposite way. Latest verification on 2026-08-22 passed with
+  `npm run build` (48 core tests, 100 root tests).
 - Vercel checks on 2026-08-21 show the current `main` production deployment is Ready
   and has the requested aliases attached. Vercel env listing still shows no env vars
   configured, so the operated relay runtime remains unconfigured.

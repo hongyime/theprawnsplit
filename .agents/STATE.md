@@ -843,3 +843,8 @@ Notes:
   `npx vitest run test/join-recovery-boundary.test.ts`, `npm run build` (64 core
   tests, 155 root tests), root `npm audit --json`, protected-string scan, and
   `git diff --check`.
+- Added REQ-DUR-05 protection-status UI coverage so the visible indicator continues to
+  reflect standalone install state, storage persistence state, and sync/quarantine state
+  together. Verification on 2026-08-22 passed with focused `npx vitest run
+  test/protection-status-ui.test.ts`, `npm run build` (64 core tests, 156 root tests),
+  root `npm audit --json`, protected-string scan, and `git diff --check`.

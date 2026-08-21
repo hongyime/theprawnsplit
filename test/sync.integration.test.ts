@@ -2,7 +2,7 @@ import "fake-indexeddb/auto";
 import { describe, expect, it } from "vitest";
 import { canonicalStateBytes, fold, type Event } from "@theprawnsplit/core";
 import { decryptEnvelope, encryptEnvelope, encryptEvents, type RelayEnvelope } from "@/crypto/envelope";
-import { createGroupSecret, groupKey, groupTag, secretToBase64 } from "@/crypto/group";
+import { createGroupSecret, groupKey, groupTag, secretFromBase64, secretToBase64 } from "@/crypto/group";
 import { appendEvents, createJoinSeed, ensureGroup, markEvents, readGroup, resetRepositoryForTests, syncCounts } from "@/db/repo";
 import { defaultParticipant, makeEvent, makeExpenseFinancials, type EventFactory } from "@/lib/events";
 import { relayFetchPlans, syncOnce } from "@/relay/sync";
@@ -48,6 +48,15 @@ function event(dev: string, ctr: number, t: "ParticipantAdded" | "ExpenseAdded",
     vv: { [dev]: ctr },
     ...payload,
   } as Event;
+}
+
+function participantEvents(deviceId: string, start: number, count: number): Event[] {
+  return Array.from({ length: count }, (_, index) =>
+    event(deviceId, start + index, "ParticipantAdded", {
+      pid: `p_${start + index}`,
+      name: `Person ${start + index}`,
+    }),
+  );
 }
 
 async function publishEvents(relays: MemoryRelay[], key: CryptoKey, tag: string, author: string, events: Event[]): Promise<number> {
@@ -252,6 +261,31 @@ describe("Phase 2 sync integration", () => {
     expect(await syncCounts(group.groupId)).toEqual({ local: 0, published: 0, confirmed: 2 });
     expect((await readGroup(group.groupId)).meta.unsyncedSince).toBeUndefined();
   });
+
+  it("publishes snapshots only after the covered raw events are confirmed", async () => {
+    const relays = [new MemoryRelay("r1"), new MemoryRelay("r2")];
+
+    await resetRepositoryForTests("prawn-confirmed-snapshot-boundary");
+    const group = await ensureGroup();
+    await appendEvents(group.groupId, participantEvents(group.deviceId, group.nextCounter, 99));
+
+    const first = await syncOnce(group.groupId, relays);
+    expect(first).toMatchObject({ confirmed: 50, snapshotsPublished: 0 });
+    expect((await readGroup(group.groupId)).meta.lastSnapshotSeq).toBeUndefined();
+
+    const second = await syncOnce(group.groupId, relays);
+    expect(second).toMatchObject({ confirmed: 50, snapshotsPublished: 1 });
+    expect((await readGroup(group.groupId)).meta.lastSnapshotSeq).toBe(100);
+
+    const key = await groupKey(secretFromBase64((await readGroup(group.groupId)).secretB64));
+    const snapshots: RelayEnvelope[] = [];
+    for (const entry of relays[0]!.entries.get((await readGroup(group.groupId)).tagHex) ?? []) {
+      const envelope = await decryptEnvelope(key, entry.blob);
+      if (envelope.type === "snapshot") snapshots.push(envelope);
+    }
+    expect(snapshots).toHaveLength(1);
+    expect(snapshots[0]).toMatchObject({ type: "snapshot", seq: 100, vv: { [group.deviceId]: 100 } });
+  }, 20_000);
 
   it("uses snapshot-only bootstrap for transport vectors without creating semantic state", async () => {
     const secret = createGroupSecret();

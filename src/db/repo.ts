@@ -179,7 +179,7 @@ function counterFromEvents(events: Event[]): number {
   }, 0);
 }
 
-function vectorFromEvents(events: Event[]): Record<string, number> {
+export function vectorFromEvents(events: Event[]): Record<string, number> {
   const vector: Record<string, number> = {};
   for (const event of events) {
     const counter = event.id.startsWith(`${event.dev}:`) ? Number(event.id.split(":")[1]) : event.hlc.ctr;
@@ -497,6 +497,12 @@ export async function syncCounts(groupId: string): Promise<SyncCounts> {
     },
     { local: 0, published: 0, confirmed: 0 },
   );
+}
+
+export async function confirmedEvents(groupId: string): Promise<Event[]> {
+  const database = await db();
+  const rows = await database.getAllFromIndex("events", "bySync", [groupId, "confirmed"]);
+  return rows.map((row) => decodeEvent(row.eventJson));
 }
 
 export async function dueBufferedEvents(groupId: string, now = Date.now()): Promise<Event[]> {

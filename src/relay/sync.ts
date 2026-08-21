@@ -4,6 +4,7 @@ import { config } from "@/config";
 import {
   dueBufferedEvents,
   getGroupCrypto,
+  confirmedEvents,
   markSnapshotPublished,
   markEvents,
   pendingOutboundEventRows,
@@ -14,6 +15,7 @@ import {
   updateTransportVectors,
   updateMeta,
   upsertRemoteEvents,
+  vectorFromEvents,
   type GroupRecord,
 } from "@/db/repo";
 import { decryptEnvelope, encryptEnvelope, encryptEvents, type SnapshotEnvelope } from "@/crypto/envelope";
@@ -199,14 +201,14 @@ export async function syncOnce(groupId: string, relayOverride?: Relay[]): Promis
   }
   result.received = await upsertRemoteEvents(groupId, transport.admitted);
   const snapshotEvery = Math.max(1, config.snapshotEvery);
-  const snapshotSeq = Math.floor((group.events.length + result.received) / snapshotEvery) * snapshotEvery;
+  const snapshotEvents = await confirmedEvents(groupId);
+  const snapshotSeq = Math.floor(snapshotEvents.length / snapshotEvery) * snapshotEvery;
   if (snapshotSeq > (group.meta.lastSnapshotSeq ?? 0)) {
-    const latest = await readGroup(groupId);
     const snapshot: SnapshotEnvelope = {
       type: "snapshot",
       seq: snapshotSeq,
-      vv: latest.meta.versionVector,
-      state: canonicalState(fold(latest.events, { supportedVersion: config.schemaVersion })),
+      vv: vectorFromEvents(snapshotEvents),
+      state: canonicalState(fold(snapshotEvents, { supportedVersion: config.schemaVersion })),
       createdAt: Date.now(),
     };
     const blob = await encryptEnvelope(key, snapshot);

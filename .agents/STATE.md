@@ -451,6 +451,11 @@ Notes:
   single-letter `t` tag shape for group addressing. Latest verification on 2026-08-21
   passed with `npm run build` (43 core tests, 86 root tests), root `npm audit --json`,
   protected-string scan, and `git diff --check`.
+- Hardened REQ-SYN-14 snapshot publication boundaries. Snapshot cadence now uses only
+  confirmed raw events, and snapshot `vv`/folded state are built from that confirmed
+  subset so snapshots cannot cover local events that have not reached relay read-back.
+  Latest verification on 2026-08-21 passed with `npm run build` (43 core tests, 87 root
+  tests), root `npm audit --json`, protected-string scan, and `git diff --check`.
 - Vercel checks on 2026-08-21 show the current `main` production deployment is Ready
   and has the requested aliases attached. Vercel env listing still shows no env vars
   configured, so the operated relay runtime remains unconfigured.

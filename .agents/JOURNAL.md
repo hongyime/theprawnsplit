@@ -123,3 +123,4 @@
 - 2026-08-22: Import artifact dispatch requires structure as well as type/version: malformed v1 ledger exports, deltas, and identity backups are rejected before restore/apply logic.
 - 2026-08-22: Service-worker caching is app-shell only; relay/API reads and other dynamic GETs must bypass cache so sync state is never replayed from offline assets.
 - 2026-08-22: Service-worker cache policy changes require a cache namespace bump so existing installs delete stale broad caches during activation.
+- 2026-08-22: Client numeric `VITE_*` runtime knobs are defensive configuration: malformed, zero, or negative values fall back to documented defaults instead of producing NaN sync/polling limits.

@@ -11,5 +11,7 @@ describe("manual fallback promotion", () => {
     expect(banner).toContain("on:click={shareDelta}");
     expect(banner).toContain("on:click={() => downloadExport()}");
     expect(banner).toContain("on:click={copyJoinLink}");
+    expect(source).toContain("$: manualFallbackDue = isManualFallbackDue(group?.meta.unsyncedSince, nowMs);");
+    expect(source).toContain("nowMs = now;");
   });
 });

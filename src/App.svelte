@@ -62,6 +62,7 @@
   import { expenseHistoryRows } from "@/lib/expense-history";
   import { frozenViewPolicy } from "@/lib/freeze-policy";
   import { buildJoinLink, decodeJoinSeed } from "@/lib/join-link";
+  import { isManualFallbackDue } from "@/lib/manual-fallback";
   import {
     archiveConfirmationText,
     canEditGroupProfile,
@@ -113,6 +114,7 @@
   let lastSyncResult: SyncResult | null = null;
   let counts: SyncCounts = { local: 0, published: 0, confirmed: 0 };
   let lastActivityAt = Date.now();
+  let nowMs = Date.now();
   let pollHandle: number | undefined;
   let isStandalone = false;
   let persistedStorage: boolean | null = null;
@@ -155,7 +157,7 @@
   $: localClaimPids = new Set(group?.identities.map((identity) => identity.pid) ?? []);
   $: hasLocalClaim = localClaimPids.size > 0;
   $: unconfirmedCount = counts.local + counts.published;
-  $: manualFallbackDue = Boolean(group?.meta.unsyncedSince && Date.now() - group.meta.unsyncedSince > 600_000);
+  $: manualFallbackDue = isManualFallbackDue(group?.meta.unsyncedSince, nowMs);
   $: joinBlocked = Boolean(group && !group.events.some((event) => event.t === "GroupCreated"));
   $: recoveryActive = Boolean(joiningFromLink && joinBlocked);
   $: canSaveExpense = Boolean(!archived && hasLocalClaim && expenseDesc.trim() && amountPreview.ok && sharePreview.ok && payerPreview.ok);
@@ -1053,13 +1055,15 @@
   }
 
   function markActivity(): void {
-    lastActivityAt = Date.now();
+    nowMs = Date.now();
+    lastActivityAt = nowMs;
   }
 
   function startPolling(): void {
     if (pollHandle !== undefined) window.clearInterval(pollHandle);
     pollHandle = window.setInterval(() => {
       const now = Date.now();
+      nowMs = now;
       if (
         shouldPollGroup({
           hasGroup: Boolean(group),

@@ -75,3 +75,4 @@
 - 2026-08-21: Publish quorum applies before local outbound events advance to `published`; a one-relay read-back is not enough to clear local unsynced state, while rows already marked `published` may still confirm from later read-back.
 - 2026-08-21: Relay fetch mode is explicit: empty logs use topic-only bootstrap; populated operated-relay sync uses device-author plus cursor fetches, while Nostr remains topic+cursor until a device-to-Nostr-pubkey directory exists.
 - 2026-08-21: REQ-SYN-16 requires banner actions, not just banner copy; overdue relay confirmation now promotes Share delta, Export, and Copy link directly in the banner.
+- 2026-08-21: Manual fallback timing must be driven by a ticking app clock; a bare `Date.now()` reactive expression will not update the REQ-SYN-16 banner as time passes. The REQ-SYN-12 property test keeps its case count but has an explicit timeout for slow harness runs.

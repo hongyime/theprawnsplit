@@ -434,6 +434,13 @@ Notes:
   now exposes direct Share delta, Export, and Copy link actions instead of passive text.
   Latest verification on 2026-08-21 passed with `npm run build` (43 core tests, 81 root
   tests), root `npm audit --json`, protected-string scan, and `git diff --check`.
+- Fixed REQ-SYN-16 timing reactivity. Manual fallback due-state now uses a tested
+  10-minute helper and a UI clock updated from the polling interval, so the banner
+  appears when time passes without requiring unrelated state changes. Also made the
+  expensive REQ-SYN-12 core property test timeout explicit after a harness timeout,
+  keeping the same generated cases and shuffle count. Latest verification on
+  2026-08-21 passed with `npm run build` (43 core tests, 82 root tests), root
+  `npm audit --json`, protected-string scan, and `git diff --check`.
 - Vercel checks on 2026-08-21 show the current `main` production deployment is Ready
   and has the requested aliases attached. Vercel env listing still shows no env vars
   configured, so the operated relay runtime remains unconfigured.

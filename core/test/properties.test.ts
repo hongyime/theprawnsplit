@@ -45,5 +45,5 @@ describe("REQ-SYN-12 property convergence", () => {
       }),
       { seed: Number(process.env.FAST_CHECK_SEED ?? 20260821), numRuns: 50, verbose: true },
     );
-  });
+  }, 20_000);
 });

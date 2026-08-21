@@ -114,9 +114,13 @@ Progress:
 - Added Phase 4 settlement-void authority. `SettlementVoided` is honored only when
   emitted by the device that recorded the original settlement; other void attempts now
   surface `unauthorized-settlement-void` and leave settlements/balances intact.
+- Added Phase 4 merged-device display semantics. Folded participant device lists now
+  union claimed devices across merged participants, include valid `DeviceLinked` and
+  `ClaimReattested` devices when claim verification context is available, exclude voided
+  link events, and do not change literal-payee settlement authority.
 
 Next step:
-- Latest pushed commit before this slice is `1d17e8e` on `main`.
+- Latest pushed commit before this slice is `5c4df6f` on `main`.
 - GitHub/Vercel automatic production deployment for `cd21de2` completed Ready on
   2026-08-21.
 - Remaining deployment work: configure Vercel env vars and verify custom-domain runtime.
@@ -178,6 +182,9 @@ Notes:
 - Latest verification on 2026-08-21 after settlement-void authority: `npm --prefix
   core test` passed with 35 tests, `npm run build` passed with 35 core tests and 11
   root tests, and root `npm audit --json` reports zero vulnerabilities.
+- Latest verification on 2026-08-21 after merged-device display semantics: `npm
+  --prefix core test` passed with 38 tests, `npm run build` passed with 38 core tests
+  and 11 root tests, and root `npm audit --json` reports zero vulnerabilities.
 - Vercel checks on 2026-08-21 show the project exists but direct deployment creation was
   quota-blocked.
 - Vercel automatic deploy on 2026-08-21 for `cd21de2` succeeded and reports Ready.

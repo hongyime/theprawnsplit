@@ -25,3 +25,4 @@
 - 2026-08-21: `DeviceIdentityBackup` restore matches local trips by `tagHex`, not only `groupId`, because a join-link recovered device can have a different local IndexedDB group id while representing the same trip.
 - 2026-08-21: Pushed accumulated local work to `main` at `cd21de2`; Vercel automatic production deployment succeeded after prior rate-limit failures.
 - 2026-08-21: `SettlementVoided` is honored only from the device that recorded the settlement; unauthorized void attempts surface an anomaly and leave balances unchanged.
+- 2026-08-21: Merged participant display unions claiming devices across the component, but settlement confirmation authority still verifies only against the literal pre-merge payee chain.

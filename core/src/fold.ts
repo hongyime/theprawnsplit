@@ -146,10 +146,26 @@ export function fold(events: Event[], opts: FoldOptions, ctx?: VerificationConte
       const root = canonical(event.pid);
       participants.set(root, { ...(participants.get(root) ?? { pid: root, canonicalPid: root, devices: [], deactivated: false }), name: event.name });
     }
-    if (event.t === "ParticipantClaimed") {
+    if (event.t === "ParticipantClaimed" && !voided.has(event.id)) {
       const root = canonical(event.pid);
       if (!claimDevices.has(root)) claimDevices.set(root, new Set());
       claimDevices.get(root)!.add(event.deviceId);
+    }
+    if (!ctx && (event.t === "DeviceLinked" || event.t === "ClaimReattested") && !voided.has(event.id)) {
+      const root = canonical(event.pid);
+      if (!claimDevices.has(root)) claimDevices.set(root, new Set());
+      claimDevices.get(root)!.add(event.newDevice);
+    }
+  }
+
+  if (ctx) {
+    const pids = new Set(supported.flatMap((event) => ("pid" in event ? [event.pid] : [])));
+    for (const pid of pids) {
+      const root = canonical(pid);
+      if (!claimDevices.has(root)) claimDevices.set(root, new Set());
+      for (const deviceId of authorisedDevices(supported, pid, ctx)) {
+        claimDevices.get(root)!.add(deviceId);
+      }
     }
   }
 

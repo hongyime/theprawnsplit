@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { canonicalStateBytes } from "../src/canonical";
 import { fold } from "../src/fold";
-import { base, claim, confirm, financials, verifier } from "./helpers";
+import { base, claim, confirm, financials, groupTag, link, sig, verifier } from "./helpers";
 
 describe("REQ-MON-15/REQ-SYN-12 fold", () => {
   it("computes zero-sum balances over live admitted events", () => {
@@ -224,5 +224,65 @@ describe("REQ-MON-15/REQ-SYN-12 fold", () => {
 
     expect(state.participants.get("alice")?.canonicalPid).toBe("alice");
     expect(state.participants.get("bob")?.canonicalPid).toBe("bob");
+  });
+
+  it("unions claimed, linked, and reattested devices for merged participant display", () => {
+    const reattestPayload = `${groupTag}:reattest:alice:restored:restored-key`;
+    const state = fold(
+      [
+        claim("alice", "alice-phone", "alice-key"),
+        link("alice", "alice-key", "alice-tablet", "tablet-key", "n1"),
+        claim("bob", "bob-phone", "bob-key"),
+        base("ClaimReattested", {
+          pid: "alice",
+          newDevice: "restored",
+          newClaimPk: "restored-key",
+          alg: "ed25519",
+          attestor: "bob",
+          sig: sig("bob-key", reattestPayload),
+        } as never),
+        base("ParticipantMerged", { from: "bob", into: "alice" } as never),
+      ],
+      { supportedVersion: 1 },
+      verifier,
+    );
+
+    expect(state.participants.get("alice")?.devices).toEqual(["alice-phone", "alice-tablet", "bob-phone", "restored"]);
+  });
+
+  it("excludes voided linked devices from participant display", () => {
+    const linked = link("alice", "alice-key", "alice-tablet", "tablet-key", "n1");
+    const state = fold(
+      [
+        claim("alice", "alice-phone", "alice-key"),
+        linked,
+        base("EventVoided", { targetId: linked.id } as never),
+      ],
+      { supportedVersion: 1 },
+      verifier,
+    );
+
+    expect(state.participants.get("alice")?.devices).toEqual(["alice-phone"]);
+  });
+
+  it("does not display unauthorised linked devices when verifying claim chains", () => {
+    const state = fold(
+      [
+        claim("alice", "alice-phone", "alice-key"),
+        base("DeviceLinked", {
+          pid: "alice",
+          parentDevice: "alice-phone",
+          newDevice: "forged-tablet",
+          newClaimPk: "forged-key",
+          alg: "ed25519",
+          nonce: "n1",
+          sig: sig("forged-key", `${groupTag}:link:alice:forged-tablet:forged-key:n1`),
+        } as never),
+      ],
+      { supportedVersion: 1 },
+      verifier,
+    );
+
+    expect(state.participants.get("alice")?.devices).toEqual(["alice-phone"]);
   });
 });

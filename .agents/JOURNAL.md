@@ -45,3 +45,4 @@
 - 2026-08-21: Phase 5 multi-payer entry uses the existing v1 `Financials.payers[]` field and validates total equality before appending, avoiding any log migration.
 - 2026-08-21: Participant deactivation is implemented as a reversible UI-default hint via `ParticipantDeactivated` plus `EventVoided`; it must not alter balances, settlements, or history.
 - 2026-08-21: Multi-currency expenses are v2 events: entered foreign totals convert to base-currency minor units for balances while `Financials.rate` freezes the source currency and rate used.
+- 2026-08-21: Subgroups are local split-selection presets in metadata for Phase 5; they do not alter ledger events because each expense still records concrete participant shares.

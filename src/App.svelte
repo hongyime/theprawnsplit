@@ -61,6 +61,7 @@
   import { normalizeRelaySettings, parseNostrRelayText, relaySettingsTargetCount, type RelaySettings } from "@/lib/relay-settings";
   import { reattestationStatus } from "@/lib/reattestation";
   import { canVoidRecordedSettlement, settlementClaimView } from "@/lib/settlement-history";
+  import { applySubgroupSelection, deleteSubgroupPreset, upsertSubgroupPreset } from "@/lib/subgroups";
   import { buildVerificationContext } from "@/lib/verification";
   import { syncOnce } from "@/relay/sync";
   import type { SyncResult } from "@/relay/types";
@@ -111,6 +112,7 @@
   let relayOperatedEndpoint = "";
   let relayNostrText = "";
   let relaySettingsError = "";
+  let subgroupName = "";
 
   $: participants = state ? [...state.participants.values()].sort((a, b) => a.name.localeCompare(b.name)) : [];
   $: balances = state && group ? [...state.balances.entries()].sort(([a], [b]) => participantLabel(a).localeCompare(participantLabel(b))) : [];
@@ -147,6 +149,7 @@
   $: showInstallHint = !isStandalone && !isDesktop && isOnline && !archived;
   $: relaySettings = currentRelaySettings();
   $: relayTargetLabel = `${relaySettingsTargetCount(relaySettings)} relay target${relaySettingsTargetCount(relaySettings) === 1 ? "" : "s"}`;
+  $: subgroupPresets = group?.meta.subgroups ?? [];
   $: participantNameMatch = findParticipantNameMatch(participantName, participants);
   $: participantClaimGroups = groupParticipantsForClaim(participants);
   $: claimCandidate = claimCandidatePid ? participants.find((participant) => participant.pid === claimCandidatePid) : undefined;
@@ -818,6 +821,29 @@
     syncStatus = "Relay settings reset.";
   }
 
+  async function saveSubgroupPreset(): Promise<void> {
+    if (!group) return;
+    const pids = selectedPidList();
+    const id = crypto.randomUUID();
+    const meta = await updateMeta(group.groupId, (current) => ({
+      ...current,
+      subgroups: upsertSubgroupPreset(current.subgroups, { id, name: subgroupName, pids }, participantPids),
+    }));
+    group = { ...group, meta };
+    subgroupName = "";
+  }
+
+  async function deleteSubgroup(id: string): Promise<void> {
+    if (!group) return;
+    group = { ...group, meta: await updateMeta(group.groupId, (current) => ({ ...current, subgroups: deleteSubgroupPreset(current.subgroups, id) })) };
+  }
+
+  function applySubgroup(id: string): void {
+    const preset = subgroupPresets.find((candidate) => candidate.id === id);
+    if (!preset) return;
+    selectedPids = applySubgroupSelection(preset, participantPids);
+  }
+
   function detectStandalone(): boolean {
     return (
       window.matchMedia("(display-mode: standalone)").matches ||
@@ -1310,6 +1336,22 @@
             {/each}
           </div>
         {/if}
+        <div class="subgroup-tools">
+          <div class="row subgroup-save">
+            <input bind:value={subgroupName} placeholder="Save subgroup" />
+            <button type="button" class="secondary" disabled={!subgroupName.trim() || selectedParticipants.length === 0} on:click={saveSubgroupPreset}>Save</button>
+          </div>
+          {#if subgroupPresets.length}
+            <div class="subgroup-list" aria-label="Subgroups">
+              {#each subgroupPresets as preset}
+                <span>
+                  <button type="button" class="secondary" on:click={() => applySubgroup(preset.id)}>{preset.name}</button>
+                  <button type="button" class="secondary" on:click={() => deleteSubgroup(preset.id)} title="Delete subgroup">x</button>
+                </span>
+              {/each}
+            </div>
+          {/if}
+        </div>
         {#if archived}<p class="hint">Archived trips are read-only.</p>{:else if !hasLocalClaim}<p class="hint">Viewing is enabled. Expense creation requires claiming one participant on this device.</p>{/if}
         {#if !payerPreview.ok}<p class="hint">{payerPreview.message}</p>{/if}
         {#if !amountPreview.ok}<p class="hint">{amountPreview.message}</p>{:else if !sharePreview.ok}<p class="hint">{sharePreview.message}</p>{:else if sharePreview.remainderPid}<p class="hint">Rounding remainder goes to {participantLabel(sharePreview.remainderPid)}.</p>{/if}

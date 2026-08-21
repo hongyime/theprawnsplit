@@ -531,6 +531,10 @@ Notes:
   orders by the stored local `date`, preserving wall-clock day display even when UTC
   `at` would sort the opposite way. Latest verification on 2026-08-22 passed with
   `npm run build` (48 core tests, 100 root tests).
+- Hardened REQ-SEC-09 identity-backup UI. The prompt now warns that the file grants
+  impersonation power, and source-level coverage keeps identity backup on download-only
+  handlers rather than share-sheet/manual sharing paths. Latest verification on
+  2026-08-22 passed with `npm run build` (48 core tests, 101 root tests).
 - Vercel checks on 2026-08-21 show the current `main` production deployment is Ready
   and has the requested aliases attached. Vercel env listing still shows no env vars
   configured, so the operated relay runtime remains unconfigured.

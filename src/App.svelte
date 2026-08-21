@@ -1185,7 +1185,7 @@
       <section class="prompt-banner important">
         <div>
           <strong>Back up this device identity</strong>
-          <p>This file is separate from the shareable trip export and restores settlement authority if this browser loses storage.</p>
+          <p>This file grants impersonation power for this trip. It is separate from the shareable trip export and restores settlement authority if this browser loses storage.</p>
         </div>
         <div class="prompt-actions">
           <button type="button" on:click={downloadPromptIdentityBackup}><KeyRound size={17} /> Identity backup</button>

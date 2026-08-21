@@ -887,3 +887,10 @@ Notes:
   `npx vitest run test/settlement-ui.test.ts`; full verification passed with `npm run
   build` (64 core tests, 165 root tests), root `npm audit --json`, protected-string
   scan, and `git diff --check`.
+- Added REQ-LIF-01/02/04/05/06/07 lifecycle UI boundary coverage so archive/unarchive
+  remain explicit user transitions, archive export happens before the archive event is
+  committed, archived trips remain readable/read-only, settled stays a computed
+  active-only banner, and relay-retention limits stay visible. Focused verification on
+  2026-08-22 passed with `npx vitest run test/lifecycle-ui.test.ts`; full verification
+  passed with `npm run build` (64 core tests, 166 root tests), root `npm audit --json`,
+  protected-string scan, and `git diff --check`.

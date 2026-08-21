@@ -162,3 +162,4 @@
 - 2026-08-22: REQ-UX-01 coverage treats paid-by-self equal split as the default expense path; advanced payer/split controls must remain opt-in.
 - 2026-08-22: REQ-ID-08/09/10 coverage treats participant claiming as a join-time decision boundary: claim existing shadows before creating new people, and confirm claims with provenance and balance context.
 - 2026-08-22: REQ-SET UI coverage treats settlement controls as append-only ledger actions, not payment rails: confirmation is payee-authority gated, disputes stay visible, and void remains tied to the recording device.
+- 2026-08-22: REQ-LIF UI coverage treats archive as an explicit export-first lifecycle transition, with unarchive confirmation and visible relay-retention/read-only copy in the app shell.

@@ -463,6 +463,20 @@ button.secondary {
   font-size: 0.9rem;
 }
 
+.settlement-state {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.45rem;
+  white-space: nowrap;
+}
+
+.settlement-state button {
+  min-height: 1.85rem;
+  padding: 0.2rem 0.5rem;
+  font-size: 0.84rem;
+}
+
 .ledger,
 .import-panel {
   margin-top: 12px;

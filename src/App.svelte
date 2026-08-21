@@ -14,7 +14,7 @@
     Archive,
     GitMerge,
   } from "@lucide/svelte";
-  import { allocate, fold, greedySettlement, type Event, type State } from "@theprawnsplit/core";
+  import { allocate, fold, greedySettlement, type Event, type VerificationContext, type State } from "@theprawnsplit/core";
   import {
     appendEvents,
     createExport,
@@ -50,11 +50,13 @@
   import { defaultExpenseDate, defaultParticipant, makeEvent, makeExpenseFinancials, type EventFactory } from "@/lib/events";
   import { formatMinor, parseMinor, type SplitMode } from "@/lib/money";
   import { isArchivedEventLog } from "@/lib/archive";
+  import { buildVerificationContext } from "@/lib/verification";
   import { syncOnce } from "@/relay/sync";
   import type { SyncResult } from "@/relay/types";
 
   let group: GroupRecord | null = null;
   let state: State | null = null;
+  let verificationContext: VerificationContext | undefined;
   let loading = true;
   let error = "";
   let participantName = "";
@@ -122,7 +124,7 @@
       group = await ensureGroup(seed);
       launchDurability = normalizeDurabilityPromptState(group.meta.durability);
       group = { ...group, meta: await recordAppLaunch(group.groupId) };
-      refreshState();
+      await refreshState();
       await refreshCounts();
       await refreshProtectionStatus();
       await refreshDurabilityPrompts();
@@ -137,9 +139,10 @@
     }
   }
 
-  function refreshState(): void {
+  async function refreshState(): Promise<void> {
     if (!group) return;
-    state = fold(group.events, { supportedVersion: 1 });
+    verificationContext = await buildVerificationContext(group);
+    state = fold(group.events, { supportedVersion: 1 }, verificationContext);
     const nextSelected: Record<string, boolean> = { ...selectedPids };
     for (const participant of state.participants.values()) {
       if (nextSelected[participant.pid] === undefined) nextSelected[participant.pid] = true;
@@ -164,7 +167,7 @@
     await saveGroup(updatedGroup);
     group = await appendEvents(group.groupId, events);
     await refreshCounts();
-    refreshState();
+    await refreshState();
     await refreshDurabilityPrompts();
   }
 
@@ -340,6 +343,21 @@
     settleAmount = "";
   }
 
+  function localIdentityForPid(pid: string) {
+    return group?.identities.find((identity) => identity.pid === pid);
+  }
+
+  async function confirmSettlement(sid: string): Promise<void> {
+    if (!group || archived) return;
+    const settlement = state?.settlements.get(sid);
+    if (!settlement) return;
+    const identity = localIdentityForPid(settlement.to);
+    if (!identity) return;
+    const f = factory();
+    const claimSig = await signClaim(identity.claimSkJwk, identity.alg, `${group.tagHex}:confirm:${sid}`);
+    await commit([makeEvent(f, "SettlementConfirmed", { sid, pid: settlement.to, claimSig })], f);
+  }
+
   function downloadExport(reason?: ExportPromptReason): void {
     if (!group) return;
     const blob = new Blob([stringifyExport(createExport(group))], { type: "application/json" });
@@ -432,7 +450,7 @@
       recoveryAttempted = false;
       lastSyncResult = null;
       syncStatus = artifact.type === "DeviceIdentityBackup" ? "Identity backup restored." : syncStatus;
-      refreshState();
+      await refreshState();
       await refreshCounts();
       await refreshDurabilityPrompts();
     } catch (err) {
@@ -461,7 +479,7 @@
       recoveryAttempted = true;
       lastSyncResult = result;
       group = await ensureGroup();
-      refreshState();
+      await refreshState();
       await refreshCounts();
       await refreshDurabilityPrompts();
       syncStatus = `${result.published} published, ${result.confirmed} confirmed, ${result.received} received, ${result.buffered} buffered, ${result.dropped} dropped, ${result.snapshotsSeen} snapshots seen, ${result.snapshotsPublished} snapshots published${result.errors.length ? `; ${result.errors[0]}` : "."}`;
@@ -863,9 +881,14 @@
             {#each settlements as settlement}
               <div class="settlement-row">
                 <span>{participantLabel(settlement.from)} paid {participantLabel(settlement.to)} {formatMinor(settlement.minor, group.currency)}</span>
-                <strong class:positive={settlement.confirmed} class:negative={settlement.disputed || settlement.contestedConfirmation}>
-                  {settlement.disputed ? "disputed" : settlement.contestedConfirmation ? "contested" : settlement.confirmed ? "confirmed" : settlement.cashUnconfirmable ? "cash" : "pending"}
-                </strong>
+                <span class="settlement-state">
+                  <strong class:positive={settlement.confirmed} class:negative={settlement.disputed || settlement.contestedConfirmation}>
+                    {settlement.disputed ? "disputed" : settlement.contestedConfirmation ? "contested" : settlement.confirmed ? "confirmed" : settlement.cashUnconfirmable ? "cash" : "pending"}
+                  </strong>
+                  {#if settlement.pending && localIdentityForPid(settlement.to)}
+                    <button type="button" disabled={archived} on:click={() => confirmSettlement(settlement.sid)}>Confirm</button>
+                  {/if}
+                </span>
               </div>
             {/each}
           </div>

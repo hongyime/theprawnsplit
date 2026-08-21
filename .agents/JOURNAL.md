@@ -165,3 +165,4 @@
 - 2026-08-22: REQ-LIF UI coverage treats archive as an explicit export-first lifecycle transition, with unarchive confirmation and visible relay-retention/read-only copy in the app shell.
 - 2026-08-22: REQ-MON expense UI coverage treats the Svelte expense panel as part of the money contract: preserve split intent, expose multi-payer rows, show remainder recipient, store local date, and append edits/voids.
 - 2026-08-22: REQ-DUR prompt UI coverage treats durable recovery prompts as app-shell obligations: install nags are policy-gated, pin-link is one-time, identity backup is warned, and export prompts stay trigger-bound.
+- 2026-08-22: REQ-SYN-03/04 relay encryption coverage must assert absence of plaintext ledger fields as well as absence of the raw group secret.

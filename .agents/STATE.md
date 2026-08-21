@@ -908,3 +908,10 @@ Notes:
   passed with `npx vitest run test/durability-prompts-ui.test.ts`; full verification
   passed with `npm run build` (64 core tests, 168 root tests), root `npm audit --json`,
   protected-string scan, and `git diff --check`.
+- Hardened REQ-SYN-03/04 relay encryption integration coverage so sync writes are
+  proven to omit plaintext ledger event names, participant identifiers, group ids,
+  participant names, raw JSON envelope markers, and the raw group secret. Focused
+  verification on 2026-08-22 passed with `npx vitest run --config vitest.config.ts
+  test/sync.integration.test.ts -t "plaintext ledger data"`; full verification passed
+  with `npm run build` (64 core tests, 168 root tests), root `npm audit --json`,
+  protected-string scan, and `git diff --check`.

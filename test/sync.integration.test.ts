@@ -100,7 +100,7 @@ describe("Phase 2 sync integration", () => {
   it("treats duplicate publish acknowledgements as successful quorum members", async () => {
     await resetRepositoryForTests("prawn-duplicate-ack-quorum");
     const group = await ensureGroup();
-    const participant = defaultParticipant({ deviceId: group.deviceId, nextCounter: group.nextCounter }, "Alice");
+    const participant = defaultParticipant({ deviceId: group.deviceId, nextCounter: group.nextCounter }, "Alice") as ParticipantAdded;
     await appendEvents(group.groupId, [participant]);
 
     const duplicate = new DuplicateAckRelay("duplicate");
@@ -202,12 +202,12 @@ describe("Phase 2 sync integration", () => {
     expect(canonicalStateBytes(fold(merged, { supportedVersion: 1 }))).toBe(expected);
   });
 
-  it("publishes encrypted relay payloads without transmitting the raw group secret", async () => {
+  it("publishes encrypted relay payloads without transmitting plaintext ledger data or the raw group secret", async () => {
     const relays = [new MemoryRelay("operated"), new MemoryRelay("nostr")];
 
     await resetRepositoryForTests(`prawn-relay-secret-${crypto.randomUUID()}`);
     const group = await ensureGroup();
-    const participant = defaultParticipant({ deviceId: group.deviceId, nextCounter: group.nextCounter }, "Alice");
+    const participant = defaultParticipant({ deviceId: group.deviceId, nextCounter: group.nextCounter }, "Alice") as ParticipantAdded;
     await appendEvents(group.groupId, [participant]);
 
     await expect(syncOnce(group.groupId, relays)).resolves.toMatchObject({ confirmed: 2 });
@@ -216,7 +216,16 @@ describe("Phase 2 sync integration", () => {
 
     expect(writes).toHaveLength(2);
     for (const write of writes) {
-      expect(JSON.stringify(write)).not.toContain(secretText);
+      const serializedWrite = JSON.stringify(write);
+      expect(serializedWrite).not.toContain(secretText);
+      expect(serializedWrite).not.toContain(group.groupId);
+      expect(serializedWrite).not.toContain(participant.id);
+      expect(serializedWrite).not.toContain(participant.pid);
+      expect(serializedWrite).not.toContain("GroupCreated");
+      expect(serializedWrite).not.toContain("ParticipantAdded");
+      expect(serializedWrite).not.toContain("Alice");
+      expect(write.blob).not.toContain("{");
+      expect(write.blob).not.toContain("\"events\"");
       expect(write.tag).toHaveLength(64);
       expect(write.tag).not.toBe(secretText);
       expect(write.writeProof).toHaveLength(64);

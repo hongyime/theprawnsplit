@@ -180,6 +180,7 @@ export async function syncOnce(groupId: string, relayOverride?: Relay[]): Promis
     maxFutureDriftMs: config.maxFutureDriftMs,
     capUnknownAuthor: config.capUnknownAuthor,
     capKnownAuthor: config.capKnownAuthor,
+    capGroupTotal: config.capGroupTotal,
     bufferMaxEvents: config.driftBufferMax,
   });
   await removeBufferedEvents(groupId, [

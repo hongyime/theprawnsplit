@@ -679,6 +679,12 @@ Notes:
   `NaN` into polling, sync caps, schema support, snapshots, or Nostr kind selection.
   Latest verification on 2026-08-22 passed with `npm run build` (51 core tests, 137
   root tests), root `npm audit --json`, protected-string scan, and `git diff --check`.
+- Hardened TDD §3.2/REQ-SYN-19/20 group-total admission caps. Runtime config now exposes
+  `VITE_CAP_GROUP_TOTAL`, sync passes it into core transport admission, and surplus
+  incoming events above the group cap are dropped with `discardVector` advancement while
+  already-retained events remain foldable. Latest verification on 2026-08-22 passed with
+  `npm run build` (52 core tests, 138 root tests), root `npm audit --json`,
+  protected-string scan, and `git diff --check`.
 - Vercel checks on 2026-08-21 show the current `main` production deployment is Ready
   and has the requested aliases attached. Vercel env listing still shows no env vars
   configured, so the operated relay runtime remains unconfigured.

@@ -14,4 +14,10 @@ describe("client numeric config parsing", () => {
     expect(parseClientNumericConfig("42.9", 500)).toBe(42);
     expect(parseClientNumericConfig(3.8, 500)).toBe(3);
   });
+
+  it("exposes the documented group-total admission cap", async () => {
+    const { config } = await import("@/config");
+
+    expect(config.capGroupTotal).toBeGreaterThan(0);
+  });
 });

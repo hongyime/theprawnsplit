@@ -7,6 +7,7 @@ export interface TransportAdmissionOptions {
   maxFutureDriftMs: number;
   capUnknownAuthor: number;
   capKnownAuthor: number;
+  capGroupTotal: number;
   bufferMaxEvents: number;
 }
 
@@ -64,6 +65,7 @@ export function admitTransportEvents(
   const dropped: DroppedEvent[] = [];
   const discardVector = { ...currentDiscardVector };
   const transportVector: Record<string, number> = {};
+  let groupCount = current.length;
 
   for (const event of incoming) {
     bump(transportVector, event);
@@ -71,6 +73,11 @@ export function admitTransportEvents(
     counts.set(event.dev, nextCount);
     const cap = known.has(event.dev) ? opts.capKnownAuthor : opts.capUnknownAuthor;
     if (nextCount > cap) {
+      dropped.push({ event, reason: "cap" });
+      bump(discardVector, event);
+      continue;
+    }
+    if (groupCount >= opts.capGroupTotal) {
       dropped.push({ event, reason: "cap" });
       bump(discardVector, event);
       continue;
@@ -88,6 +95,7 @@ export function admitTransportEvents(
     }
 
     admitted.push(event);
+    groupCount += 1;
   }
 
   return { admitted, buffered, dropped, discardVector, transportVector };

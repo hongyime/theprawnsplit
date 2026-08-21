@@ -25,6 +25,7 @@ describe("REQ-SYN-19/24/27 transport admission", () => {
       maxFutureDriftMs: 120_000,
       capUnknownAuthor: 2,
       capKnownAuthor: 1000,
+      capGroupTotal: 10_000,
       bufferMaxEvents: 500,
     });
 
@@ -41,6 +42,7 @@ describe("REQ-SYN-19/24/27 transport admission", () => {
       maxFutureDriftMs: 120_000,
       capUnknownAuthor: 50,
       capKnownAuthor: 1000,
+      capGroupTotal: 10_000,
       bufferMaxEvents: 500,
     });
     expect(first.admitted).toHaveLength(0);
@@ -53,6 +55,7 @@ describe("REQ-SYN-19/24/27 transport admission", () => {
       maxFutureDriftMs: 120_000,
       capUnknownAuthor: 50,
       capKnownAuthor: 1000,
+      capGroupTotal: 10_000,
       bufferMaxEvents: 500,
     });
     expect(second.admitted.map((e) => e.id)).toEqual(["fast:1"]);
@@ -66,10 +69,29 @@ describe("REQ-SYN-19/24/27 transport admission", () => {
       maxFutureDriftMs: 120_000,
       capUnknownAuthor: 1,
       capKnownAuthor: 1000,
+      capGroupTotal: 10_000,
       bufferMaxEvents: 500,
     });
     expect(result.buffered.map((held) => held.event.id)).toEqual(["fast:1"]);
     expect(result.dropped.map((drop) => drop.event.id)).toEqual(["fast:2"]);
     expect(result.discardVector).toEqual({ fast: 2 });
+  });
+
+  it("drops surplus over the group-total admission cap without blocking existing events", () => {
+    const current = [event("peer-a", 1), event("peer-b", 1)];
+    const incoming = [event("peer-c", 1), event("peer-d", 1)];
+    const result = admitTransportEvents(incoming, current, {}, {
+      now: 10,
+      supportedVersion: 1,
+      maxFutureDriftMs: 120_000,
+      capUnknownAuthor: 50,
+      capKnownAuthor: 1000,
+      capGroupTotal: 3,
+      bufferMaxEvents: 500,
+    });
+
+    expect(result.admitted.map((e) => e.id)).toEqual(["peer-c:1"]);
+    expect(result.dropped.map((drop) => [drop.event.id, drop.reason])).toEqual([["peer-d:1", "cap"]]);
+    expect(result.discardVector).toEqual({ "peer-d": 1 });
   });
 });

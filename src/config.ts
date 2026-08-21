@@ -23,6 +23,7 @@ export const config = {
   batchMaxEvents: parseClientNumericConfig(import.meta.env.VITE_BATCH_MAX_EVENTS, 50),
   capUnknownAuthor: parseClientNumericConfig(import.meta.env.VITE_CAP_UNKNOWN_AUTHOR, 50),
   capKnownAuthor: parseClientNumericConfig(import.meta.env.VITE_CAP_KNOWN_AUTHOR, 1000),
+  capGroupTotal: parseClientNumericConfig(import.meta.env.VITE_CAP_GROUP_TOTAL, 10_000),
   driftBufferMax: parseClientNumericConfig(import.meta.env.VITE_DRIFT_BUFFER_MAX, 500),
   maxFutureDriftMs: parseClientNumericConfig(import.meta.env.VITE_MAX_FUTURE_DRIFT_MS, 120_000),
   snapshotEvery: parseClientNumericConfig(import.meta.env.VITE_SNAPSHOT_EVERY, 100),

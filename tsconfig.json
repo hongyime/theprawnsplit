@@ -1,0 +1,21 @@
+{
+  "extends": "@tsconfig/svelte/tsconfig.json",
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+    "allowJs": false,
+    "checkJs": false,
+    "isolatedModules": true,
+    "resolveJsonModule": true,
+    "types": ["svelte", "node", "vite/client"],
+    "paths": {
+      "@/*": ["./src/*"],
+      "@theprawnsplit/core": ["./core/src/index.ts"]
+    }
+  },
+  "include": ["src/**/*.ts", "src/**/*.svelte", "test/**/*.ts", "vite.config.ts", "vitest.config.ts"]
+}

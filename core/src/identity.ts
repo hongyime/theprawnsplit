@@ -1,0 +1,163 @@
+import type { Event, VerificationContext } from "./types";
+import { eventSortKey } from "./types";
+
+class DSU {
+  private parent = new Map<string, string>();
+
+  add(x: string): void {
+    if (!this.parent.has(x)) this.parent.set(x, x);
+  }
+
+  find(x: string): string {
+    this.add(x);
+    const parent = this.parent.get(x)!;
+    if (parent === x) return x;
+    const root = this.find(parent);
+    this.parent.set(x, root);
+    return root;
+  }
+
+  union(a: string, b: string): void {
+    const ra = this.find(a);
+    const rb = this.find(b);
+    if (ra === rb) return;
+    const root = ra < rb ? ra : rb;
+    const child = root === ra ? rb : ra;
+    this.parent.set(child, root);
+  }
+
+  roots(): Map<string, string> {
+    const out = new Map<string, string>();
+    for (const pid of [...this.parent.keys()].sort()) out.set(pid, this.find(pid));
+    return out;
+  }
+}
+
+export function voidedEventIds(events: Event[]): Set<string> {
+  const eventTypes = new Map(events.map((event) => [event.id, event.t]));
+  const voided = new Set<string>();
+  for (const event of events) {
+    if (event.t !== "EventVoided") continue;
+    if (eventTypes.get(event.targetId) === "EventVoided") continue;
+    voided.add(event.targetId);
+  }
+  return voided;
+}
+
+export function buildDSU(events: Event[]): Map<string, string> {
+  const dsu = new DSU();
+  const voided = voidedEventIds(events);
+  for (const event of [...events].sort(eventSortKey)) {
+    if ("pid" in event) dsu.add(event.pid);
+    if (event.t === "ParticipantMerged" && !voided.has(event.id)) dsu.union(event.from, event.into);
+  }
+  return dsu.roots();
+}
+
+const verifiesWithAny = (
+  ctx: VerificationContext,
+  payload: string,
+  signature: string,
+  keys: { publicKey: string; alg: "ed25519" | "ecdsa-p256" }[],
+): boolean => keys.some((key) => ctx.verifySignature({ payload, signature, publicKey: key.publicKey, alg: key.alg }));
+
+export function authorisedKeys(events: Event[], pid: string, ctx: VerificationContext): Set<string> {
+  const voided = voidedEventIds(events);
+  const ordered = [...events].filter((event) => !voided.has(event.id)).sort(eventSortKey);
+  const keys = new Map<string, "ed25519" | "ecdsa-p256">();
+
+  for (const event of ordered) {
+    if (event.t !== "ParticipantClaimed" || event.pid !== pid) continue;
+    const payload = `${ctx.groupTag}:${event.pid}:${event.deviceId}:${event.claimPk}`;
+    if (ctx.verifySignature({ payload, signature: event.sig, publicKey: event.claimPk, alg: event.alg })) {
+      keys.set(event.claimPk, event.alg);
+    }
+  }
+
+  let changed = true;
+  while (changed) {
+    changed = false;
+    const current = [...keys.entries()].map(([publicKey, alg]) => ({ publicKey, alg }));
+    for (const event of ordered) {
+      if (event.t === "DeviceLinked" && event.pid === pid && !keys.has(event.newClaimPk)) {
+        const payload = `${ctx.groupTag}:link:${event.pid}:${event.newDevice}:${event.newClaimPk}:${event.nonce}`;
+        if (verifiesWithAny(ctx, payload, event.sig, current)) {
+          keys.set(event.newClaimPk, event.alg);
+          changed = true;
+        }
+      }
+    }
+  }
+
+  const claimedPeers = [...new Set(ordered.flatMap((event) => (event.t === "ParticipantClaimed" ? [event.pid] : [])))]
+    .filter((peerPid) => peerPid !== pid && authorisedKeysWithoutReattestation(ordered, peerPid, ctx).size > 0)
+    .sort();
+  const threshold = Math.max(1, Math.floor((claimedPeers.length - 1) / 2) + 1);
+  const validAttestors = new Set<string>();
+  const reattestedKeys: { key: string; alg: "ed25519" | "ecdsa-p256" }[] = [];
+
+  for (const event of ordered) {
+    if (event.t !== "ClaimReattested" || event.pid !== pid) continue;
+    if (!claimedPeers.includes(event.attestor)) continue;
+    const attestorKeys = [...authorisedKeysWithoutReattestation(ordered, event.attestor, ctx).entries()].map(
+      ([publicKey, alg]) => ({ publicKey, alg }),
+    );
+    const payload = `${ctx.groupTag}:reattest:${event.pid}:${event.newDevice}:${event.newClaimPk}`;
+    if (verifiesWithAny(ctx, payload, event.sig, attestorKeys)) {
+      validAttestors.add(event.attestor);
+      reattestedKeys.push({ key: event.newClaimPk, alg: event.alg });
+    }
+  }
+
+  if (validAttestors.size >= threshold) {
+    for (const key of reattestedKeys) keys.set(key.key, key.alg);
+  }
+
+  return new Set([...keys.keys()].sort());
+}
+
+function authorisedKeysWithoutReattestation(
+  events: Event[],
+  pid: string,
+  ctx: VerificationContext,
+): Map<string, "ed25519" | "ecdsa-p256"> {
+  const keys = new Map<string, "ed25519" | "ecdsa-p256">();
+  for (const event of events) {
+    if (event.t !== "ParticipantClaimed" || event.pid !== pid) continue;
+    const payload = `${ctx.groupTag}:${event.pid}:${event.deviceId}:${event.claimPk}`;
+    if (ctx.verifySignature({ payload, signature: event.sig, publicKey: event.claimPk, alg: event.alg })) {
+      keys.set(event.claimPk, event.alg);
+    }
+  }
+  let changed = true;
+  while (changed) {
+    changed = false;
+    const current = [...keys.entries()].map(([publicKey, alg]) => ({ publicKey, alg }));
+    for (const event of events) {
+      if (event.t !== "DeviceLinked" || event.pid !== pid || keys.has(event.newClaimPk)) continue;
+      const payload = `${ctx.groupTag}:link:${event.pid}:${event.newDevice}:${event.newClaimPk}:${event.nonce}`;
+      if (verifiesWithAny(ctx, payload, event.sig, current)) {
+        keys.set(event.newClaimPk, event.alg);
+        changed = true;
+      }
+    }
+  }
+  return keys;
+}
+
+export function verifyConfirmation(events: Event[], sid: string, claimSig: string, ctx: VerificationContext): boolean {
+  const settlement = events.find((event) => event.t === "SettlementRecorded" && event.sid === sid);
+  if (!settlement || settlement.t !== "SettlementRecorded") return false;
+  const keySet = authorisedKeys(events, settlement.to, ctx);
+  const keyAlgs = [...keySet].map((publicKey) => ({ publicKey, alg: findAlg(events, publicKey) ?? "ed25519" }));
+  return verifiesWithAny(ctx, `${ctx.groupTag}:confirm:${sid}`, claimSig, keyAlgs);
+}
+
+function findAlg(events: Event[], publicKey: string): "ed25519" | "ecdsa-p256" | undefined {
+  for (const event of events) {
+    if (event.t === "ParticipantClaimed" && event.claimPk === publicKey) return event.alg;
+    if (event.t === "DeviceLinked" && event.newClaimPk === publicKey) return event.alg;
+    if (event.t === "ClaimReattested" && event.newClaimPk === publicKey) return event.alg;
+  }
+  return undefined;
+}

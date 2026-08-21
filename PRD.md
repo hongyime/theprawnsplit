@@ -40,7 +40,7 @@ These were decided deliberately with reasoning recorded in §11. Challenge them 
 | Greedy settlement, not optimal | D-07 |
 | Optimistic settlement with pending flag | D-08 |
 | Nagging escalation ladder | D-09 |
-| Additive claim sets, disambiguated by explicit mode | D-10 |
+| Additive claim sets; additional-device authority is cryptographic | D-10/D-16 |
 | Vercel app / Cloudflare relay split | D-11 |
 | Operated relay dual-write in Phase 2 | D-12 — accepted at v1.5 |
 | Everything on Vercel; D-11 superseded | D-19 |
@@ -51,7 +51,7 @@ These were decided deliberately with reasoning recorded in §11. Challenge them 
 | Atomic `Financials` LWW unit | D-14 |
 | Signed settlement confirmation, unsigned expense attribution | D-15 |
 | Cryptographic device delegation, not self-assertion | D-16 |
-| Frontier-relative clock-drift detection | D-17 |
+| Frontier-relative clock-drift detection rejected; admission gating supersedes it | D-17/D-20 |
 | Per-author ingestion drops; fold never blocked | D-18 |
  
 ### 0.3 What the author is least confident about
@@ -197,7 +197,7 @@ A self-hosted, serverless clone has no monetisation pressure by construction. Th
 | **groupSecret** | 256-bit random value. The group's bearer credential. Lives in the URL fragment. |
 | **groupTag** | `SHA-256(groupSecret ‖ "tag")`. Public relay address. Reveals nothing. |
 | **groupKey** | `HKDF(groupSecret, "enc")`. AES-256-GCM key. Never transmitted. |
-| **Relay** | A commodity WebSocket server storing opaque blobs. Replaceable, never authoritative. |
+| **Relay** | A blind append-only store for opaque blobs. Replaceable, never authoritative. |
 | **Fold** | Deterministic replay of the event log producing current state. |
 | **Confirmed** | An event read back from either backend, proving retention (not merely acknowledged). |
 | **Financials** | The atomic unit `{minor, payers, shares, rate}`. Merged whole or not at all (D-14). |
@@ -207,7 +207,7 @@ A self-hosted, serverless clone has no monetisation pressure by construction. Th
 | **Claim key** | Ed25519/P-256 keypair minted when a device claims a participant. Authorises settlement confirmation. |
 | **DeviceLinked** | Signed delegation admitting a second device to a participant's authorised key set. |
 | **ClaimReattested** | A claimed peer vouching for a device that lost its key. Social recovery path. |
-| **Implausible event** | One whose `hlc.wall` exceeds its own causal frontier by >60 s. Retained, flagged, excluded from LWW. |
+| **Future-dated event** | One whose `hlc.wall` is more than 120 s ahead of local time at transport admission. Held outside the admitted log until local time catches up; never mutated. |
  
 ---
  
@@ -457,20 +457,12 @@ violating the invariant and halting the fold under REQ-MON-15. They therefore re
 as **one LWW unit**: an edit either replaces the entire `Financials` struct or leaves
 it untouched. `desc` and `date` remain independently mergeable. See REQ-MON-16.
  
-**Number vs BigInt — not a contradiction.** Stored amounts are integer JS `number`s:
-JSON-serialisable, and ledger totals sit far below 2^53. BigInt is mandatory only
-*inside* `allocate()` (REQ-MON-14), where the intermediate `total × weight` product can
-exceed double precision. Do not "normalise" the schema to BigInt (unserialisable) or
-the algorithm to `number` (loses exactness). The conversion happens at the `allocate()`
-boundary and nowhere else.
- 
-**Claim mode.** `mode` distinguishes a person's second device from a second person
-claiming the same participant — a distinction D-10 assumed but never specified.
-`"additional-own-device"` is recorded only after the user explicitly confirms
-"this is my other device." Anomalies (REQ-ID-07) fire only on a `"first"` claim
-against an already-claimed participant. Without this, every legitimate two-device
-user would sit in a permanent anomaly state and lose settlement-confirmation
-authority under REQ-SET-09.
+**Number vs BigInt — not a contradiction.** Serialized events store integer minor units
+as JSON-safe numbers. The Phase 0 core converts those values at the boundary and uses
+`bigint` for all money math: allocation, fold balances, settlements, and settlement
+plans. Do not use floating-point arithmetic for ledger money. Convert back to
+JSON-safe integers only at storage/UI boundaries after validating the value is finite,
+integral, and safe.
  
 **Claim keys — the Q10 resolution.** The claim-hijack loop persisted through two review
 rounds because it conflated two different acts:
@@ -960,13 +952,14 @@ in order of practical value:
  
 | Defence | Covers | Requires |
 |---|---|---|
-| **1. Export carries the key** (REQ-SEC-05) | Alone, phone dead, no peer nearby | Having exported. The prompts already exist |
+| **1. DeviceIdentityBackup carries the key** (REQ-SEC-05) | Alone, phone dead, no peer nearby | Having created the backup. The prompts already exist |
 | **2. QR device pairing** (REQ-SEC-02) | Losing one of two devices | Foresight |
 | **3. Peer re-attestation** (REQ-SEC-06) | No export, no second device | Another claimed member present |
  
 Defence 1 is primary: it is the only one that works for someone alone in an airport with
-a wiped phone. Its cost is that the export file becomes credential-bearing and must be
-labelled accordingly.
+a wiped phone. Its cost is that `DeviceIdentityBackup` becomes credential-bearing and
+must be labelled accordingly. `TripLedgerExport` remains shareable and contains no
+private key material.
  
 ### 9.12 Clock-drift handling — transport admission gate
  
@@ -1128,14 +1121,15 @@ Encrypted events persist on third-party relays indefinitely and **cannot be reli
 A `groupSecret` holder can flood relays with dummy events, exhausting browser memory
 during fold and rendering local state unusable.
  
-**Mitigation:** REQ-SYN-19 and REQ-SYN-20 impose hard ingestion and fold caps
-(≤1,000 events per device, ≤10,000 per group). On breach, ingestion halts, existing
-local state is preserved rather than overwritten, and the user is routed to
-"restore from your export into a new group."
+**Mitigation:** REQ-SYN-19 and REQ-SYN-20 impose per-author admission caps. Surplus
+events from that author are dropped or quarantined before entering the admitted log,
+while events from every other author continue to process. The fold always runs on the
+admitted subset and MUST NOT be blocked by log size.
  
-**Residual risk:** the group is effectively destroyed and must be recreated with a new
-`groupSecret`. Recovery depends entirely on export discipline (REQ-DUR-07). This is the
-strongest argument for the export prompts and for A6.
+**Residual risk:** a holder of `groupSecret` can still create nuisance ledger events
+inside the friend-group trust model. A tag-only attacker against the operated relay is a
+separate relay-cost risk; Phase 2 mitigates it with a no-account write proof derived
+from `groupSecret`, while preserving the relay's inability to decrypt ledger contents.
  
 ---
  
@@ -1159,7 +1153,7 @@ strongest argument for the export prompts and for A6.
 | **D-13** | Void is terminal; un-voiding is not supported | Voidable voids; tombstone toggling | A non-monotonic void predicate reintroduces order-dependence into the fold, defeating the grow-only design. Reversal is achieved by emitting a new event with a new ID. |
 | **D-15** | Settlement confirmation is cryptographically signed; expense attribution is not | Sign everything; sign nothing | Shadow participants make expense signatures meaningless as authorisation (D-04), but shadows never confirm settlements (REQ-SET-06). Every eligible confirmer has a device and can hold a key, so signing confirmations excludes nobody. This is the Q10 resolution. |
 | **D-16** | Additional-device authority is delegated, not self-asserted | v1.2 `mode` field | A self-asserted flag is forgeable by any `groupSecret` holder, which defeated the REQ-SET-09 interlock. `DeviceLinked` must be signed by an already-authorised key. |
-| **D-17** | Clock drift judged against the event's own causal frontier | Clamp to local time; reject outright | Local-time clamping produces different HLC values on devices that ingest at different moments — divergence. Frontier-relative evaluation is deterministic from log content alone. |
+| **D-17** | ~~Clock drift judged against the event's own causal frontier~~ **SUPERSEDED BY D-20** | Clamp to local time; reject outright | Frontier-relative evaluation was deterministic but wrong: normal idle time looked like clock skew. D-20 is authoritative. |
 | **D-18** | Ingestion caps drop per-author; the fold is never blocked | Halt ingestion on breach (v1.2) | Halting on breach is an unauthenticated remote kill-switch: 1,001 events from a throwaway key would brick every member's sync. |
 | **D-20** | Clock drift gated at transport admission; events never mutated | Local-time clamping (v1.3); causal-frontier bounds (v1.4) | Clamping diverges — local time differs per device. Frontier bounds flag normal idle time: an 8-hour gap between lunch and dinner reads as 8 hours of "drift." Admission gating leaves the event untouched, so all devices eventually fold identical values. |
 | **D-21** | Merge unions display, never cryptographic authority | Union `authorisedKeys` on merge | `ParticipantMerged` is unsigned, so unioning authority lets any `groupSecret` holder merge a victim into themselves and clear the victim's debts — defeating the entire v1.4 claim-key model. |
@@ -1207,10 +1201,10 @@ strongest argument for the export prompts and for A6.
 | Vercel Hobby paused on overage **pauses the client too** (shared account, D-19) | Medium | Very Low | Manual fallbacks always available (REQ-SYN-13); Nostr dual-write continues; relay can move accounts or vendors behind the `Relay` interface | Low — accepted trade for single-vendor simplicity |
 | Merge divergence bug | **Critical** | Low | Phase 0 property suite (§16.2), built before app code | Low — verified, not asserted |
 | Money allocation bug | **Critical** | Low | Phase 0 exhaustive sweep + zero-sum property (§16.1, §16.2) | Low — verified, not asserted |
-| **Claim key destroyed by storage eviction** | **High** | **Medium-High** | Export carries the key (REQ-SEC-05); QR pairing; peer re-attestation | **Medium — top open risk** |
+| **Claim key destroyed by storage eviction** | **High** | **Medium-High** | `DeviceIdentityBackup` carries the key (REQ-SEC-05); QR pairing; peer re-attestation | **Medium — top open risk** |
 | Genesis claim race (attacker pre-claims a participant) | Medium | Low | Visible attribution (REQ-SEC-07); peer voiding | Medium — TOFU, not eliminable |
 | Remote kill-switch via ingestion cap | **Was Critical** | — | REQ-SYN-19/20 rewritten: per-author drops, fold never blocked | Low |
-| Clock-drift LWW domination | **Was High** | — | REQ-SYN-24 frontier-relative detection | Low |
+| Clock-drift LWW domination | **Was High** | — | REQ-SYN-24 transport admission gating | Low |
 | Divergence from local-time clamping | **Was Critical (proposed fix)** | — | Rejected before implementation; D-17 | None |
  
 ---
@@ -1226,11 +1220,11 @@ strongest argument for the export prompts and for A6.
 | ~~Q1~~ | 2 | **CLOSED (provisionally).** Kind **1512** — regular range (1000–9999), clear of known allocations (1059/1060 gift wrap, 1311 live chat, 1984 reporting, 9734/9735 zaps). **Task 0 MUST verify against the current NIP index and confirm all five default relays accept it** — kinds get allocated over time and this cannot be asserted from memory. |
 | ~~Q2~~ | 2 | **CLOSED.** Fork & Re-key via snapshot export, not in-band rotation (§10.2). |
 | ~~Q3~~ | 1 | **CLOSED.** Store `at` (epoch UTC) and `date` (YYYY-MM-DD local). REQ-MON-13. |
-| ~~Q4~~ | 2 | **CLOSED.** Claim sets union on merge (§8.6, REQ-ID-19). **Required a new fix:** `ParticipantClaimed.mode` — without it the REQ-ID-07 anomaly interlock fires on every legitimate two-device user and permanently strips their settlement-confirmation authority under REQ-SET-09. |
+| ~~Q4~~ | 2 | **CLOSED.** Claim sets union on merge for display (§8.6, REQ-ID-19). Additional-device authority is not self-asserted; it requires cryptographic delegation via `DeviceLinked` or enough valid `ClaimReattested` events. |
 | ~~Q6~~ | 1 | **CLOSED.** Hard caps set; snapshots moved to Phase 2. |
 | ~~Q8~~ | 2 | **CLOSED.** Optimistic acceptance with fold-time surfacing. Rejection at entry would break offline availability, since an offline device cannot know whether a partitioned peer merged the pair. Confirms REQ-ID-17. |
 | ~~Q9~~ | 2 | **CLOSED.** Transport version vector advances; semantic ledger freezes. REQ-SYN-22. |
-| ~~Q7~~ | 3 | **CLOSED.** Clock drift judged against the event's own causal frontier, not local time. REQ-SYN-24, §9.12, D-17. |
+| ~~Q7~~ | 3 | **CLOSED.** Current resolution is transport admission gating: future-dated events are held outside the admitted log until local time catches up. REQ-SYN-24, §9.12, D-20. |
 | ~~Q10~~ | 3 | **CLOSED.** Claim keys: settlement confirmation is signed, additional devices are cryptographically delegated. REQ-SEC-01→07, D-15/D-16. **The v1.2 `mode` field is removed.** |
 | ~~Q11~~ | 3 | **CLOSED.** Active conflict surfacing with Keep/Revert. **Refinement:** "Revert" MUST emit a new `ExpenseEdited`, never un-apply — void is terminal (D-13). |
 | ~~Q12~~ | 3 | **CLOSED.** Snapshots embed `VV_snap`; receiver initialises to it. **Added:** background raw-history reconciliation, since a malicious snapshot could otherwise advance a vector past events it omitted. REQ-SYN-25/26. |
@@ -1242,7 +1236,7 @@ strongest argument for the export prompts and for A6.
 | ~~Q5~~ | **CLOSED.** Read-only joiners are **invisible**. Announcing presence would require emitting an event and allocating a device identity, which contradicts read-only semantics. Read-only is purely local client state: decrypt, fold, display, no ledger footprint. |
 | ~~Q7~~ | **CLOSED.** Ambient non-blocking banner only. If local time deviates >10 min from the median `hlc.wall` of the last 10 peer events, show "Your device clock appears inaccurate; expense ordering may look wrong." **Never mutate HLC values based on local skew** — that is the divergence trap of §9.12. |
 | ~~Q13~~ | **CLOSED.** Support both. QR in person is primary. Remote pairing signs `groupTag:link:pid:newClaimPk:nonce` with a single-use 128-bit nonce generated by the joining device, preventing replay of a delegation onto a different device. |
-| ~~Q14~~ | **CLOSED.** `ClaimReattested` requires a simple majority of claimed peers: `M = max(1, floor((N_claimed − 1) / 2) + 1)`. **Caveat:** at N = 2 the majority is one, so a single colluding peer suffices. Unavoidable in small groups; note it in the UI. |
+| ~~Q14~~ | **CLOSED.** `ClaimReattested` is one attestor per event; recovery authority activates after a simple majority of valid claimed-peer attestations accumulate: `M = max(1, floor((N_claimed − 1) / 2) + 1)`. **Caveat:** at N = 2 the majority is one, so a single colluding peer suffices. Unavoidable in small groups; note it in the UI. |
 | ~~Q15~~ | **CLOSED.** Do not password-protect ledger exports — a password reintroduces exactly the credential D-01 exists to avoid. Isolate the key instead: `TripLedgerExport` carries no secrets, `DeviceIdentityBackup` carries the key behind an explicit warning (REQ-SEC-05/09). |
  
 ### 14.3 Still open
@@ -1281,6 +1275,8 @@ core/
 ```
  
 **Tooling:** `vitest` + `fast-check` for property tests. No app dependencies.
+Phase 0 owns pure admission verdicts only. Persistent future-event buffers, retry
+scheduling, eviction, and per-author budget accounting belong to Phase 2 sync.
  
 **Ship gate — all of §16.1 and §16.2 pass, including:**
 - The **normal-usage regression suite** (§16.2). These are the cases whose absence let the
@@ -1496,7 +1492,7 @@ Receipt OCR and photo attachments · categories, budgets, analytics, charts · r
 | Cold-start author-fetch blindspot (v1.1 design) | **Was High** | REQ-SYN-21 bootstrap mode | Low |
 | Forged `"additional-own-device"` claim bypasses the REQ-SET-09 interlock | **Was Medium — CLOSED** | REQ-SEC-01/02 cryptographic delegation; `mode` field removed | None |
 | Ingestion cap as remote kill-switch (v1.2 design) | **Was Critical** | REQ-SYN-19/20 per-author drops; fold never blocked | Low |
-| Clock-drift LWW domination (v1.2 design) | **Was High** | REQ-SYN-24 frontier-relative detection | Low |
+| Clock-drift LWW domination (v1.2 design) | **Was High** | REQ-SYN-24 transport admission gating | Low |
 | **Claim key lost to storage eviction (v1.4 design)** | **High** | REQ-SEC-05 export-carried key; QR pairing; peer attestation | **Medium — new top risk** |
 | Export file becomes an impersonation credential | Medium | Labelled in UI; **open Q15** | Medium — open |
  
@@ -1821,8 +1817,8 @@ The relay is a **blind append-only store**. It never decrypts, never interprets 
 never coordinates. Two endpoints:
  
 ```
-POST /api/relay/publish   { tag, blob }        → { cursor }
-GET  /api/relay/fetch     ?tag&cursor&limit    → [{ blob, cursor }]
+POST /api/relay   { tag, blob, author, writeProof }        → { cursor }
+GET  /api/relay   ?tag&cursor&author&limit                 → { entries }
 ```
  
 **Storage — Upstash Redis Streams (recommended).** `XADD` appends and returns a
@@ -1849,10 +1845,13 @@ at trip scale (tens of KB) either is acceptable.
 **Sizing.** ~6 devices polling every 30 s across ~4 active hours/day for 14 days ≈ 40,000
 invocations per trip, against 1M/month on Hobby. Each call is one storage round-trip.
  
-**Access control.** None beyond the opaque `groupTag`. The relay cannot distinguish a
-group member from anyone else holding the tag — consistent with §10.2, where the join link
-is already an unrevocable bearer credential. Per-author ingestion caps (REQ-SYN-19) are
-enforced **client-side during fold**, never by the relay.
+**Write proof.** Phase 2 adds a no-account write proof derived from `groupSecret`.
+The relay can verify write eligibility for a tag but still cannot decrypt ledger
+contents. This separates `groupTag` visibility from ledger membership and limits
+tag-only relay-cost attacks.
+
+Per-author ingestion caps (REQ-SYN-19) are enforced at the client admission boundary,
+before events enter the admitted log, never inside `fold()`.
  
 ---
  

@@ -1,0 +1,76 @@
+import { describe, expect, it } from "vitest";
+import { authorisedKeys, buildDSU, verifyConfirmation } from "../src/identity";
+import { base, claim, confirm, groupTag, link, sig, verifier } from "./helpers";
+
+describe("REQ-ID-13/REQ-SEC-08 identity", () => {
+  it("rebuilds DSU with lowest canonical root regardless of merge direction", () => {
+    const dsu = buildDSU([
+      base("ParticipantMerged", { from: "mallory", into: "alice" } as never),
+      base("ParticipantMerged", { from: "bob", into: "mallory" } as never),
+    ]);
+    expect(dsu.get("mallory")).toBe("alice");
+    expect(dsu.get("bob")).toBe("alice");
+  });
+
+  it("converges transitive DeviceLinked authority under shuffled arrival", () => {
+    const genesis = claim("alice", "phone", "key-a");
+    const tablet = link("alice", "key-a", "tablet", "key-b", "n1");
+    const laptopPayload = `${groupTag}:link:alice:laptop:key-c:n2`;
+    const laptop = base("DeviceLinked", {
+      pid: "alice",
+      parentDevice: "tablet",
+      newDevice: "laptop",
+      newClaimPk: "key-c",
+      alg: "ed25519",
+      nonce: "n2",
+      sig: sig("key-b", laptopPayload),
+    } as never);
+    expect([...authorisedKeys([laptop, tablet, genesis], "alice", verifier)]).toEqual(["key-a", "key-b", "key-c"]);
+  });
+
+  it("does not let unsigned merge transfer settlement confirmation authority", () => {
+    const events = [
+      claim("alice", "phone", "alice-key"),
+      claim("mallory", "phone", "mallory-key"),
+      base("ParticipantMerged", { from: "alice", into: "mallory" } as never),
+      base("SettlementRecorded", { sid: "s1", from: "mallory", to: "alice", minor: 10n } as never),
+    ];
+    const malloryConfirm = confirm("s1", "mallory-key");
+    const aliceConfirm = confirm("s1", "alice-key");
+    if (malloryConfirm.t !== "SettlementConfirmed" || aliceConfirm.t !== "SettlementConfirmed") {
+      throw new Error("test helper returned wrong event type");
+    }
+    expect(verifyConfirmation([...events, malloryConfirm], "s1", malloryConfirm.claimSig, verifier)).toBe(false);
+    expect(verifyConfirmation([...events, aliceConfirm], "s1", aliceConfirm.claimSig, verifier)).toBe(true);
+  });
+
+  it("activates ClaimReattested only after enough single-attestor events accumulate", () => {
+    const payloadA = `${groupTag}:reattest:lost:new-phone:lost-new`;
+    const payloadB = `${groupTag}:reattest:lost:new-phone:lost-new`;
+    const events = [
+      claim("peer-a", "a", "peer-a-key"),
+      claim("peer-b", "b", "peer-b-key"),
+      claim("peer-c", "c", "peer-c-key"),
+      base("ClaimReattested", {
+        pid: "lost",
+        newDevice: "new-phone",
+        newClaimPk: "lost-new",
+        alg: "ed25519",
+        attestor: "peer-a",
+        sig: sig("peer-a-key", payloadA),
+      } as never),
+    ];
+    expect([...authorisedKeys(events, "lost", verifier)]).toEqual([]);
+    events.push(
+      base("ClaimReattested", {
+        pid: "lost",
+        newDevice: "new-phone",
+        newClaimPk: "lost-new",
+        alg: "ed25519",
+        attestor: "peer-b",
+        sig: sig("peer-b-key", payloadB),
+      } as never),
+    );
+    expect([...authorisedKeys(events, "lost", verifier)]).toEqual(["lost-new"]);
+  });
+});

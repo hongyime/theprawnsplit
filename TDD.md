@@ -151,7 +151,7 @@ VITE_IDLE_AFTER_MS=120000
 VITE_ACK_QUORUM=2
 VITE_BATCH_MAX_EVENTS=50
  
-# Ingestion caps (REQ-SYN-19/20). Enforced CLIENT-SIDE during fold.
+# Ingestion caps (REQ-SYN-19/20). Enforced CLIENT-SIDE at admission, before fold.
 VITE_CAP_UNKNOWN_AUTHOR=50
 VITE_CAP_KNOWN_AUTHOR=1000
 VITE_CAP_GROUP_TOTAL=10000
@@ -268,13 +268,16 @@ const key = (tag: string) => `ts:${tag}`;
 export default async function handler(req: Request): Promise<Response> {
   const url = new URL(req.url);
  
-  // ── POST /api/relay  { tag, blob, author } ──────────────────────────────
+  // ── POST /api/relay  { tag, blob, author, writeProof } ──────────────────
   if (req.method === "POST") {
-    const { tag, blob, author } = await req.json();
+    const { tag, blob, author, writeProof } = await req.json();
  
     if (!TAG_RE.test(tag ?? "")) return bad("invalid tag");
     if (typeof blob !== "string" || blob.length > MAX_BLOB) return bad("invalid blob");
     if (typeof author !== "string" || author.length > 128) return bad("invalid author");
+    if (typeof writeProof !== "string" || writeProof.length > 256) return bad("invalid proof");
+    // Phase 2 verifies writeProof from groupSecret-derived material without learning
+    // groupSecret or groupKey. Exact construction is finalised with the relay adapter.
  
     // XADD ts:{tag} * blob <b64> author <pubkey>  → server-generated monotonic ID
     const cursor = await redis.xadd(key(tag), "*", { blob, author });
@@ -320,8 +323,8 @@ this is written from the documented pattern rather than a running build.
  
 | Not implemented | Why |
 |---|---|
-| Authentication | The join link is already an unrevocable bearer credential (PRD §10.2). Adding auth here protects nothing and reintroduces accounts. |
-| Per-author rate limiting | Caps are enforced **client-side during fold** (REQ-SYN-19). A server-side cap would be a remote kill-switch — the exact bug D-18 fixed. |
+| Accounts or user auth | No accounts, no sessions, no third-party auth (D-01). The relay write proof is derived from `groupSecret` and is not an account. |
+| Per-author rate limiting | Caps are enforced client-side at admission before `fold()` (REQ-SYN-19). A server-side cap would be a remote kill-switch — the exact bug D-18 fixed. |
 | Deletion | Void is terminal and expressed as events (D-13). Nothing is ever removed. |
 | `subscribe` / WebSocket | The client polls (REQ-PLT-03/04). Edge functions cannot hold connections, and nothing needs one. |
 | Decryption, validation of payloads | REQ-PLT-08. The relay must not be able to interpret content. |
@@ -349,8 +352,8 @@ export function allocate(
 ): bigint[];                                   // Σ result === total, always
  
 // core/src/settle.ts
-export interface Transfer { from: string; to: string; minor: number }
-export function greedySettlement(balances: Map<string, number>): Transfer[];
+export interface Transfer { from: string; to: string; minor: bigint }
+export function greedySettlement(balances: Map<string, bigint>): Transfer[];
  
 // core/src/hlc.ts
 export interface HLC { wall: number; ctr: number; dev: string }
@@ -370,10 +373,9 @@ export interface State {
   participants: Map<string, Participant>;
   expenses:     Map<string, Expense>;
   settlements:  Map<string, Settlement>;
-  balances:     Map<string, number>;      // Σ === 0 invariant (REQ-MON-15)
+  balances:     Map<string, bigint>;      // Σ === 0 invariant (REQ-MON-15)
   anomalies:    Anomaly[];
   quarantined:  string[];                 // event ids, v > supported
-  buffered:     string[];                 // future-dated, held
   frozen:       boolean;                  // true when quarantined.length > 0
 }
 export function fold(events: Event[], opts: FoldOptions): State;
@@ -382,6 +384,10 @@ export function fold(events: Event[], opts: FoldOptions): State;
 `fold` is **pure and total**: same input → same output, no throws on malformed input
 (malformed events are quarantined, not fatal). This is what makes the §16.2 property
 suite possible.
+
+Future-dated events are handled at the sync/admission boundary. Phase 0 exports the pure
+`admissionGate()` verdict; Phase 2 owns persistent buffer storage, retry scheduling,
+eviction, and per-author budget accounting. `fold()` receives only admitted events.
  
 ---
  

@@ -4,6 +4,7 @@ import { bigintReplacer, bigintReviver } from "@/lib/money";
 import { inferCurrency, newId } from "@/lib/ids";
 import { createGroupSecret, groupKey, groupTag, secretFromBase64, secretToBase64 } from "@/crypto/group";
 import { mintClaimKey, type ClaimAlg } from "@/crypto/claim";
+import { normalizeDurabilityPromptState, type DurabilityPromptState } from "@/lib/durability";
 
 export interface StoredGroup {
   groupId: string;
@@ -40,6 +41,7 @@ export interface StoredMeta {
   discardVector: Record<string, number>;
   cursors: Record<string, string | null>;
   nostrSk: string;
+  durability?: DurabilityPromptState;
   lastSnapshotSeq?: number;
   lastSyncAt?: number;
   lastSyncError?: string;
@@ -190,7 +192,11 @@ async function ensureSecrets(group: Partial<StoredGroup> & Omit<StoredGroup, "se
 async function ensureMeta(group: StoredGroup, events: Event[]): Promise<StoredMeta> {
   const database = await db();
   const existing = await database.get("meta", group.groupId);
-  if (existing) return existing;
+  if (existing) {
+    const normalized = { ...existing, durability: normalizeDurabilityPromptState(existing.durability) };
+    if (!existing.durability) await database.put("meta", normalized);
+    return normalized;
+  }
   const meta: StoredMeta = {
     groupId: group.groupId,
     versionVector: vectorFromEvents(events),
@@ -200,6 +206,26 @@ async function ensureMeta(group: StoredGroup, events: Event[]): Promise<StoredMe
   };
   await database.put("meta", meta);
   return meta;
+}
+
+export async function updateMeta(groupId: string, update: (meta: StoredMeta) => StoredMeta): Promise<StoredMeta> {
+  const database = await db();
+  const existing = await database.get("meta", groupId);
+  if (!existing) throw new Error("Group metadata not found");
+  const next = update({ ...existing, durability: normalizeDurabilityPromptState(existing.durability) });
+  await database.put("meta", next);
+  return next;
+}
+
+export async function recordAppLaunch(groupId: string, now = Date.now()): Promise<StoredMeta> {
+  return updateMeta(groupId, (meta) => ({
+    ...meta,
+    durability: {
+      ...meta.durability!,
+      sessionCount: meta.durability!.sessionCount + 1,
+      lastSeenAt: now,
+    },
+  }));
 }
 
 export async function ensureGroup(seed?: JoinSeed): Promise<GroupRecord> {

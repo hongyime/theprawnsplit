@@ -12,7 +12,7 @@
     Users,
     WalletCards,
   } from "@lucide/svelte";
-  import { allocate, fold, greedySettlement, type Event, type State } from "@theprawnsplit/core";
+  import { allocate, eventSortKey, fold, greedySettlement, type Event, type State } from "@theprawnsplit/core";
   import {
     appendEvents,
     createExport,
@@ -21,14 +21,27 @@
     ensureClaimIdentity,
     ensureGroup,
     parseExport,
+    recordAppLaunch,
     replaceFromExport,
     saveGroup,
     stringifyExport,
     syncCounts,
+    updateMeta,
     type GroupRecord,
     type JoinSeed,
     type SyncCounts,
   } from "@/db/repo";
+  import {
+    dismissInstallPrompt,
+    installPromptLevel,
+    normalizeDurabilityPromptState,
+    shouldPromptFirstZeroExport,
+    shouldPromptPinLink,
+    shouldPromptSevenDayExport,
+    type DurabilityPromptState,
+    type ExportPromptReason,
+    type InstallPromptLevel,
+  } from "@/lib/durability";
   import { signClaim } from "@/crypto/claim";
   import { config } from "@/config";
   import { defaultExpenseDate, defaultParticipant, makeEvent, makeExpenseFinancials, type EventFactory } from "@/lib/events";
@@ -64,6 +77,12 @@
   let isStandalone = false;
   let persistedStorage: boolean | null = null;
   let persistenceRequested = false;
+  let isDesktop = false;
+  let isOnline = navigator.onLine;
+  let activeInstallLevel: InstallPromptLevel | null = null;
+  let showPinLinkPrompt = false;
+  let activeExportPrompt: ExportPromptReason | null = null;
+  let launchDurability: DurabilityPromptState | null = null;
 
   $: participants = state ? [...state.participants.values()].sort((a, b) => a.name.localeCompare(b.name)) : [];
   $: balances = state && group ? [...state.balances.entries()].sort(([a], [b]) => participantLabel(a).localeCompare(participantLabel(b))) : [];
@@ -81,6 +100,7 @@
   $: canSaveExpense = Boolean(hasLocalClaim && payerPid && expenseDesc.trim() && parseMinor(expenseTotal) !== null && sharePreview.ok);
   $: storageLabel = persistedStorage === null ? "storage unknown" : persistedStorage ? "storage protected" : "storage best effort";
   $: syncLabel = unconfirmedCount === 0 ? "sync current" : `${unconfirmedCount} unsynced`;
+  $: showInstallHint = !isStandalone && !isDesktop && isOnline && !isGroupArchived();
 
   async function load(): Promise<void> {
     loading = true;
@@ -89,9 +109,12 @@
       const seed = readJoinSeed();
       joiningFromLink = Boolean(seed);
       group = await ensureGroup(seed);
+      launchDurability = normalizeDurabilityPromptState(group.meta.durability);
+      group = { ...group, meta: await recordAppLaunch(group.groupId) };
       refreshState();
       await refreshCounts();
       await refreshProtectionStatus();
+      await refreshDurabilityPrompts();
       if (joinBlocked) await runSync();
       if (participants.length === 0) {
         selectedPids = {};
@@ -131,6 +154,7 @@
     group = await appendEvents(group.groupId, events);
     await refreshCounts();
     refreshState();
+    await refreshDurabilityPrompts();
   }
 
   async function addParticipant(): Promise<void> {
@@ -231,6 +255,7 @@
     if (!group || !sharePreview.ok || !payerPid) return;
     const total = parseMinor(expenseTotal);
     if (total === null) return;
+    const wasFirstExpense = expenses.length === 0;
     const f = factory();
     const dates = defaultExpenseDate();
     const event = makeEvent(f, "ExpenseAdded", {
@@ -240,7 +265,10 @@
       ...dates,
     });
     await commit([event], f);
-    await requestStoragePersistenceAfterFirstExpense();
+    if (wasFirstExpense) {
+      await requestStoragePersistenceAfterFirstExpense();
+      await markFirstExpensePersistenceRequested();
+    }
     expenseDesc = "";
     expenseTotal = "";
   }
@@ -280,7 +308,7 @@
     settleAmount = "";
   }
 
-  function downloadExport(): void {
+  function downloadExport(reason?: ExportPromptReason): void {
     if (!group) return;
     const blob = new Blob([stringifyExport(createExport(group))], { type: "application/json" });
     const url = URL.createObjectURL(blob);
@@ -289,6 +317,7 @@
     a.download = `${group.name || "trip"}-ledger.json`;
     a.click();
     URL.revokeObjectURL(url);
+    if (reason) void markExportPromptHandled(reason);
   }
 
   function downloadIdentityBackup(): void {
@@ -347,6 +376,7 @@
       lastSyncResult = null;
       refreshState();
       await refreshCounts();
+      await refreshDurabilityPrompts();
     } catch (err) {
       error = err instanceof Error ? err.message : String(err);
     }
@@ -375,6 +405,7 @@
       group = await ensureGroup();
       refreshState();
       await refreshCounts();
+      await refreshDurabilityPrompts();
       syncStatus = `${result.published} published, ${result.confirmed} confirmed, ${result.received} received, ${result.buffered} buffered, ${result.dropped} dropped, ${result.snapshotsSeen} snapshots seen, ${result.snapshotsPublished} snapshots published${result.errors.length ? `; ${result.errors[0]}` : "."}`;
     } catch (err) {
       syncStatus = "Sync failed. Manual export/import is still available.";
@@ -406,6 +437,8 @@
 
   async function refreshProtectionStatus(): Promise<void> {
     isStandalone = detectStandalone();
+    isDesktop = window.matchMedia("(hover: hover) and (pointer: fine)").matches;
+    isOnline = navigator.onLine;
     persistedStorage = (await navigator.storage?.persisted?.()) ?? null;
   }
 
@@ -417,6 +450,101 @@
     persistenceRequested = true;
     persistedStorage = await navigator.storage.persist();
     isStandalone = detectStandalone();
+  }
+
+  function isGroupArchived(): boolean {
+    let archived = false;
+    for (const event of [...(group?.events ?? [])].sort(eventSortKey)) {
+      if (event.t === "GroupArchived") archived = true;
+      if (event.t === "GroupUnarchived") archived = false;
+    }
+    return archived;
+  }
+
+  function allBalancesZero(): boolean {
+    return balances.length > 0 && balances.every(([, minor]) => minor === 0n);
+  }
+
+  function hasNonZeroBalance(): boolean {
+    return balances.some(([, minor]) => minor !== 0n);
+  }
+
+  async function patchDurability(update: (state: DurabilityPromptState) => DurabilityPromptState): Promise<void> {
+    if (!group) return;
+    const meta = await updateMeta(group.groupId, (current) => ({
+      ...current,
+      durability: update(normalizeDurabilityPromptState(current.durability)),
+    }));
+    group = { ...group, meta };
+  }
+
+  async function refreshDurabilityPrompts(): Promise<void> {
+    if (!group || !state) return;
+    await refreshProtectionStatus();
+    if (hasNonZeroBalance() && !group.meta.durability?.hadNonZeroBalance) {
+      await patchDurability((durability) => ({ ...durability, hadNonZeroBalance: true }));
+    }
+    const current = normalizeDurabilityPromptState(group.meta.durability);
+    const returnWindow = launchDurability ? { ...current, lastSeenAt: launchDurability.lastSeenAt } : current;
+    activeInstallLevel = installPromptLevel({
+      state: returnWindow,
+      expenseCount: expenses.length,
+      isStandalone,
+      isArchived: isGroupArchived(),
+      isOnline,
+      isDesktop,
+      persisted: persistedStorage,
+      now: Date.now(),
+    });
+    if (activeInstallLevel === 3 && current.installModalShownSession !== current.sessionCount) {
+      await patchDurability((durability) => ({ ...durability, installModalShownSession: durability.sessionCount }));
+    }
+    showPinLinkPrompt = shouldPromptPinLink(current);
+    activeExportPrompt = shouldPromptFirstZeroExport(current, allBalancesZero())
+      ? "first-zero"
+      : shouldPromptSevenDayExport(returnWindow, persistedStorage, Date.now())
+        ? "seven-day"
+        : null;
+  }
+
+  async function dismissActiveInstallPrompt(): Promise<void> {
+    if (!activeInstallLevel) return;
+    const level = activeInstallLevel;
+    activeInstallLevel = null;
+    await patchDurability((durability) => dismissInstallPrompt(durability, level));
+    await refreshDurabilityPrompts();
+  }
+
+  async function markPinLinkPromptHandled(copy = false): Promise<void> {
+    if (copy) await copyJoinLink();
+    showPinLinkPrompt = false;
+    await patchDurability((durability) => ({ ...durability, pinLinkPromptedAt: Date.now() }));
+    await refreshDurabilityPrompts();
+  }
+
+  async function markExportPromptHandled(reason: ExportPromptReason): Promise<void> {
+    activeExportPrompt = null;
+    await patchDurability((durability) => ({
+      ...durability,
+      firstZeroExportPromptedAt: reason === "first-zero" ? Date.now() : durability.firstZeroExportPromptedAt,
+      sevenDayExportPromptedAt: reason === "seven-day" ? Date.now() : durability.sevenDayExportPromptedAt,
+    }));
+    await refreshDurabilityPrompts();
+  }
+
+  function downloadPromptExport(): void {
+    if (!activeExportPrompt) return;
+    downloadExport(activeExportPrompt);
+  }
+
+  async function dismissActiveExportPrompt(): Promise<void> {
+    if (!activeExportPrompt) return;
+    await markExportPromptHandled(activeExportPrompt);
+  }
+
+  async function markFirstExpensePersistenceRequested(): Promise<void> {
+    if (!group || group.meta.durability?.firstExpensePersistRequestedAt) return;
+    await patchDurability((durability) => ({ ...durability, firstExpensePersistRequestedAt: Date.now() }));
   }
 
   function markActivity(): void {
@@ -434,6 +562,8 @@
     window.addEventListener("pointerdown", markActivity);
     window.addEventListener("keydown", markActivity);
     window.addEventListener("visibilitychange", () => void refreshProtectionStatus());
+    window.addEventListener("online", () => void refreshDurabilityPrompts());
+    window.addEventListener("offline", () => void refreshDurabilityPrompts());
   }
 
   load();
@@ -448,19 +578,54 @@
       <div>
         <input class="title-input" value={group.name} aria-label="Trip name" on:change={(e) => renameGroup((e.currentTarget as HTMLInputElement).value)} />
         <div class="subtle">No accounts · {unconfirmedCount} unconfirmed · {state.quarantined.length ? "update required" : "ready offline"}</div>
-        {#if !isStandalone}<div class="subtle">On iOS, use Share then Add to Home Screen for offline launch.</div>{/if}
+        {#if showInstallHint}<div class="subtle">On iOS, use Share then Add to Home Screen for offline launch.</div>{/if}
       </div>
       <div class="header-actions">
         <input class="currency" value={group.currency} aria-label="Currency" on:change={(e) => setCurrency((e.currentTarget as HTMLInputElement).value)} />
         <button type="button" disabled={syncing} on:click={runSync} title="Sync now"><RefreshCcw size={18} /> {syncing ? "Syncing" : "Sync"}</button>
         <button type="button" on:click={copyJoinLink} title="Copy join link"><Link size={18} /> Link</button>
-        <button type="button" on:click={downloadExport} title="Export ledger"><Download size={18} /> Export</button>
+        <button type="button" on:click={() => downloadExport()} title="Export ledger"><Download size={18} /> Export</button>
       </div>
     </header>
 
     {#if error}<p class="error">{error}</p>{/if}
     {#if state.frozen}<p class="warning">A newer ledger event was retained but excluded. Balances are not authoritative until the app is updated.</p>{/if}
     {#if manualFallbackDue}<p class="warning">Relay confirmation is still pending. Export the ledger or copy the join link to share manually.</p>{/if}
+    {#if showPinLinkPrompt}
+      <section class="prompt-banner">
+        <div>
+          <strong>Pin the trip link</strong>
+          <p>Keep the join link in your group chat so a wiped device can recover before showing an empty ledger.</p>
+        </div>
+        <div class="prompt-actions">
+          <button type="button" on:click={() => markPinLinkPromptHandled(true)}><Link size={17} /> Copy link</button>
+          <button type="button" class="secondary" on:click={() => markPinLinkPromptHandled(false)}>Dismiss</button>
+        </div>
+      </section>
+    {/if}
+    {#if activeExportPrompt}
+      <section class="prompt-banner important">
+        <div>
+          <strong>{activeExportPrompt === "first-zero" ? "Balances are settled" : "Export a recovery copy"}</strong>
+          <p>{activeExportPrompt === "first-zero" ? "All balances reached zero for the first time." : "This device returned after more than 7 days without protected storage."}</p>
+        </div>
+        <div class="prompt-actions">
+          <button type="button" on:click={downloadPromptExport}><Download size={17} /> Export</button>
+          <button type="button" class="secondary" on:click={dismissActiveExportPrompt}>Dismiss</button>
+        </div>
+      </section>
+    {/if}
+    {#if activeInstallLevel && activeInstallLevel < 3}
+      <section class:sticky-install={activeInstallLevel === 2} class="prompt-banner install">
+        <div>
+          <strong>{activeInstallLevel === 1 ? "Install for safer storage" : "Protect this trip"}</strong>
+          <p>Use Add to Home Screen to reduce browser storage eviction risk.</p>
+        </div>
+        <div class="prompt-actions">
+          <button type="button" class="secondary" on:click={dismissActiveInstallPrompt}>Dismiss</button>
+        </div>
+      </section>
+    {/if}
     {#if recoveryActive}
       <section class="recovery-panel">
         <div>
@@ -501,7 +666,7 @@
               <button type="button" disabled={syncing} on:click={runSync}><RefreshCcw size={17} /> Retry sync</button>
             {:else}
               <p>Add people to start a trip ledger.</p>
-              <button type="button" on:click={downloadExport}><Download size={17} /> Share trip file</button>
+              <button type="button" on:click={() => downloadExport()}><Download size={17} /> Share trip file</button>
             {/if}
           </div>
         {:else}
@@ -611,6 +776,17 @@
       <textarea bind:value={importText} placeholder="Paste a TripLedgerExport JSON file here"></textarea>
       <button type="button" disabled={!importText.trim()} on:click={importExport}>Import</button>
     </section>
+    {#if activeInstallLevel && activeInstallLevel >= 3}
+      <div class="modal-backdrop" role="presentation">
+        <div class="modal" role="dialog" aria-modal="true" aria-label="Protect this trip">
+          <h2>{activeInstallLevel === 4 ? "Storage survived" : "Storage is still best effort"}</h2>
+          <p>{activeInstallLevel === 4 ? "This trip returned after more than 7 days. Keep a fresh export and install the app when possible." : "Install the app so the browser can give this trip stronger storage protection."}</p>
+          <div class="prompt-actions">
+            <button type="button" class="secondary" on:click={dismissActiveInstallPrompt}>Dismiss</button>
+          </div>
+        </div>
+      </div>
+    {/if}
   </main>
 {:else}
   <main class="center">Unable to open local ledger.</main>

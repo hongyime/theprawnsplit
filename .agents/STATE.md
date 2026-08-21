@@ -72,6 +72,13 @@ Progress:
   protection indicator for installed/browser, storage persistence, and sync health, hides
   install guidance when already standalone, and calls `navigator.storage.persist()` only
   after the first expense save path rather than initial load.
+- Added durable Phase 3 prompt state in IndexedDB metadata. The app now tracks session
+  count, install dismissals/retired levels, first-expense persistence request, pin-link
+  prompt handling, non-zero balance history, and first-zero/seven-day export prompt
+  handling without `localStorage`.
+- Added durability prompt policy tests for standalone/archive/offline/desktop suppression,
+  dismissal retirement, modal once-per-session behavior, pin-link once-only behavior, and
+  export prompt triggers.
 
 Next step:
 - Commit and push `main` when ready; GitHub push is expected to trigger Vercel deployment.
@@ -79,6 +86,9 @@ Next step:
 - Direct Vercel CLI deploy remains blocked by the daily free-tier API deployment limit.
   Attempted production deploy on 2026-08-21 failed with `api-deployments-free-per-day`
   (>100 deployments).
+- Pushed commit `d543234` to `main` on 2026-08-21. GitHub recorded a Vercel status,
+  but Vercel failed it at the account/build-rate-limit layer before creating a new
+  deployment for that commit.
 - Configure Vercel env vars `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN`.
   They are currently absent; without them the app can still build and Nostr sync can run,
   but `/api/relay` will return a configuration error.
@@ -107,6 +117,9 @@ Notes:
   passed locally and root `npm audit --json` reports zero vulnerabilities.
 - Latest verification on 2026-08-21 after Phase 3 protection UI: `npm run build` passed
   locally and root `npm audit --json` reports zero vulnerabilities.
+- Latest verification on 2026-08-21 after Phase 3 prompt gating: `npm run build` passed
+  locally with 23 core tests and 7 root tests; root `npm audit --json` reports zero
+  vulnerabilities.
 - Vercel checks on 2026-08-21 show the project exists but direct deployment creation was
   quota-blocked.
 - Retried a production Vercel CLI deploy on 2026-08-21; it is still blocked with

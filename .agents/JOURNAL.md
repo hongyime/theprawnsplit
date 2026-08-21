@@ -15,3 +15,5 @@
 - 2026-08-21: Recovery UI must not render an ordinary empty trip for join-link empty logs; it now shows retry/import actions and treats snapshots as advisory transport bootstrap until raw events arrive.
 - 2026-08-21: Root build owns all deployment-time test dependencies because Vercel installs from the root project; core-only devDependencies are insufficient when root scripts call `npm --prefix core test`.
 - 2026-08-21: With Vercel CLI deploy quota-blocked, ship via `git push origin main`; Phase 3 local durability work can continue independently of production relay env setup.
+- 2026-08-21: Pushing `main` triggers Vercel status, but the current account is build-rate-limited before a deployment is created; do not chase code fixes for that status until the quota resets or plan limits change.
+- 2026-08-21: Phase 3 durability prompts are stored in IndexedDB metadata, not web storage; export prompt UI is limited to first-zero and seven-day-unprotected returns, while manual export remains a user action.

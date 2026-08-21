@@ -57,3 +57,4 @@
 - 2026-08-21: Archived read-only mode covers local group profile metadata too; trip name and base currency edits are blocked until an explicit unarchive event reopens editing.
 - 2026-08-21: Archived read-only mode also freezes the expense draft surface and subgroup preset mutations; local relay settings stay editable because they are device routing preferences for recovery/manual sync, not ledger edits.
 - 2026-08-21: Archived settlement controls follow the same read-only policy: draft fields are frozen, while recovery/export/import controls remain available.
+- 2026-08-21: REQ-LIF-05 polling suspension is a lifecycle decision, not incidental timer code; archived and hidden groups must fail polling eligibility before cadence checks.

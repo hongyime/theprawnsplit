@@ -54,7 +54,15 @@
   import { createDeviceLinkRequest, linkPayload, parseDeviceLinkRequest, type DeviceLinkRequest } from "@/lib/device-link";
   import { expenseHistoryRows } from "@/lib/expense-history";
   import { frozenViewPolicy } from "@/lib/freeze-policy";
-  import { archiveConfirmationText, canEditGroupProfile, createArchiveTransitionPlan, isSettledViewPredicate, latestArchiveEvent, unarchiveConfirmationText } from "@/lib/lifecycle";
+  import {
+    archiveConfirmationText,
+    canEditGroupProfile,
+    createArchiveTransitionPlan,
+    isSettledViewPredicate,
+    latestArchiveEvent,
+    shouldPollGroup,
+    unarchiveConfirmationText,
+  } from "@/lib/lifecycle";
   import { currencyAmountPreview, normalizeCurrency } from "@/lib/multicurrency";
   import { buildPayerPreview, type PayerMode } from "@/lib/payers";
   import { defaultSplitSelection, findParticipantNameMatch, groupParticipantsForClaim, type ParticipantNameMatch } from "@/lib/participants";
@@ -977,10 +985,22 @@
   function startPolling(): void {
     if (pollHandle !== undefined) window.clearInterval(pollHandle);
     pollHandle = window.setInterval(() => {
-      if (!group || document.hidden || isGroupArchived()) return;
-      const idle = Date.now() - lastActivityAt > config.idleAfterMs;
-      const cadence = idle ? config.pollIdleMs : config.pollActiveMs;
-      if (Date.now() - (group.meta.lastSyncAt ?? 0) >= cadence) void runSync();
+      const now = Date.now();
+      if (
+        shouldPollGroup({
+          hasGroup: Boolean(group),
+          documentHidden: document.hidden,
+          archived: isGroupArchived(),
+          now,
+          lastActivityAt,
+          lastSyncAt: group?.meta.lastSyncAt,
+          idleAfterMs: config.idleAfterMs,
+          pollActiveMs: config.pollActiveMs,
+          pollIdleMs: config.pollIdleMs,
+        })
+      ) {
+        void runSync();
+      }
     }, 5_000);
     window.addEventListener("pointerdown", markActivity);
     window.addEventListener("keydown", markActivity);

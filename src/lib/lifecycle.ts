@@ -13,12 +13,31 @@ export interface ArchiveTransitionPlan {
   outstanding: OutstandingTransfer[];
 }
 
+export interface PollingDecisionInput {
+  hasGroup: boolean;
+  documentHidden: boolean;
+  archived: boolean;
+  now: number;
+  lastActivityAt: number;
+  lastSyncAt?: number | undefined;
+  idleAfterMs: number;
+  pollActiveMs: number;
+  pollIdleMs: number;
+}
+
 export function isSettledViewPredicate(balances: Map<string, Money>, archived: boolean): boolean {
   return !archived && [...balances.values()].every((minor) => minor === 0n);
 }
 
 export function canEditGroupProfile(archived: boolean): boolean {
   return !archived;
+}
+
+export function shouldPollGroup(input: PollingDecisionInput): boolean {
+  if (!input.hasGroup || input.documentHidden || input.archived) return false;
+  const idle = input.now - input.lastActivityAt > input.idleAfterMs;
+  const cadence = idle ? input.pollIdleMs : input.pollActiveMs;
+  return input.now - (input.lastSyncAt ?? 0) >= cadence;
 }
 
 export function latestArchiveEvent(events: Event[]): ArchiveEvent | undefined {

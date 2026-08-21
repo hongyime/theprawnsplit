@@ -1,6 +1,14 @@
 import { describe, expect, it } from "vitest";
 import type { Event } from "@theprawnsplit/core";
-import { archiveConfirmationText, canEditGroupProfile, createArchiveTransitionPlan, isSettledViewPredicate, latestArchiveEvent, unarchiveConfirmationText } from "@/lib/lifecycle";
+import {
+  archiveConfirmationText,
+  canEditGroupProfile,
+  createArchiveTransitionPlan,
+  isSettledViewPredicate,
+  latestArchiveEvent,
+  shouldPollGroup,
+  unarchiveConfirmationText,
+} from "@/lib/lifecycle";
 
 type ArchiveOutstanding = Extract<Event, { t: "GroupArchived" }>["outstanding"];
 
@@ -49,6 +57,27 @@ describe("lifecycle copy", () => {
   it("locks profile edits while the group is archived", () => {
     expect(canEditGroupProfile(false)).toBe(true);
     expect(canEditGroupProfile(true)).toBe(false);
+  });
+
+  it("stops polling when archived or hidden and applies active/idle cadence otherwise", () => {
+    const base = {
+      hasGroup: true,
+      documentHidden: false,
+      archived: false,
+      now: 20_000,
+      lastActivityAt: 19_000,
+      lastSyncAt: 12_000,
+      idleAfterMs: 5_000,
+      pollActiveMs: 10_000,
+      pollIdleMs: 60_000,
+    };
+
+    expect(shouldPollGroup({ ...base, archived: true })).toBe(false);
+    expect(shouldPollGroup({ ...base, documentHidden: true })).toBe(false);
+    expect(shouldPollGroup(base)).toBe(false);
+    expect(shouldPollGroup({ ...base, lastSyncAt: 9_000 })).toBe(true);
+    expect(shouldPollGroup({ ...base, lastActivityAt: 0, lastSyncAt: 0 })).toBe(false);
+    expect(shouldPollGroup({ ...base, now: 70_000, lastActivityAt: 0, lastSyncAt: 0 })).toBe(true);
   });
 
   it("returns the archive event that currently controls archived display", () => {

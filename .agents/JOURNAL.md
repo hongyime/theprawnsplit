@@ -155,3 +155,4 @@
 - 2026-08-22: REQ-DUR-01 coverage treats the placement of `navigator.storage.persist()` as a UI workflow invariant: first saved expense only, not launch, polling, or prompt timers.
 - 2026-08-22: REQ-ID-11/REQ-DUR-06 coverage treats missing `GroupCreated` on a linked join as a recovery block: sync first, show recovery UI, and block participant creation until data arrives.
 - 2026-08-22: REQ-DUR-05 coverage treats the protection strip as a three-signal contract: install mode, persistent-storage status, and sync/quarantine status must remain visible together.
+- 2026-08-22: REQ-DUR-07 coverage treats archive export as an automatic lifecycle action, separate from the first-zero/seven-day user prompt banner.

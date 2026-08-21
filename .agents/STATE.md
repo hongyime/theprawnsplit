@@ -848,3 +848,9 @@ Notes:
   together. Verification on 2026-08-22 passed with focused `npx vitest run
   test/protection-status-ui.test.ts`, `npm run build` (64 core tests, 156 root tests),
   root `npm audit --json`, protected-string scan, and `git diff --check`.
+- Added REQ-DUR-07 export-prompt UI coverage tying the three allowed export triggers
+  together: first-zero prompt, seven-day unprotected-return prompt, and automatic
+  archive export without an ordinary prompt path. Verification on 2026-08-22 passed
+  with focused `npx vitest run test/export-prompt-ui.test.ts`, `npm run build` (64
+  core tests, 157 root tests), root `npm audit --json`, protected-string scan, and
+  `git diff --check`.

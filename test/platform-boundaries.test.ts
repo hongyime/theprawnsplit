@@ -96,6 +96,20 @@ describe("platform boundaries", () => {
     expect(offenders).toEqual([]);
   });
 
+  it("keeps the relay contract publish/fetch only without subscribe or held connections", () => {
+    const relaySources = [
+      join(sourceRoot, "relay", "types.ts"),
+      join(sourceRoot, "relay", "http.ts"),
+      join(sourceRoot, "relay", "nostr.ts"),
+      join(process.cwd(), "api", "relay.ts"),
+    ].map((path) => ({ path, source: readFileSync(path, "utf8") }));
+    const offenders = relaySources
+      .filter((entry) => /\b(?:subscribe|WebSocket|EventSource|Upgrade|ReadableStream)\b/.test(entry.source))
+      .map((entry) => relative(process.cwd(), entry.path));
+
+    expect(offenders).toEqual([]);
+  });
+
   it("keeps Nostr transport signatures out of ledger authorization", () => {
     const ledgerAuthFiles = [
       join(process.cwd(), "core", "src", "identity.ts"),

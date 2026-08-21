@@ -810,6 +810,11 @@ Notes:
   itemized splitting, Splitwise export, or cross-/multi-group workflows. Verification
   on 2026-08-22 passed with `npm run build` (64 core tests, 150 root tests), root
   `npm audit --json`, protected-string scan, and `git diff --check`.
+- Added REQ-PLT-07 publish/fetch-only relay boundary coverage. Platform tests now fail
+  if relay interface, adapters, or the operated relay function introduce `subscribe`,
+  WebSocket/EventSource, Upgrade handling, or held streaming connections. Verification
+  on 2026-08-22 passed with `npm run build` (64 core tests, 151 root tests), root
+  `npm audit --json`, protected-string scan, and `git diff --check`.
 - Vercel checks on 2026-08-21 show the current `main` production deployment is Ready
   and has the requested aliases attached. Vercel env listing still shows no env vars
   configured, so the operated relay runtime remains unconfigured.

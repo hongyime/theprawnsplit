@@ -4,7 +4,7 @@ import type { AckResult, Relay, RelayEntry } from "./types";
 export class HttpRelay implements Relay {
   name = "operated";
 
-  constructor(private endpoint = config.relayEndpoint) {}
+  constructor(readonly endpoint = config.relayEndpoint) {}
 
   async publish(tag: string, author: string, blob: string, writeProof: string): Promise<AckResult> {
     const response = await fetch(this.endpoint, {

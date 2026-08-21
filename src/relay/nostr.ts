@@ -14,7 +14,7 @@ export class NostrRelay implements Relay {
   private sk: Uint8Array;
   author: string;
 
-  constructor(secretHex?: string, private relays = config.nostrRelays, private kind = config.nostrKind) {
+  constructor(secretHex?: string, readonly relayUrls = config.nostrRelays, private kind = config.nostrKind) {
     this.sk = secretFromHex(secretHex);
     this.author = getPublicKey(this.sk);
   }
@@ -37,7 +37,7 @@ export class NostrRelay implements Relay {
         },
         this.sk,
       );
-      const pubs = this.pool.publish(this.relays, event);
+      const pubs = this.pool.publish(this.relayUrls, event);
       const settled = await Promise.allSettled(pubs);
       const ok = settled.filter((result) => result.status === "fulfilled").length;
       return ok > 0 ? { ok: true, cursor: event.id } : { ok: false, reason: "no nostr relay accepted publish" };
@@ -53,7 +53,7 @@ export class NostrRelay implements Relay {
       limit: opts.limit ?? 500,
     };
     if (opts.author) Object.assign(filter, { authors: [opts.author] });
-    const events = await this.pool.querySync(this.relays, filter);
+    const events = await this.pool.querySync(this.relayUrls, filter);
     return events
       .sort((a, b) => a.created_at - b.created_at || a.id.localeCompare(b.id))
       .filter((event) => !opts.cursor || event.id > opts.cursor)

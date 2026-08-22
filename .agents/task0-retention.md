@@ -18,3 +18,8 @@ Decision gates — agreed **before** seeing data (see CR-005 Task 3):
 | 2026-08-22 13:00 | 1m | wss://relay.primal.net | 50/50 | 100% |  |
 | 2026-08-22 13:00 | 1m | wss://nostr.mom | 50/50 | 100% |  |
 | 2026-08-22 13:00 | 1m | wss://offchain.pub | 15/50 | 30% |  |
+| 2026-08-22 13:10 | 11m | wss://relay.damus.io | 6/50 | 12% |  |
+| 2026-08-22 13:10 | 11m | wss://nos.lol | 50/50 | 100% |  |
+| 2026-08-22 13:10 | 11m | wss://relay.primal.net | 50/50 | 100% |  |
+| 2026-08-22 13:10 | 11m | wss://nostr.mom | 50/50 | 100% |  |
+| 2026-08-22 13:10 | 11m | wss://offchain.pub | 15/50 | 30% |  |

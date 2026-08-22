@@ -255,6 +255,56 @@ export async function recordAppLaunch(groupId: string, now = Date.now()): Promis
   }));
 }
 
+export async function listGroups(): Promise<StoredGroup[]> {
+  const database = await db();
+  const groups = await database.getAll("groups");
+  return groups.sort((a, b) => b.createdAt - a.createdAt);
+}
+
+export async function createGroup(name?: string, currency?: string): Promise<GroupRecord> {
+  const database = await db();
+  const deviceId = newId("d");
+  const secret = createGroupSecret();
+  const group: StoredGroup = {
+    groupId: newId("g"),
+    name: name?.trim() || "Trip",
+    currency: (currency?.trim() || inferCurrency()).toUpperCase().slice(0, 3),
+    deviceId,
+    nextCounter: 2,
+    createdAt: Date.now(),
+    secretB64: secretToBase64(secret),
+    tagHex: await groupTag(secret),
+  };
+  const meta: StoredMeta = {
+    groupId: group.groupId,
+    versionVector: {},
+    discardVector: {},
+    cursors: {},
+    nostrSk: createNostrSecretHex(),
+    durability: emptyDurabilityPromptState(),
+  };
+  const tx = database.transaction(["groups", "events", "meta"], "readwrite");
+  await tx.objectStore("groups").put(group);
+  const created: Event[] = [
+    {
+      v: 1,
+      id: `${deviceId}:1`,
+      hlc: { wall: group.createdAt, ctr: 1, dev: deviceId },
+      dev: deviceId,
+      t: "GroupCreated",
+      name: group.name,
+      currency: group.currency,
+    },
+  ];
+  for (const event of created) {
+    meta.versionVector[event.dev] = Math.max(meta.versionVector[event.dev] ?? 0, counterFromEvents([event]));
+    await tx.objectStore("events").put({ groupId: group.groupId, eventId: event.id, eventJson: encodeEvent(event), syncState: "local" });
+  }
+  await tx.objectStore("meta").put(meta);
+  await tx.done;
+  return { ...group, events: created, meta, identities: [] };
+}
+
 export async function ensureGroup(seed?: JoinSeed): Promise<GroupRecord> {
   const database = await db();
   const groups = await database.getAll("groups");

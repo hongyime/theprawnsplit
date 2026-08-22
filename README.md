@@ -1,44 +1,55 @@
-# Project Name
+# The Prawn Split
 
-Short description of what this project does and who it is for.
+Split trip costs with friends. No accounts, no ads, no usage limits.
 
-## Start Here
+Expenses live on your own device and sync peer-to-peer through relays that
+cannot read them. There is no server holding your ledger.
 
-This repository was created from `hongyime/theprawntemplate`.
+**Live:** https://theprawnsplit.vercel.app
 
-For project work:
+## What it does
 
-1. Replace this README with the real project name and description.
-2. Add setup instructions before asking someone else to run it.
-3. Keep secrets out of git. Use environment variables and `.env.example`.
-4. Open pull requests for review instead of committing directly to `main`.
-
-For agents:
-
-1. Read `AGENTS.md`.
-2. If `.agents/STATE.md` exists, read it before changing files.
-3. Do not write secrets or personal details into `.agents/`.
-
-## What It Does
-
-Describe the concrete workflow or product behavior here.
+- Track shared expenses on a trip and see who owes whom
+- Include friends who never install the app
+- Works fully offline; reconciles when you reconnect
+- Split equally, by exact amounts, by shares, or by percentage
+- Settles a group in at most n−1 transfers
 
 ## Stack
 
-List the runtime, framework, database, APIs, and deployment target.
+Svelte 5 · TypeScript · Vite 6 · IndexedDB (`idb`) · Vercel · Upstash Redis (relay) · Nostr (relay pool)
+
+`core/` is a dependency-free package holding every correctness-critical algorithm —
+money allocation, settlement, HLC ordering, merge resolution, and the fold. It is
+verified by property tests before any app code runs.
 
 ## Setup
 
-Add exact commands needed to install dependencies and run locally.
+```bash
+npm install
+cp .env.example .env.local     # add Upstash values for relay work
+npm run dev
+```
 
-## Deploy
-
-Add deployment instructions, or state clearly that this repo is not deployed.
+`core/` tests need no network, no database, and no environment variables.
 
 ## Checks
 
-Run the project checks before opening a pull request. Add the real commands once
-the stack is chosen.
+```bash
+npm run test:core     # property + unit suite for core/
+npm run test:sync     # sync and integration tests
+npm run lint:money    # bans floating-point arithmetic on money
+npm run check         # svelte-check
+npm run build         # runs all of the above, then builds
+```
+
+`npm run build` fails if any check fails. That is deliberate — see `PRD.md` §16.5.
+
+## Docs
+
+- `PRD.md` — what it does and why, with the decision log
+- `TDD.md` — how it is built, including environment variables
+- `AGENTS.md` — conventions for agents working in this repo
 
 ## License
 

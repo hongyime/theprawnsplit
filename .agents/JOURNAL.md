@@ -166,3 +166,8 @@
 - 2026-08-22: REQ-MON expense UI coverage treats the Svelte expense panel as part of the money contract: preserve split intent, expose multi-payer rows, show remainder recipient, store local date, and append edits/voids.
 - 2026-08-22: REQ-DUR prompt UI coverage treats durable recovery prompts as app-shell obligations: install nags are policy-gated, pin-link is one-time, identity backup is warned, and export prompts stay trigger-bound.
 - 2026-08-22: REQ-SYN-03/04 relay encryption coverage must assert absence of plaintext ledger fields as well as absence of the raw group secret.
+- 2026-08-22: CR-001: Fixed blank page by updating src/main.ts to Svelte 5 mount() API with crash guard; added landing screen, trip list view, favicon.svg and rasterized PNG icons, full index.html metadata, completed README.md, and package.json hygiene.
+- 2026-08-22: CR-002: Completed verification evidence, confirmed asset distribution in dist/, validated zero secrets in client bundles, justified sw.js/repo.ts additions, completed bundle audit via rollup-plugin-visualizer, and verified crash guard and 360px layout.
+- 2026-08-22: CR-003: Replaced favicon with segmented prawn SVG and updated raster icons; updated sw.js to v3 with network-first navigation shell caching and removed /icons/ prefix; code-split qrcode and sync relay dependencies reducing initial entry chunk to 55.87 kB gzip.
+- 2026-08-22: CR-004: Added behavioural service worker test suite asserting shell freshness, network-first fallback, asset cache-first serving, and version shape; verified clean build and merged PR #1 to main.
+

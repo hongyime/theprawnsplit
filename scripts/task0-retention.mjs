@@ -3,6 +3,7 @@
 //   node scripts/task0-retention.mjs publish        # ONCE. Starts the clock.
 //   node scripts/task0-retention.mjs check          # repeatedly, via cron
 //   node scripts/task0-retention.mjs probe <relay>  # raw WS probe to inspect OK reasons
+//   node scripts/task0-retention.mjs vet <relay>    # 4-event fresh-key probe → PASS/WARN/FAIL
 //   node scripts/task0-retention.mjs publish-slow   # starts the slow-cohort clock
 //   node scripts/task0-retention.mjs check-slow     # repeatedly for slow cohort
 //
@@ -289,6 +290,106 @@ async function probe(relay) {
   } catch {}
 }
 
+
+// WoT / policy block patterns — must match src/relay/diagnostics.ts WOT_BLOCK_PATTERN.
+const WOT_BLOCK_RE = /web of trust|not trusted|policy|whitelist|not allowed|restricted/i;
+// NIP-01 standard prefixes that permanently prevent the key from publishing.
+const HARD_BLOCK_RE = /^(auth-required|blocked):/i;
+
+/**
+ * vet <relay>
+ *
+ * Sends 4 events at 2.5-second spacing from a fresh ephemeral keypair.
+ * Reports each OK reason verbatim, then prints a verdict:
+ *
+ *   PASS  ≥3 of 4 accepted  (no policy rejections)
+ *   WARN  ≥1 accepted, but ≥1 rejected with a retryable reason
+ *   FAIL  0 accepted, OR any accepted=false with a WoT/policy reason
+ */
+async function vet(relay) {
+  if (!relay) {
+    console.error("usage: node scripts/task0-retention.mjs vet <relay-url>");
+    process.exit(1);
+  }
+
+  console.log(`\nVetting ${relay} with 4 events from a fresh keypair…\n`);
+  const sk = generateSecretKey();
+  const seed = webcrypto.getRandomValues(new Uint8Array(32));
+  const tag = Buffer.from(await webcrypto.subtle.digest("SHA-256", seed)).toString("hex");
+
+  let ws;
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      ws = new WebSocket(relay);
+      ws.onerror = () => {};
+      await new Promise((res, rej) => {
+        ws.onopen = res;
+        ws.onerror = (err) => rej(err);
+      });
+      break;
+    } catch {
+      console.log(`  connection attempt ${attempt} failed`);
+      if (attempt < 3) await sleep(3000);
+      else {
+        console.log(`\nVERDICT: FAIL — could not open socket to ${relay}`);
+        return;
+      }
+    }
+  }
+
+  const results = [];
+  ws.onmessage = (e) => {
+    try {
+      const d = JSON.parse(e.data);
+      if (d[0] === "OK") {
+        const accepted = d[2];
+        const reason = d[3] ?? "";
+        results.push({ accepted, reason });
+        const symbol = accepted ? "✓ accepted" : "✗ rejected";
+        console.log(`  ${symbol}  reason="${reason}"`);
+      }
+      if (d[0] === "NOTICE") console.log(`  NOTICE  ${d[1]}`);
+    } catch {
+      console.log(`  raw: ${e.data}`);
+    }
+  };
+  ws.onerror = () => {};
+
+  for (let i = 0; i < 4; i++) {
+    const content = Buffer.from(webcrypto.getRandomValues(new Uint8Array(300))).toString("base64");
+    const ev = finalizeEvent(
+      { kind: KIND, created_at: Math.floor(Date.now() / 1000), tags: [["t", tag], ["s", String(i)]], content },
+      sk,
+    );
+    try {
+      ws.send(JSON.stringify(["EVENT", ev]));
+    } catch {
+      console.log(`  send error on event ${i}`);
+    }
+    if (i < 3) await sleep(2500);
+  }
+  await sleep(4000);
+  try { ws.close(); } catch {}
+
+  const accepted = results.filter((r) => r.accepted).length;
+  const policyBlocked = results.some((r) => !r.accepted && (WOT_BLOCK_RE.test(r.reason) || HARD_BLOCK_RE.test(r.reason)));
+  const socketFail = results.length === 0;
+
+  let verdict;
+  if (socketFail || policyBlocked) {
+    verdict = "FAIL";
+  } else if (accepted >= 3) {
+    verdict = "PASS";
+  } else {
+    verdict = "WARN";
+  }
+
+  console.log(`\nVERDICT: ${verdict}  (${accepted}/4 accepted)`);
+  if (policyBlocked) console.log("  → Structural admission block (WoT / policy). Disqualified.");
+  if (socketFail) console.log("  → Socket never opened. Relay unreachable.");
+  if (verdict === "WARN") console.log("  → Partial acceptance. Investigate before adding to defaults.");
+}
+
 function humanElapsed(ms) {
   const h = ms / 3_600_000;
   if (h < 1) return `${Math.round(ms / 60000)}m`;
@@ -320,10 +421,11 @@ Decision gates — agreed **before** seeing data (see CR-005 Task 3):
 const cmd = process.argv[2];
 if (cmd === "publish") await publish();
 else if (cmd === "check") await check(MANIFEST, REPORT);
-else if (cmd === "probe") await probe(process.argv[3] || "wss://relay.damus.io");
+else if (cmd === "probe") await probe(process.argv[3] || "wss://nos.lol");
+else if (cmd === "vet") await vet(process.argv[3]);
 else if (cmd === "publish-slow") await publishSlow();
 else if (cmd === "check-slow") await check(SLOW_MANIFEST, SLOW_REPORT);
 else {
-  console.error("usage: node scripts/task0-retention.mjs <publish|check|probe <relay>|publish-slow|check-slow>");
+  console.error("usage: node scripts/task0-retention.mjs <publish|check|probe <relay>|vet <relay>|publish-slow|check-slow>");
   process.exit(1);
 }

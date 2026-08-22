@@ -169,4 +169,5 @@
 - 2026-08-22: CR-001: Fixed blank page by updating src/main.ts to Svelte 5 mount() API with crash guard; added landing screen, trip list view, favicon.svg and rasterized PNG icons, full index.html metadata, completed README.md, and package.json hygiene.
 - 2026-08-22: CR-002: Completed verification evidence, confirmed asset distribution in dist/, validated zero secrets in client bundles, justified sw.js/repo.ts additions, completed bundle audit via rollup-plugin-visualizer, and verified crash guard and 360px layout.
 - 2026-08-22: CR-003: Replaced favicon with segmented prawn SVG and updated raster icons; updated sw.js to v3 with network-first navigation shell caching and removed /icons/ prefix; code-split qrcode and sync relay dependencies reducing initial entry chunk to 55.87 kB gzip.
+- 2026-08-22: CR-004: Added behavioural service worker test suite asserting shell freshness, network-first fallback, asset cache-first serving, and version shape; verified clean build and merged PR #1 to main.
 

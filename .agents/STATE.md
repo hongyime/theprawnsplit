@@ -1,9 +1,9 @@
 # Project State
 
-Current task: continue next-phase hardening while production relay runtime env remains
-unconfigured.
+Current task: completed CR-001 (Make the app visible).
 
 Progress:
+- Completed CR-001: diagnosed Cause A mount failure on Svelte 5, added crash guard to src/main.ts, added Landing and Group List views in App.svelte and listGroups/createGroup in db/repo.ts, created favicon.svg and generated PNG icons (192, 512, apple-touch-icon), completed index.html metadata, updated README.md, cleaned package.json dependencies, and verified full test/build pipeline.
 - Completed spec cleanup plus Phase 0 executable core.
 - Created live `.agents/STATE.md` and `.agents/JOURNAL.md`.
 - Cleaned active PRD/TDD contradictions for claim mode, drift handling, cap semantics,

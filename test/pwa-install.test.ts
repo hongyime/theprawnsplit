@@ -34,25 +34,24 @@ describe("PWA install boundary", () => {
     expect(mainSource).toContain('navigator.serviceWorker.register("/sw.js")');
 
     expect(manifest).toMatchObject({
-      name: "ThePrawnSplit",
-      short_name: "PrawnSplit",
+      name: "The Prawn Split",
+      short_name: "Prawn Split",
       start_url: "/",
       display: "standalone",
-      background_color: "#f7f7f2",
+      background_color: "#ffffff",
       theme_color: "#0f766e",
     });
     expect(manifest.icons).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          src: "/icons/icon.svg",
+          src: "/favicon.svg",
           sizes: "any",
           type: "image/svg+xml",
-          purpose: "any",
         }),
       ]),
     );
 
-    expect(serviceWorker).toContain('const APP_SHELL = ["/", "/manifest.webmanifest", "/icons/icon.svg"];');
+    expect(serviceWorker).toContain('const APP_SHELL = ["/", "/manifest.webmanifest", "/favicon.svg"];');
     expect(appSource).toContain("Add to Home Screen");
     expect(appSource).toContain('window.matchMedia("(display-mode: standalone)")');
     expect(appSource).toContain("standalone?: boolean");

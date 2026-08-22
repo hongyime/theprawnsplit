@@ -1,5 +1,5 @@
 const CACHE_NAME = "theprawnsplit-v2";
-const APP_SHELL = ["/", "/manifest.webmanifest", "/icons/icon.svg"];
+const APP_SHELL = ["/", "/manifest.webmanifest", "/favicon.svg"];
 const CACHEABLE_PREFIXES = ["/assets/", "/icons/"];
 
 function isCacheable(request) {

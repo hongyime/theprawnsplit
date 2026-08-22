@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="The Prawn Split">
+  <rect width="64" height="64" rx="14" fill="#0f766e"/>
+  <g fill="none" stroke="#fb923c" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M41 20C28 20 20 27 20 35.5S28 49 38 46.5" stroke-width="9"/>
+    <path d="M45 17c3.5-3.5 7.5-5 11.5-5" stroke-width="2.6"/>
+    <path d="M44 19c2-4 3-8 2.5-12" stroke-width="2.6"/>
+  </g>
+  <path d="M36.5 41.5 49 43l-7.5 8.5z" fill="#fb923c"/>
+  <circle cx="40" cy="24" r="2.8" fill="#0f766e"/>
+</svg>

@@ -24,12 +24,15 @@
     applyDelta,
     createDelta,
     createExport,
+    createGroup,
     createIdentityBackup,
     createJoinSeed,
     ensureClaimIdentity,
     ensureGroup,
+    listGroups,
     parseExport,
     pendingOutboundEvents,
+    readGroup,
     recordAppLaunch,
     replaceFromExport,
     restoreIdentityBackup,
@@ -39,6 +42,7 @@
     updateMeta,
     type GroupRecord,
     type JoinSeed,
+    type StoredGroup,
     type SyncCounts,
   } from "@/db/repo";
   import {
@@ -143,6 +147,7 @@
   let relaySettingsError = "";
   let subgroupName = "";
   let participantNameInput: HTMLInputElement | undefined;
+  let storedGroups: StoredGroup[] = [];
 
   $: participants = state ? [...state.participants.values()].sort((a, b) => a.name.localeCompare(b.name)) : [];
   $: balances = state && group ? [...state.balances.entries()].sort(([a], [b]) => participantLabel(a).localeCompare(participantLabel(b))) : [];
@@ -200,24 +205,66 @@
       const seed = readJoinSeed();
       joiningFromLink = Boolean(seed);
       recoveryMode = seed ? readRecoveryMode() : "first-join";
-      group = await ensureGroup(seed);
-      launchDurability = normalizeDurabilityPromptState(group.meta.durability);
-      group = { ...group, meta: await recordAppLaunch(group.groupId) };
-      expenseCurrency ||= group.currency;
-      resetRelaySettingsForm();
-      await refreshState();
-      await refreshCounts();
-      await refreshProtectionStatus();
-      await refreshDurabilityPrompts();
-      if (joinBlocked) await runSync();
-      if (participants.length === 0) {
-        selectedPids = {};
+      if (seed) {
+        group = await ensureGroup(seed);
+        await initGroupSession();
+      } else {
+        storedGroups = await listGroups();
+        group = null;
       }
     } catch (err) {
       error = err instanceof Error ? err.message : String(err);
     } finally {
       loading = false;
     }
+  }
+
+  async function initGroupSession(): Promise<void> {
+    if (!group) return;
+    launchDurability = normalizeDurabilityPromptState(group.meta.durability);
+    group = { ...group, meta: await recordAppLaunch(group.groupId) };
+    expenseCurrency = group.currency;
+    resetRelaySettingsForm();
+    await refreshState();
+    await refreshCounts();
+    await refreshProtectionStatus();
+    await refreshDurabilityPrompts();
+    if (joinBlocked) await runSync();
+    if (participants.length === 0) {
+      selectedPids = {};
+    }
+  }
+
+  async function startNewTrip(): Promise<void> {
+    loading = true;
+    error = "";
+    try {
+      group = await createGroup();
+      await initGroupSession();
+      storedGroups = await listGroups();
+    } catch (err) {
+      error = err instanceof Error ? err.message : String(err);
+    } finally {
+      loading = false;
+    }
+  }
+
+  async function selectTrip(groupId: string): Promise<void> {
+    loading = true;
+    error = "";
+    try {
+      group = await readGroup(groupId);
+      await initGroupSession();
+    } catch (err) {
+      error = err instanceof Error ? err.message : String(err);
+    } finally {
+      loading = false;
+    }
+  }
+
+  async function showTripList(): Promise<void> {
+    group = null;
+    storedGroups = await listGroups();
   }
 
   async function refreshState(): Promise<void> {
@@ -713,7 +760,7 @@
     const file = new File([contents], filename, { type: "application/json" });
     const shareData: ShareData = {
       title: `${group.name || "Trip"} ledger delta`,
-      text: "Import this TripLedgerDelta in ThePrawnSplit.",
+      text: "Import this TripLedgerDelta in The Prawn Split.",
       files: [file],
     };
     try {
@@ -1125,6 +1172,7 @@
     window.addEventListener("visibilitychange", () => void refreshProtectionStatus());
     window.addEventListener("online", () => void refreshDurabilityPrompts());
     window.addEventListener("offline", () => void refreshDurabilityPrompts());
+    window.addEventListener("hashchange", () => void load());
   }
 
   load();
@@ -1133,6 +1181,43 @@
 
 {#if loading}
   <main class="center">Loading local ledger...</main>
+{:else if !group && storedGroups.length === 0}
+  <main class="landing-screen">
+    <div class="landing-content">
+      <img src="/favicon.svg" alt="The Prawn Split" class="landing-logo" width="64" height="64" />
+      <h1>The Prawn Split</h1>
+      <p class="tagline">
+        Split trip costs with friends.<br />
+        No accounts. No ads. Works offline.
+      </p>
+      <button type="button" class="landing-btn" on:click={startNewTrip}>Start a new trip</button>
+      <p class="hint-note">Got a link from a friend? Just open it.</p>
+    </div>
+  </main>
+{:else if !group && storedGroups.length > 0}
+  <main class="landing-screen group-list-screen">
+    <div class="landing-content group-list-content">
+      <div class="brand-header">
+        <img src="/favicon.svg" alt="The Prawn Split" width="40" height="40" />
+        <h1>The Prawn Split</h1>
+      </div>
+      <div class="trips-header">
+        <h2>Your Trips</h2>
+        <button type="button" on:click={startNewTrip}>+ Start a new trip</button>
+      </div>
+      <div class="trips-list" role="list">
+        {#each storedGroups as g}
+          <button type="button" class="trip-card" on:click={() => selectTrip(g.groupId)}>
+            <div class="trip-card-info">
+              <strong>{g.name || "Trip"}</strong>
+              <span>{g.currency} · Created {new Date(g.createdAt).toLocaleDateString()}</span>
+            </div>
+            <span class="trip-arrow">→</span>
+          </button>
+        {/each}
+      </div>
+    </div>
+  </main>
 {:else if group && state}
   <main class="app-shell">
     <header class="topbar">
@@ -1143,6 +1228,7 @@
       </div>
       <div class="header-actions">
         <input class="currency" value={group.currency} aria-label="Currency" disabled={!groupProfileEditable} on:change={(e) => setCurrency((e.currentTarget as HTMLInputElement).value)} />
+        <button type="button" class="secondary" on:click={showTripList} title="All trips">Trips</button>
         <button type="button" disabled={syncing} on:click={runSync} title="Sync now"><RefreshCcw size={18} /> {syncing ? "Syncing" : "Sync"}</button>
         <button type="button" on:click={copyJoinLink} title="Copy join link"><Link size={18} /> Link</button>
         <button type="button" on:click={showJoinQrCode} title="Show join QR"><QrCode size={18} /> QR</button>

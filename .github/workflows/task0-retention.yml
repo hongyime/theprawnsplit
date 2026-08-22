@@ -19,10 +19,11 @@ jobs:
           cache: npm
       - run: npm ci
       - run: node scripts/task0-retention.mjs check
+      - run: node scripts/task0-retention.mjs check-slow
       - name: Commit results
         run: |
           git config user.name "task0-probe"
           git config user.email "actions@github.com"
-          git add .agents/task0-retention.md
+          git add .agents/task0-retention.md .agents/task0-retention-slow.md
           git diff --staged --quiet || git commit -m "chore(task0): retention probe $(date -u +%F)"
           git push

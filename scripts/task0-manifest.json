@@ -20,6 +20,13 @@
     "wss://nostr.mom": 50,
     "wss://offchain.pub": 15
   },
+  "baselines": {
+    "wss://relay.damus.io": 6,
+    "wss://nos.lol": 50,
+    "wss://relay.primal.net": 50,
+    "wss://nostr.mom": 50,
+    "wss://offchain.pub": 15
+  },
   "ids": [
     "7ec9e4078bf477e20287ef3ee19609bfd5334bdfb593e873c3b5fdda92a0358c",
     "faf33c81cdc66545e030fd5d82a4826a77238ecec29b3cef8d08b2a72a59dae7",

@@ -1,8 +1,9 @@
 # Project State
 
-Current task: completed CR-001 (Make the app visible).
+Current task: completed CR-002 verification and bundle audit.
 
 Progress:
+- Completed CR-002: verified all CR-001 evidence, validated asset paths and dist bundle outputs, confirmed security greps, justified sw.js and repo.ts changes, performed rollup-plugin-visualizer bundle audit, evidenced crash guard rendering, and verified 360px responsiveness.
 - Completed CR-001: diagnosed Cause A mount failure on Svelte 5, added crash guard to src/main.ts, added Landing and Group List views in App.svelte and listGroups/createGroup in db/repo.ts, created favicon.svg and generated PNG icons (192, 512, apple-touch-icon), completed index.html metadata, updated README.md, cleaned package.json dependencies, and verified full test/build pipeline.
 - Completed spec cleanup plus Phase 0 executable core.
 - Created live `.agents/STATE.md` and `.agents/JOURNAL.md`.

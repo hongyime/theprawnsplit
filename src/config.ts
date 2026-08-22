@@ -8,7 +8,7 @@ export const config = {
   nostrKind: parseClientNumericConfig(import.meta.env.VITE_NOSTR_KIND, 1512),
   nostrRelays: String(
     import.meta.env.VITE_NOSTR_RELAYS ??
-      "wss://relay.damus.io,wss://nos.lol,wss://relay.primal.net,wss://nostr.mom,wss://offchain.pub",
+      "wss://nos.lol,wss://relay.primal.net,wss://nostr.mom,wss://offchain.pub,wss://relay.snort.social",
   )
     .split(",")
     .map((relay) => relay.trim())

@@ -1,8 +1,9 @@
 # Project State
 
-Current task: completed CR-006 (Fix the probe before the data lies to us).
+Current task: completed CR-007 (relay admission diagnosis and WoT correction).
 
 Progress:
+- Completed CR-007: corrected WoT misdiagnosis (not rate limiting — structural admission policy); verbatim offchain.pub reason: "Policy violated and pubkey is not in our web of trust."; verbatim relay.damus.io reason: silent socket failure, no OK text. Dropped relay.damus.io from defaults. Vetted wss://relay.snort.social (PASS: 3/3) and added as 5th relay. Added `vet` command to probe script. Added `classifyRejection`-equivalent WoT pattern matching and unknown-rejection escalation to src/relay/diagnostics.ts. Added unit tests (verbatim offchain WoT string → blocked, escalation after 3 strikes). Replaced single gate table in task0-retention.md with two-component Admission + Retention structure. Recorded D-23 (operated relay is primary, Nostr is secondary redundancy).
 - Completed CR-006: hardened probe check against false zero data loss by adding 3x retry with backoff, unreachable '—' markers, per-relay baseline retention tracking, and minimal `#t` query filter; ran raw WS probe proving damus accepts polite traffic (3/3) and offchain enforces policy rate limits; initiated second slow cohort (20 events at 30s spacing); updated workflow to check both cohorts.
 - Completed CR-005: created scripts/task0-retention.mjs and started retention probe series at 2026-08-22T12:59:41.810Z with 50 kind 1512 events to 5 relays, verified double-publish refusal guard, generated .agents/task0-retention.md with agreed decision gates and t≈0 baseline, scheduled daily probe workflow .github/workflows/task0-retention.yml, and added task0:publish / task0:check package scripts.
 - Completed CR-004: replaced test/service-worker.test.ts with behavioural regression tests and shape assertions, verified cache-first regression failure on mutation check, verified CACHE_NAME version bump resilience, verified clean npm ci && npm run build, merged PR #1 to main, verified Vercel production deploy, and deleted cr-001-visible-app branch.

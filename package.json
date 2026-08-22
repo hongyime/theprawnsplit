@@ -15,6 +15,7 @@
     "task0:publish": "node scripts/task0-retention.mjs publish",
     "task0:check": "node scripts/task0-retention.mjs check",
     "task0:probe": "node scripts/task0-retention.mjs probe",
+    "task0:vet": "node scripts/task0-retention.mjs vet",
     "task0:publish-slow": "node scripts/task0-retention.mjs publish-slow",
     "task0:check-slow": "node scripts/task0-retention.mjs check-slow",
     "analyze": "ANALYZE=1 vite build",

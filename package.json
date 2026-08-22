@@ -12,6 +12,8 @@
     "test:sync": "vitest run --config vitest.config.ts --dir .",
     "test:core": "npm --prefix core test",
     "gen:icons": "node scripts/gen-icons.mjs",
+    "task0:publish": "node scripts/task0-retention.mjs publish",
+    "task0:check": "node scripts/task0-retention.mjs check",
     "analyze": "ANALYZE=1 vite build",
     "preview": "vite preview"
   },

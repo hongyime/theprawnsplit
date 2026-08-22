@@ -28,6 +28,7 @@ __pycache__/
 .agents/*
 !.agents/STATE.md
 !.agents/JOURNAL.md
+!.agents/task0-retention.md
 !.agents/handoffs/
 !.agents/handoffs/**
 !.gitignore

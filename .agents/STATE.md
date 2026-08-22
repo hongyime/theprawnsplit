@@ -1,8 +1,9 @@
 # Project State
 
-Current task: completed CR-004 (Service worker behavioural tests, verification, and PR merge to main).
+Current task: completed CR-005 (Start the relay retention clock).
 
 Progress:
+- Completed CR-005: created scripts/task0-retention.mjs and started retention probe series at 2026-08-22T12:59:41.810Z with 50 kind 1512 events to 5 relays, verified double-publish refusal guard, generated .agents/task0-retention.md with agreed decision gates and t≈0 baseline, scheduled daily probe workflow .github/workflows/task0-retention.yml, and added task0:publish / task0:check package scripts.
 - Completed CR-004: replaced test/service-worker.test.ts with behavioural regression tests and shape assertions, verified cache-first regression failure on mutation check, verified CACHE_NAME version bump resilience, verified clean npm ci && npm run build, merged PR #1 to main, verified Vercel production deploy, and deleted cr-001-visible-app branch.
 - Completed CR-003: replaced favicon.svg with segmented prawn SVG and regenerated PNGs, deleted orphaned public/icons/, updated sw.js to theprawnsplit-v3 with network-first navigation shell handling and purged /icons/ prefix, code-split qrcode and relay sync (nostr-tools/@noble) via dynamic imports bringing initial entry chunk to 55.87 kB gzip (<60 kB target), and verified all tests pass.
 - Completed CR-002: verified all CR-001 evidence, validated asset paths and dist bundle outputs, confirmed security greps, justified sw.js and repo.ts changes, performed rollup-plugin-visualizer bundle audit, evidenced crash guard rendering, and verified 360px responsiveness.
@@ -27,9 +28,14 @@ Progress:
 - Started Phase 2 sync work. Scope: Task 0 relay/protocol checks, encrypted relay
   payloads, operated Vercel relay, Nostr adapter, sync metadata/outbox, adaptive
   polling, claim-key minting, honest unsynced UI, and manual fallback promotion.
-- Added and ran `scripts/task0-relay-check.mjs`: kind 1512 is regular-range and
-  unregistered in the current registry; all five default relays expose NIP-11 metadata.
-  Retention remains unproven and requires scheduled publish/read-back probes.
+- Task 0 retention probe running since 2026-08-22T12:59:41.810Z. A11 and Q1 already closed
+  (kind 1512 regular-range and unregistered; all five relays expose NIP-11).
+  A1 decision gates agreed in advance:
+    >=95% on >=3 relays at 30d -> A1 holds, Nostr is genuine redundancy
+    50-95% or <3 relays        -> A1 partial, operated relay carries recovery
+    <50%                       -> A1 false, Nostr opportunistic only
+  A1 does not block Phase 2: D-12 pre-committed the operated Vercel relay as an
+  unconditional dual-write target.
 - Added Phase 2 sync plumbing: group secret/tag storage, AES-GCM relay envelopes,
   Nostr and HTTP relay adapters, sync metadata/outbox states, read-back confirmation,
   join-link seed support, and visible unconfirmed counts.

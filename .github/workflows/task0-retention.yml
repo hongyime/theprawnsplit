@@ -1,0 +1,28 @@
+name: Task 0 — relay retention probe
+
+on:
+  schedule:
+    - cron: "0 6 * * *"   # daily 06:00 UTC
+  workflow_dispatch:       # manual runs for the 1h datapoint
+
+permissions:
+  contents: write
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: node scripts/task0-retention.mjs check
+      - name: Commit results
+        run: |
+          git config user.name "task0-probe"
+          git config user.email "actions@github.com"
+          git add .agents/task0-retention.md
+          git diff --staged --quiet || git commit -m "chore(task0): retention probe $(date -u +%F)"
+          git push

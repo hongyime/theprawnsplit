@@ -1,6 +1,6 @@
-const CACHE_NAME = "theprawnsplit-v2";
+const CACHE_NAME = "theprawnsplit-v3";
 const APP_SHELL = ["/", "/manifest.webmanifest", "/favicon.svg"];
-const CACHEABLE_PREFIXES = ["/assets/", "/icons/"];
+const CACHEABLE_PREFIXES = ["/assets/"];
 
 function isCacheable(request) {
   if (request.method !== "GET") return false;
@@ -26,6 +26,24 @@ self.addEventListener("activate", (event) => {
 
 self.addEventListener("fetch", (event) => {
   if (!isCacheable(event.request)) return;
+  const url = new URL(event.request.url);
+  const isShell = event.request.mode === "navigate" || url.pathname === "/";
+
+  if (isShell) {
+    // Network-first: always try for a fresh shell, fall back to cache offline.
+    event.respondWith(
+      fetch(event.request)
+        .then((response) => {
+          const copy = response.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
+          return response;
+        })
+        .catch(() => caches.match(event.request).then((c) => c || Response.error())),
+    );
+    return;
+  }
+
+  // Hashed assets: cache-first is correct — the filename changes when contents do.
   event.respondWith(
     caches.match(event.request).then((cached) => {
       if (cached) return cached;

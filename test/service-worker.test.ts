@@ -6,7 +6,7 @@ describe("service worker cache boundary", () => {
   it("keeps relay API and dynamic responses out of the offline cache", () => {
     const source = readFileSync(join(process.cwd(), "public", "sw.js"), "utf8");
 
-    expect(source).toContain('const CACHE_NAME = "theprawnsplit-v2";');
+    expect(source).toContain('const CACHE_NAME = "theprawnsplit-v3";');
     expect(source).toContain('if (url.pathname.startsWith("/api/")) return false;');
     expect(source).toContain("APP_SHELL.includes(url.pathname)");
     expect(source).toContain("CACHEABLE_PREFIXES");

@@ -17,7 +17,6 @@
     Share2,
     Settings,
   } from "@lucide/svelte";
-  import * as QRCode from "qrcode";
   import { allocate, eventSortKey, fold, greedySettlement, type Event, type Financials, type VerificationContext, type State } from "@theprawnsplit/core";
   import {
     appendEvents,
@@ -93,7 +92,6 @@
   import { isEventCoveredByEveryKnownDevice } from "@/lib/sync-coverage";
   import { syncSurfaceLabels } from "@/lib/sync-labels";
   import { buildVerificationContext } from "@/lib/verification";
-  import { syncOnce } from "@/relay/sync";
   import type { SyncResult } from "@/relay/types";
 
   let group: GroupRecord | null = null;
@@ -854,8 +852,13 @@
 
   async function showJoinQrCode(): Promise<void> {
     if (!group) return;
-    const link = buildJoinLink(window.location.href, createJoinSeed(group));
-    joinQrDataUrl = await QRCode.toDataURL(link, { margin: 2, width: 240, errorCorrectionLevel: "M" });
+    try {
+      const link = buildJoinLink(window.location.href, createJoinSeed(group));
+      const QRCode = await import("qrcode");
+      joinQrDataUrl = await QRCode.toDataURL(link, { margin: 2, width: 240, errorCorrectionLevel: "M" });
+    } catch (err) {
+      syncStatus = err instanceof Error ? err.message : "Failed to generate QR code.";
+    }
   }
 
   async function importExport(): Promise<void> {
@@ -906,6 +909,7 @@
     syncing = true;
     error = "";
     try {
+      const { syncOnce } = await import("@/relay/sync");
       const result = await syncOnce(group.groupId);
       recoveryAttempted = true;
       lastSyncResult = result;

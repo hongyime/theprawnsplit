@@ -1,8 +1,9 @@
 # Project State
 
-Current task: completed CR-002 verification and bundle audit.
+Current task: completed CR-003 (Favicon, service worker network-first shell, bundle code-splitting).
 
 Progress:
+- Completed CR-003: replaced favicon.svg with segmented prawn SVG and regenerated PNGs, deleted orphaned public/icons/, updated sw.js to theprawnsplit-v3 with network-first navigation shell handling and purged /icons/ prefix, code-split qrcode and relay sync (nostr-tools/@noble) via dynamic imports bringing initial entry chunk to 55.87 kB gzip (<60 kB target), and verified all tests pass.
 - Completed CR-002: verified all CR-001 evidence, validated asset paths and dist bundle outputs, confirmed security greps, justified sw.js and repo.ts changes, performed rollup-plugin-visualizer bundle audit, evidenced crash guard rendering, and verified 360px responsiveness.
 - Completed CR-001: diagnosed Cause A mount failure on Svelte 5, added crash guard to src/main.ts, added Landing and Group List views in App.svelte and listGroups/createGroup in db/repo.ts, created favicon.svg and generated PNG icons (192, 512, apple-touch-icon), completed index.html metadata, updated README.md, cleaned package.json dependencies, and verified full test/build pipeline.
 - Completed spec cleanup plus Phase 0 executable core.

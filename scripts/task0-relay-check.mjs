@@ -1,3 +1,9 @@
+// SUPERSEDED — This script's job (NIP-11 metadata probe, closing A11 and Q1) is done.
+// Results are recorded in .agents/JOURNAL.md and PRD.md (A11, A12 verified 2026-08-22).
+// The active retention series runs in scripts/task0-retention.mjs.
+//
+// Do not update the relay list in this file — it is frozen as a historical record.
+
 const DEFAULT_RELAYS = [
   "wss://relay.damus.io",
   "wss://nos.lol",

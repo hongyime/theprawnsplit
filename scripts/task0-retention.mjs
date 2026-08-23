@@ -1,11 +1,13 @@
 // Task 0 retention probe (PRD A1).
 //
-//   node scripts/task0-retention.mjs publish        # ONCE. Starts the clock.
-//   node scripts/task0-retention.mjs check          # repeatedly, via cron
-//   node scripts/task0-retention.mjs probe <relay>  # raw WS probe to inspect OK reasons
-//   node scripts/task0-retention.mjs vet <relay>    # 4-event fresh-key probe → PASS/WARN/FAIL
-//   node scripts/task0-retention.mjs publish-slow   # starts the slow-cohort clock
-//   node scripts/task0-retention.mjs check-slow     # repeatedly for slow cohort
+//   node scripts/task0-retention.mjs publish          # ONCE. Starts the clock.
+//   node scripts/task0-retention.mjs check            # repeatedly, via cron
+//   node scripts/task0-retention.mjs probe <relay>    # raw WS probe to inspect OK reasons
+//   node scripts/task0-retention.mjs vet <relay>      # 4-event fresh-key probe → PASS/WARN/FAIL
+//   node scripts/task0-retention.mjs publish-slow     # starts the slow-cohort clock
+//   node scripts/task0-retention.mjs check-slow       # repeatedly for slow cohort
+//   node scripts/task0-retention.mjs publish-current  # starts the current-pool cohort clock
+//   node scripts/task0-retention.mjs check-current    # repeatedly for current-pool cohort
 //
 // Uses throwaway keys and tags. It cannot touch real user data.
 
@@ -13,6 +15,11 @@ import { readFileSync, writeFileSync, existsSync, appendFileSync, mkdirSync } fr
 import { webcrypto } from "node:crypto";
 import { finalizeEvent, generateSecretKey, getPublicKey, SimplePool } from "nostr-tools";
 
+// NOTE: this list is FROZEN to match scripts/task0-manifest.json. It intentionally
+// still contains relay.damus.io even though CR-007 dropped it from the app defaults.
+// check() reads the relay list from the manifest, not this constant. Changing this
+// array will not affect the running series, but do not "sync" it with src/config.ts —
+// the retention clock must keep measuring the cohort it actually published to.
 const RELAYS = [
   "wss://relay.damus.io",
   "wss://nos.lol",
@@ -29,9 +36,18 @@ const MANIFEST = "scripts/task0-manifest.json";
 const REPORT = ".agents/task0-retention.md";
 const SLOW_MANIFEST = "scripts/task0-manifest-slow.json";
 const SLOW_REPORT = ".agents/task0-retention-slow.md";
+const CURRENT_MANIFEST = "scripts/task0-manifest-current.json";
+const CURRENT_REPORT = ".agents/task0-retention-current.md";
 const EVENT_COUNT = 50;
 const PAYLOAD_BYTES = 3000;
 const SPACING_MS = 400;
+
+function readCurrentRelays() {
+  const envContent = readFileSync(".env.example", "utf8");
+  const match = envContent.match(/^VITE_NOSTR_RELAYS=(.+)$/m);
+  if (!match) throw new Error("VITE_NOSTR_RELAYS not found in .env.example");
+  return match[1].split(",").map((r) => r.trim()).filter(Boolean);
+}
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -172,6 +188,78 @@ async function publishSlow() {
 
   pool.close(SLOW_RELAYS);
   await writeReportHeader(manifest, SLOW_REPORT);
+}
+
+async function publishCurrent() {
+  if (existsSync(CURRENT_MANIFEST)) {
+    console.error(`${CURRENT_MANIFEST} exists. Refusing to republish — that would reset the clock.`);
+    console.error("Delete it deliberately only if you intend to start a new series.");
+    process.exit(1);
+  }
+
+  const currentRelays = readCurrentRelays();
+  const sk = generateSecretKey();
+  const pk = getPublicKey(sk);
+
+  const seed = webcrypto.getRandomValues(new Uint8Array(32));
+  const digest = await webcrypto.subtle.digest("SHA-256", seed);
+  const tag = Buffer.from(digest).toString("hex");
+
+  const pool = new SimplePool();
+  const ids = [];
+  const acks = Object.fromEntries(currentRelays.map((r) => [r, 0]));
+  const currentCount = 20;
+  const currentSpacingMs = 30000;
+
+  console.log(`publishing ${currentCount} events slowly (30s apart) to current pool of ${currentRelays.length} relays (${currentRelays.join(", ")}), kind ${KIND}, tag ${tag.slice(0, 12)}…`);
+
+  for (let i = 0; i < currentCount; i++) {
+    const content = Buffer.from(
+      webcrypto.getRandomValues(new Uint8Array(PAYLOAD_BYTES)),
+    ).toString("base64");
+
+    const event = finalizeEvent(
+      {
+        kind: KIND,
+        created_at: Math.floor(Date.now() / 1000),
+        tags: [["t", tag], ["s", String(i)]],
+        content,
+      },
+      sk,
+    );
+    ids.push(event.id);
+
+    const settled = await Promise.allSettled(pool.publish(currentRelays, event));
+    settled.forEach((res, idx) => {
+      if (res.status === "fulfilled") acks[currentRelays[idx]]++;
+    });
+
+    console.log(`  [${new Date().toISOString().slice(11, 19)}] published ${i + 1}/${currentCount} -> acks: ${currentRelays.map((r) => `${r}: ${acks[r]}`).join(", ")}`);
+    if (i + 1 < currentCount) await sleep(currentSpacingMs);
+  }
+
+  const manifest = {
+    publishedAt: Date.now(),
+    publishedAtIso: new Date().toISOString(),
+    kind: KIND,
+    pubkey: pk,
+    tag,
+    relays: currentRelays,
+    eventCount: currentCount,
+    payloadBytes: PAYLOAD_BYTES,
+    spacingMs: currentSpacingMs,
+    acks,
+    baselines: { ...acks },
+    ids,
+  };
+  writeFileSync(CURRENT_MANIFEST, JSON.stringify(manifest, null, 2) + "\n");
+
+  console.log("\nACKs at publish time (current pool cohort):");
+  for (const r of currentRelays) console.log(`  ${acks[r]}/${currentCount}  ${r}`);
+  console.log(`\nmanifest written to ${CURRENT_MANIFEST}`);
+
+  pool.close(currentRelays);
+  await writeReportHeader(manifest, CURRENT_REPORT);
 }
 
 async function queryRelay(pool, relay, m, attempts = 3) {
@@ -425,7 +513,9 @@ else if (cmd === "probe") await probe(process.argv[3] || "wss://nos.lol");
 else if (cmd === "vet") await vet(process.argv[3]);
 else if (cmd === "publish-slow") await publishSlow();
 else if (cmd === "check-slow") await check(SLOW_MANIFEST, SLOW_REPORT);
+else if (cmd === "publish-current") await publishCurrent();
+else if (cmd === "check-current") await check(CURRENT_MANIFEST, CURRENT_REPORT);
 else {
-  console.error("usage: node scripts/task0-retention.mjs <publish|check|probe <relay>|vet <relay>|publish-slow|check-slow>");
+  console.error("usage: node scripts/task0-retention.mjs <publish|check|probe <relay>|vet <relay>|publish-slow|check-slow|publish-current|check-current>");
   process.exit(1);
 }

@@ -36,4 +36,21 @@ describe("client numeric config parsing", () => {
 
     expect(runtimeKeys.filter((key) => !sampleKeys.has(key))).toEqual([]);
   });
+
+  it("src/config.ts fallback relay list matches VITE_NOSTR_RELAYS in .env.example", () => {
+    const configSource = readFileSync("src/config.ts", "utf8");
+    const envExample = readFileSync(".env.example", "utf8");
+
+    // Extract fallback relay list from config.ts (the string literal after ??)
+    const fallbackMatch = configSource.match(/import\.meta\.env\.VITE_NOSTR_RELAYS\s*\?\?\s*"([^"]+)"/);
+    if (!fallbackMatch || !fallbackMatch[1]) throw new Error("Could not find VITE_NOSTR_RELAYS fallback in src/config.ts");
+    const fallbackRelays = fallbackMatch[1].split(",").map((r) => r.trim()).filter(Boolean).sort();
+
+    // Extract VITE_NOSTR_RELAYS from .env.example
+    const envMatch = envExample.match(/^VITE_NOSTR_RELAYS=(.+)$/m);
+    if (!envMatch || !envMatch[1]) throw new Error("Could not find VITE_NOSTR_RELAYS in .env.example");
+    const envRelays = envMatch[1].split(",").map((r) => r.trim()).filter(Boolean).sort();
+
+    expect(fallbackRelays).toEqual(envRelays);
+  });
 });

@@ -285,7 +285,7 @@ Requirements are testable assertions. Cite by ID in review.
 | REQ-SYN-02 | Relays are accessed only through the `Relay` interface (§8.4). No relay-specific logic outside adapters | 2 |
 | REQ-SYN-03 | All relay payloads are AES-256-GCM encrypted client-side before transmission | 2 |
 | REQ-SYN-04 | `groupSecret` MUST NOT be transmitted to any relay or to the static host. It lives only in the URL fragment and local storage | 2 |
-| REQ-SYN-05 | Events publish to ≥5 relays; ≥2 acknowledgements constitute quorum | 2 |
+| REQ-SYN-05 | Publishing requires an ACK from the **operated relay** (mandatory) **plus ≥1 Nostr relay ACK**. The Nostr pool is published to in full; the operated relay is not optional. Ephemeral-key admission is unreliable across volunteer relays (D-23), so a pure Nostr quorum is not a sufficient durability guarantee | 2 |
 | REQ-SYN-06 | Events hold one of three states: `local`, `published`, `confirmed`. The outbox retains an event until `confirmed` | 2 |
 | REQ-SYN-07 | `confirmed` requires reading the event back from a subscription distinct from the write. Acknowledgement alone is insufficient | 2 |
 | REQ-SYN-08 | Every published event carries the sender's current version vector | 2 |
@@ -303,11 +303,12 @@ Requirements are testable assertions. Cite by ID in review.
 | REQ-SYN-20 | **Caps govern admission, never folding.** The fold ALWAYS runs on the admitted subset and MUST NOT be blocked by log size. Refusing to fold on a large log is the same remote kill-switch as REQ-SYN-19's halt | 2 |
 | REQ-SYN-21 | Two fetch modes (§9.5). A device with an EMPTY local log MUST bootstrap via topic filter `{"#t": [groupTag]}` with NO author filter, because it holds no author directory. Author-filtered fetch is used only for incremental gap filling on a populated log | 2 |
 | REQ-SYN-22 | Quarantined events (`v` unsupported) MUST advance the transport version vector, preventing infinite refetch loops, but MUST NOT advance semantic ledger state. While any quarantined event exists: balance display and settlement are frozen, the protection indicator goes amber, and an unmissable "a newer version is required" banner is shown. Expense entry and viewing remain available | 2 |
-| REQ-SYN-23 | The relay adapter MUST dual-write to the Nostr relay pool AND the operated Vercel relay (§15 Phase 2, D-12/D-19). Neither is authoritative; either alone is sufficient for recovery. An event is `confirmed` (REQ-SYN-06) when read back from **either** backend | 2 |
+| REQ-SYN-23 | The relay adapter MUST dual-write to the operated Vercel relay AND the Nostr pool. **The operated relay is primary (D-23); the Nostr pool is secondary redundancy.** An event is `confirmed` (REQ-SYN-06) when read back from **either** backend. Bootstrap recovery (§9.5 Mode A) MUST query the operated relay first | 2 |
 | REQ-SYN-24 | Clock drift is gated at **transport admission**, not inside the fold. Events with `hlc.wall > local_time + 120,000 ms` are held in a bounded buffer (cap 500, counted against REQ-SYN-19 budgets) and admitted when local time catches up. Events MUST NOT be mutated — clamping `hlc.wall` against local time is PROHIBITED (it diverges). Causal-frontier drift bounds are PROHIBITED (they flag normal idle time). Admitted events fold via standard HLC receive: `wall = max(local, remote)` (§9.12) | 2 |
 | REQ-SYN-25 | Snapshots MUST embed the version vector they cover. A bootstrapping device initialises its transport vector to `VV_snap`, preventing false gap detection for pruned pre-snapshot events | 2 |
 | REQ-SYN-26 | After bootstrapping from a snapshot, a device MUST continue a background topic-only history fetch and reconcile. Raw events take precedence over snapshot-derived state on any discrepancy — a snapshot cannot be trusted to advance a vector past events it omitted | 2 |
 | REQ-SYN-27 | Dropping surplus events under REQ-SYN-19 MUST advance a local `discardVector: Record<DeviceId, number>` to the sender's counter. Without it, version-vector gap detection sees the peer ahead, re-requests the dropped events, and loops forever every sync cycle | 2 |
+| REQ-SYN-28 | Any relay added to the default pool MUST first pass `npm run task0:vet` using a **freshly generated keypair with no social graph**. Any relay returning a web-of-trust, whitelist, or policy rejection is disqualified — the condition is permanent for this architecture, not a transient limit | 2 |
  
 ### 7.5 Durability
  
@@ -568,7 +569,7 @@ interface Relay {
 }
 ```
  
-Adapters: `NostrRelay` (§9.10) and `HttpRelay` (operated Vercel Function, Appendix D). Both are dual-write targets from Phase 2 (REQ-SYN-23). `subscribe` is unimplemented on both — the client polls (REQ-PLT-03/04).
+Adapters: `HttpRelay` (operated Vercel Function, Appendix D) is primary (D-23); `NostrRelay` (§9.10) is secondary redundancy. Both are dual-write targets from Phase 2 (REQ-SYN-23). `subscribe` is unimplemented on both — the client polls (REQ-PLT-03/04).
  
 **Note:** version vectors remain the mechanism for *detecting* gaps and for the
 "everyone has this" guarantee. They are no longer the mechanism for *fetching*.
@@ -1159,32 +1160,34 @@ from `groupSecret`, while preserving the relay's inability to decrypt ledger con
 | **D-21** | Merge unions display, never cryptographic authority | Union `authorisedKeys` on merge | `ParticipantMerged` is unsigned, so unioning authority lets any `groupSecret` holder merge a victim into themselves and clear the victim's debts — defeating the entire v1.4 claim-key model. |
 | **D-22** | Two export artifacts: shareable ledger, private identity backup | One export containing everything | REQ-SYN-13 uses exports as a *sharing* channel. Bundling `claimSk` would hand impersonation power to anyone the ledger is shared with. |
 | **D-14** | `Financials` is an atomic LWW unit | Per-field LWW; operational transform | Per-field merge across mutually-constrained financial fields can produce `minor` and `payers` from different edits, violating REQ-MON-02 and halting the fold under REQ-MON-15. |
- 
+| **D-23** | Operated Vercel relay is **primary**; Nostr pool is secondary redundancy | Co-equal dual-write (D-12); Nostr-primary | Measurement 2026-08-22: 2 of 5 volunteer relays could not reliably accept traffic from an ephemeral key. offchain.pub gates on web of trust — a criterion TripSplit's disposable keys can never satisfy (§9.10). relay.damus.io failed silently with no OK text, leaving REQ-SYN-11 nothing to act on. The operated relay has no opinion about a pubkey's social standing. |
+
 ---
- 
+
 ## 12. Assumptions register
- 
+
 **Reviewers: this is the highest-value section. Every assumption here is a place this PRD could be wrong.**
- 
+
 | ID | Assumption | Confidence | Verification | If false |
 |---|---|---|---|---|
 | **A1** | Public Nostr relays will accept and retain our event kind for ≥30 days | **UNVERIFIED — LOAD-BEARING. External review judges this LIKELY FALSE:** free relays prune aggressively via size caps, anti-spam heuristics, and LRU eviction | Phase 2 Task 0: publish 300 events, check read-back at 1h / 24h / 7d / 30d | Already hedged: D-12 ships the Durable Object dual-write in Phase 2 **regardless of the outcome** — Task 0 now only calibrates how much weight the Nostr pool carries. Snapshots (REQ-SYN-14) mitigate independently. |
-| **A11** | Default relays accept our chosen kind at all, and do not reject unfamiliar kinds by policy | Unverified | Phase 2 Task 0; check NIP-11 `supported_nips` and `limitation` | Choose a different kind, or rely on the own-relay path |
-| **A12** | Relay `t`-tag values are not truncated or rejected at 64 hex characters | Unverified | Phase 2 Task 0 | Shorten `groupTag` to 32 hex chars (128-bit); collision risk remains negligible |
-| **A13** | Batching ≤50 ledger events stays under every default relay's `max_message_length` | Unverified | Read NIP-11 `limitation.max_message_length` at startup | Reduce batch size dynamically per relay. Config-only change |
+| **A11** | Default relays accept our chosen kind at all, and do not reject unfamiliar kinds by policy | **VERIFIED 2026-08-22.** No relay rejected kind 1512. Failures were WoT policy and socket-level, never kind-related | Phase 2 Task 0; check NIP-11 `supported_nips` and `limitation` | Choose a different kind, or rely on the own-relay path |
+| **A12** | Relay `t`-tag values are not truncated or rejected at 64 hex characters | **VERIFIED 2026-08-22.** `#t` tag queries returned counts identical to `ids` queries on all five relays. 64-char lowercase hex tags are indexed correctly. **REQ-SYN-17 validated on real infrastructure** | Phase 2 Task 0 | Shorten `groupTag` to 32 hex chars (128-bit); collision risk remains negligible |
+| **A13** | Batching ≤50 ledger events stays under every default relay's `max_message_length` | **Still open.** The probe used 3 kB single events, not 50-event batches. Untested | Read NIP-11 `limitation.max_message_length` at startup | Reduce batch size dynamically per relay. Config-only change |
 | **A2** | iOS home-screen PWAs receive a more lenient storage-eviction counter than Safari tabs | Medium — stated by WebKit, Apple may change | Manual testing across an OS release | Relay recovery (REQ-DUR-06) becomes the sole defence. Already designed for. |
 | **A3** | `navigator.storage.persist()` is granted for installed PWAs on target browsers | Medium — browser-dependent, best-effort by spec | Instrument `persisted()` results during Phase 3 | Protection dot goes amber; nag ladder escalates. Already handled. |
 | **A4** | Groups remain ≤12 participants and ≤400 expenses | High | Observed usage | Version vectors and snapshots grow. Still viable to ~50 devices / 2,000 expenses. |
 | **A5** | Friend groups tolerate unsigned, forgeable events | High for target users | User feedback | Add Ed25519 signing. Schema reserves the field; no migration needed. |
 | **A6** | Users retain access to the join link (e.g. pinned in a group chat) | **Medium — second most load-bearing** | Phase 3 prompt effectiveness | A user who loses both device data and the link loses their copy permanently. Group survives on other devices. |
 | **A7** | WebCrypto AES-GCM and HKDF are available on all target browsers | High | Feature detection at startup | Fall back to a JS crypto library, ~30 kB. |
-| **A8** | `nostr-tools` bundle size is acceptable (<50 kB gzipped) | Unverified | Measure at Phase 2 start | Hand-roll the minimal NIP-01 subset needed (~200 lines). |
+| **A8** | `nostr-tools` bundle size is acceptable (<50 kB gzipped) | **VERIFIED.** `nostr-tools` + `@noble/*` + `@scure/base` measured at 44.03 kB gzip in the lazy `sync` chunk (CR-003); `nostr-tools` alone 25.86 kB. Under the 50 kB budget | Measure at Phase 2 start | Hand-roll the minimal NIP-01 subset needed (~200 lines). |
 | **A10** | Levenshtein ≤2 is the right fuzzy-match threshold for names | Low — invented | User testing | Tune the threshold. Low impact either way. |
 | **A14** | Ed25519 or ECDSA P-256 signing is available in WebCrypto across the REQ-PLT-06 support window | Medium — Ed25519 reached Chrome only mid-2025; older Android WebViews lack it | Feature-detect at startup; test on an old WebView | ECDSA P-256 fallback is universal. `alg` field makes events self-describing (REQ-SEC-03). |
 | **A15** | Users will have exported at least once before storage eviction | **Low — this now gates settlement authority, not just data** | Instrument export rates in Phase 3 | Peer re-attestation (REQ-SEC-06) becomes the sole recovery path and requires another member present. |
 | **A16** | Real users claim their own participant within minutes of joining, keeping the genesis-race window small | Medium | Observed usage | The TOFU window widens; an attacker with early link access can pre-claim participants. |
 | **A17** | A friend group's relay traffic stays far inside Vercel Hobby limits (~40k invocations per trip vs 1M/mo; ~0.2 of 4 CPU-hours) | High | Instrument during Phase 2 | Split the relay to a second Vercel account, or move it to Cloudflare — the `Relay` interface makes either a config change (REQ-SYN-02). |
 | **A18** | Upstash Redis free tier is **500,000 commands/month, 256 MB** (raised from the old 10,000/day cap on 12 Mar 2025) | **Verified against vendor pricing, Aug 2026.** Estimated need ≈80k commands/trip, less with adaptive polling (REQ-PLT-09) | Re-check at Phase 2 start; third-party terms change | Swap the storage backend behind the same function. The client is unaffected (REQ-SYN-02). |
+| **A19** | Volunteer Nostr relays may gate admission on web-of-trust membership. TripSplit mints an ephemeral keypair per device (§9.10) with no social graph, so it can **never** satisfy such a policy | **CONFIRMED FALSE — this is now a known constraint, not an assumption.** offchain.pub verbatim: "Policy violated and pubkey is not in our web of trust." | Reproduced independently with a fresh key at 2.5s spacing | Already mitigated: D-23 makes the operated relay primary. Every new relay must pass `vet` with a fresh key before entering the defaults (REQ-SYN-28) |
  
 ---
  
@@ -1240,11 +1243,9 @@ from `groupSecret`, while preserving the relay's inability to decrypt ledger con
 | ~~Q15~~ | **CLOSED.** Do not password-protect ledger exports — a password reintroduces exactly the credential D-01 exists to avoid. Isolate the key instead: `TripLedgerExport` carries no secrets, `DeviceIdentityBackup` carries the key behind an explicit warning (REQ-SEC-05/09). |
  
 ### 14.3 Still open
- 
-**None.** Every question raised across four review rounds is closed. Remaining
-uncertainty is empirical, not architectural: **A1 / A11 / A12 / A13 are settled by Phase 2
-Task 0**, and A15 (export discipline) by Phase 3 instrumentation.
- 
+
+**None.** Every question raised across four review rounds is closed. A11, A12, and A8 are verified by Task 0 measurement (2026-08-22). A13 remains open (batch-size under relay limits untested). A15 (export discipline) by Phase 3 instrumentation.
+
 ## 15. Phases and acceptance criteria
  
 Every phase ends shippable.
@@ -1778,19 +1779,23 @@ No requirement, algorithm, or decision. Phase 0 is a change to build order and v
 ---
  
 ## Appendix A — Default relay set
- 
-```ts
-const DEFAULT_RELAYS = [
-  "wss://relay.damus.io",     // Damus (Will Casarin). Large, high uptime.
-  "wss://nos.lol",            // Consistently among the most stable.
-  "wss://relay.primal.net",   // Large, well-resourced, general purpose.
-  "wss://nostr.mom",          // Long-running independent general relay.
-  "wss://offchain.pub",       // General purpose, good uptime history.
-];
-```
- 
-User-editable. Subject to A1 verification. These are volunteer-operated for a social network, not for this app.
- 
+
+**The canonical list lives in `.env.example` (`VITE_NOSTR_RELAYS`).** It is not duplicated
+here, because it changes as relays are vetted and dropped.
+
+Admission criteria, which do not change (REQ-SYN-28):
+
+1. Must pass `npm run task0:vet` with a **freshly generated keypair**
+2. Any web-of-trust, whitelist, or policy rejection → **disqualified permanently**.
+   TripSplit's ephemeral keys can never satisfy such a policy (A19)
+3. Must return an OK frame on failure. A relay that fails silently gives REQ-SYN-11
+   nothing to act on and is disqualified
+4. Must index single-letter `#t` tag queries (REQ-SYN-17)
+
+As of 2026-08-22: `relay.damus.io` dropped (silent socket failure); `relay.snort.social`
+added (vetted PASS). These are volunteer-operated relays run for a social network, not
+for this app — D-23 exists because of that.
+
 ## Appendix B — Key derivation
  
 ```

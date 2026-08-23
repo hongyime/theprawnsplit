@@ -131,9 +131,8 @@ your app can read, write, and delete your entire relay database.
 # and accepted by every relay below.
 VITE_NOSTR_KIND=1512
  
-# Default public relay pool. Comma-separated, no spaces. User-editable in-app.
-# Publish to all; ACK quorum is 2 (REQ-SYN-05).
-VITE_NOSTR_RELAYS=wss://relay.damus.io,wss://nos.lol,wss://relay.primal.net,wss://nostr.mom,wss://offchain.pub
+# Canonical list — see .env.example in the repo root. Vetting rules: PRD Appendix A.
+VITE_NOSTR_RELAYS=<comma-separated wss:// URLs, no spaces>
  
 # Our operated relay (D-19). Same origin, so a path — not an absolute URL.
 VITE_RELAY_ENDPOINT=/api/relay

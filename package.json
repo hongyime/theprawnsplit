@@ -18,6 +18,8 @@
     "task0:vet": "node scripts/task0-retention.mjs vet",
     "task0:publish-slow": "node scripts/task0-retention.mjs publish-slow",
     "task0:check-slow": "node scripts/task0-retention.mjs check-slow",
+    "task0:publish-current": "node scripts/task0-retention.mjs publish-current",
+    "task0:check-current": "node scripts/task0-retention.mjs check-current",
     "analyze": "ANALYZE=1 vite build",
     "preview": "vite preview"
   },

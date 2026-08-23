@@ -53,4 +53,23 @@ describe("client numeric config parsing", () => {
 
     expect(fallbackRelays).toEqual(envRelays);
   });
+
+  it("every PRD requirement appears in STATUS.md exactly once", () => {
+    const prd = readFileSync("PRD.md", "utf8");
+    const status = readFileSync("STATUS.md", "utf8");
+    const inPrd: Set<string> = new Set(prd.match(/REQ-[A-Z]+-\d+/g) ?? []);
+    const inStatus: string[] = status.match(/REQ-[A-Z]+-\d+/g) ?? [];
+
+    const untracked: string[] = [...inPrd].filter((id) => !inStatus.includes(id));
+    const orphaned: string[] = [...new Set(inStatus)].filter((id) => !inPrd.has(id));
+    const duplicated: string[] = [...new Set(inStatus)].filter(
+      (id) => inStatus.filter((x) => x === id).length > 1,
+    );
+
+    expect({ untracked, orphaned, duplicated }).toEqual({
+      untracked: [],
+      orphaned: [],
+      duplicated: [],
+    });
+  });
 });

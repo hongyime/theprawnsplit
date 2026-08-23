@@ -250,7 +250,7 @@ Requirements are testable assertions. Cite by ID in review.
 | REQ-MON-05 | Four split modes: Equally, Exact amounts, Shares, Percentage | 1 |
 | REQ-MON-06 | Switching split mode MUST preserve user intent per the mapping in §9.4. Blanking the form on mode change is prohibited | 1 |
 | REQ-MON-07 | One currency per group in v1, inferred from locale, editable, never a setup step | 1 |
-| REQ-MON-08 | Multi-currency stores the exchange rate frozen at entry time inside the expense event | 5 |
+| REQ-MON-08 | Multi-currency stores the exchange rate frozen at entry time inside the expense event | Built |
 | REQ-MON-09 | The recipient of the rounding remainder MUST be visible to the user | 1 |
 | REQ-MON-10 | Expenses are editable and voidable via new events. In-place mutation is prohibited | 1 |
 | REQ-MON-11 | `ExpenseAdded.payers` is an array in schema v1. `Σ payers.minor` MUST equal `minor`. Single-payer is the one-element case. The multi-payer **UI** ships in Phase 5; the **schema** ships in Phase 1 to avoid a log migration | 1 |
@@ -492,12 +492,16 @@ feature-detect and fall back to ECDSA P-256, which is universally available in W
 signature to be replayed into a different group. The signed payload is always prefixed
 with `groupTag`.
  
-**Schema versioning (v).** `v = 1` for Phase 1–4. Multi-currency (`rate`) requires `v = 2`.
-A device that encounters `v` greater than it supports MUST **quarantine** the event:
-retain it in the log, exclude it from all balance computation, and display an
-"update required" marker on the affected entity. Silently ignoring the `rate` field
-would cause a €50 expense to be counted as ¥50 — a correctness failure, not a
-degradation. See REQ-MON-12 and REQ-SYN-22.
+**Schema versioning (v).** The current schema version is **2**, which adds the optional
+`rate` field for multi-currency expenses (REQ-MON-08). Version 1 omitted it.
+
+A device encountering `v` greater than it supports MUST **quarantine** the event: retain
+it, exclude it from all balance computation, and display an "update required" marker on
+the affected entity (REQ-MON-12, REQ-SYN-22). Silently ignoring an unknown field would
+cause a €50 expense to be counted as ¥50 — a correctness failure, not a degradation.
+
+Version numbers are independent of build phases. Bump `v` whenever a field is added whose
+absence would change a balance.
  
 **Multi-payer.** `payers` is an array in v1 even though the multi-payer UI ships in
 Phase 5. The common case is a single-element array. Adding this later would require a

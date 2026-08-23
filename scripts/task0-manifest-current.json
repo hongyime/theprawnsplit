@@ -1,0 +1,53 @@
+{
+  "publishedAt": 1787450906477,
+  "publishedAtIso": "2026-08-23T02:08:26.477Z",
+  "kind": 1512,
+  "pubkey": "9581afd5f9813ec37d833826f6f4475730c38fa381288c09b05fc4c770b8aec9",
+  "tag": "5cd9d0beeeb40f93acfe9ddff5730d43d65c1ce5bf23709b974654ed638f5dce",
+  "relays": [
+    "wss://nos.lol",
+    "wss://relay.primal.net",
+    "wss://nostr.mom",
+    "wss://offchain.pub",
+    "wss://relay.snort.social"
+  ],
+  "eventCount": 20,
+  "payloadBytes": 3000,
+  "spacingMs": 30000,
+  "acks": {
+    "wss://nos.lol": 20,
+    "wss://relay.primal.net": 20,
+    "wss://nostr.mom": 20,
+    "wss://offchain.pub": 19,
+    "wss://relay.snort.social": 20
+  },
+  "baselines": {
+    "wss://nos.lol": 20,
+    "wss://relay.primal.net": 20,
+    "wss://nostr.mom": 20,
+    "wss://offchain.pub": 19,
+    "wss://relay.snort.social": 20
+  },
+  "ids": [
+    "38496a0b9978b9d3c3aa5098718fb6606ebd32897b37544342823a599cbbf314",
+    "86e09ebcc8ea440a7cc14b543da9b4ce76a11c1d8e6134b625ee618a562a08c6",
+    "ec8dc2b4451376e760d80cc20db5cf03c0dbea2289fffa28e87218656c62fc97",
+    "caebd50503937a75e7010784f65494d9aec1a86d672b4fcfe72ffbfffd5d09a6",
+    "aba4584594399c2d0d9fea61a3d38b4965796aa1bcc2dbbf678daf06b004606f",
+    "4e9cacad9a846ecec37cac92e6c213739d8106acc911a63b683552c4541cbdf0",
+    "1b04fe6d8782927dc2cf9f1dc21a18d07d3fd98dec45aa8921a86ccbdcb93c58",
+    "bd65f8752ecd19d9a19b9c284a558f1058a9016df5658e2b4a7076a28a933371",
+    "6672b42e743e57035da60241c8c2ff0060b3fee90eabc72c03ab9150a9ff03db",
+    "765b71bfc2ded435bf46cf39f08f30537fe2160c8f68aa22961e060a4a1f7b0f",
+    "c230676c69d4356b9f0415156900fee4176d18a9dc3c3a1c4eb5dc821172f04a",
+    "83e6d2026771dfe85b74c821027de472d3dfdb6e91c8fb214d100934dccf3b97",
+    "6f80d80fb219e82a762012321ca6863ed296c667f34e7fae49bde6fb1d85575c",
+    "67e3202e24cf0df36fa7e29442fa13fab407bf7dc7dc8997effd0906f3619fc5",
+    "ca3d79872a5149cd33b7269f6fe7612990cb4a45596c951575e0da72d1c159eb",
+    "70378c7d5cb4e7de5120fdb9d558244b3344a50c6f33042d6593bbf8df5d8c2e",
+    "e293d43fc9f084399319c692a492bb4cf091db0afce35cb8dfb01bc34b2fbb84",
+    "b18da629835b9512d34fa7c42cc1d95019fb0dee6188ae35e96b3646c24323ac",
+    "400ce987e5f661ff544271f440ab15f7a9111e6bc238ed8cd01de7330a93152b",
+    "e7d1f8098db430ccd763d0bacd8382b2c54bdc446e78fe3bdff74c2f3d2305cd"
+  ]
+}

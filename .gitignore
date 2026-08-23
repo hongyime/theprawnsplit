@@ -30,6 +30,7 @@ __pycache__/
 !.agents/JOURNAL.md
 !.agents/task0-retention.md
 !.agents/task0-retention-slow.md
+!.agents/task0-retention-current.md
 !.agents/cr-007-report.md
 !.agents/handoffs/
 !.agents/handoffs/**

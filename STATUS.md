@@ -1,0 +1,198 @@
+# Delivery status
+
+Tracks implementation against `PRD.md`. **The PRD is the specification; this file is the
+report card.** When they disagree, the PRD is right and this file is stale — or the code
+is wrong. Never edit the PRD to match the code without a decision recorded in §11.
+
+Last audited: 2026-08-24 against commit 891c281 (cr-009-status-register); every referenced
+implementation/test path re-checked for existence, five Built rows re-evidenced below
+
+| ID | Status | Implementation | Tests |
+|---|---|---|---|
+| REQ-ID-01 | Built | `src/App.svelte`, `src/main.ts` | `test/platform-boundaries.test.ts` |
+| REQ-ID-02 | Built | `src/lib/ids.ts`, `src/db/repo.ts` | `test/device-identity.test.ts`, `test/device-id-privacy-ui.test.ts` |
+| REQ-ID-03 | Built | `core/src/types.ts`, `core/src/identity.ts`, `core/src/fold.ts` | `core/test/identity.test.ts`, `test/participants.test.ts` |
+| REQ-ID-04 | Built | `src/lib/events.ts`, `core/src/fold.ts`, `src/App.svelte` | `core/test/fold.test.ts`, `test/participants.test.ts` |
+| REQ-ID-05 | Built | `core/src/fold.ts`, `core/src/settle.ts` | `core/test/fold.test.ts`, `core/test/settle.test.ts` |
+| REQ-ID-06 | Built | `core/src/identity.ts`, `core/src/fold.ts` | `core/test/identity.test.ts`, `test/participants.test.ts` |
+| REQ-ID-07 | Built | `core/src/identity.ts`, `core/src/fold.ts` | `core/test/identity.test.ts`, `test/verification.test.ts`, `test/participant-claim-ui.test.ts` |
+| REQ-ID-08 | Built | `src/lib/participants.ts`, `src/App.svelte` | `test/participant-claim-ui.test.ts`, `test/landing-ui.test.ts` |
+| REQ-ID-09 | Built | `src/lib/participants.ts`, `src/App.svelte` | `test/participant-claim-ui.test.ts` |
+| REQ-ID-10 | Built | `src/lib/participants.ts`, `src/App.svelte` | `test/participant-claim-ui.test.ts` |
+| REQ-ID-11 | Built | `src/lib/join-link.ts`, `src/App.svelte` | `test/join-recovery-boundary.test.ts`, `test/durability.test.ts` |
+| REQ-ID-12 | Built | `core/src/identity.ts`, `core/src/fold.ts`, `src/App.svelte` | `core/test/identity.test.ts`, `test/reconciliation-ui.test.ts` |
+| REQ-ID-13 | Built | `core/src/identity.ts`, `core/src/fold.ts` | `core/test/identity.test.ts`, `core/test/properties.test.ts` |
+| REQ-ID-14 | Built | `core/src/fold.ts`, `src/lib/events.ts` | `core/test/fold.test.ts`, `test/reconciliation-ui.test.ts` |
+| REQ-ID-15 | Built | `src/lib/expense-command.ts`, `src/App.svelte` | `test/expense-command.test.ts`, `test/landing-ui.test.ts` |
+| REQ-ID-16 | Built | `core/src/identity.ts`, `core/src/fold.ts` | `core/test/identity.test.ts`, `test/reconciliation-ui.test.ts` |
+| REQ-ID-17 | Built | `core/src/identity.ts`, `core/src/fold.ts` | `core/test/identity.test.ts`, `test/reconciliation-ui.test.ts` |
+| REQ-ID-18 | Built | `core/src/identity.ts`, `src/lib/verification.ts`, `src/lib/device-link.ts`, `src/lib/reattestation.ts` | `core/test/identity.test.ts`, `test/verification.test.ts`, `test/device-link.test.ts`, `test/reattestation.test.ts` |
+| REQ-ID-19 | Built | `core/src/identity.ts`, `core/src/fold.ts` | `core/test/identity.test.ts`, `core/test/properties.test.ts` |
+| REQ-MON-01 | Built | `core/src/money.ts`, `scripts/lint-money.mjs` | `core/test/money.test.ts` |
+| REQ-MON-02 | Built | `core/src/money.ts`, `src/lib/expense-command.ts`, `src/App.svelte` | `core/test/money.test.ts`, `test/expense-command.test.ts` |
+| REQ-MON-03 | Built | `core/src/money.ts` | `core/test/money.test.ts` |
+| REQ-MON-04 | Built | `core/src/fold.ts`, `core/src/canonical.ts` | `core/test/properties.test.ts` |
+| REQ-MON-05 | Built | `core/src/types.ts`, `core/src/money.ts`, `src/lib/split-preservation.ts` | `core/test/money.test.ts`, `test/split-preservation.test.ts` |
+| REQ-MON-06 | Built | `src/lib/split-preservation.ts` | `test/split-preservation.test.ts` |
+| REQ-MON-07 | Built | `src/lib/events.ts`, `src/db/repo.ts`, `src/App.svelte` | `test/currency-onboarding.test.ts` |
+| REQ-MON-08 | Built | `core/src/types.ts`, `core/src/fold.ts`, `src/lib/multicurrency.ts` | `core/test/fold.test.ts`, `test/multicurrency.test.ts`, `test/phase5-money-acceptance.test.ts` |
+| REQ-MON-09 | Built | `src/lib/expense-display.ts`, `src/App.svelte` | `test/expense-display.test.ts`, `test/common-expense-ui.test.ts` |
+| REQ-MON-10 | Built | `core/src/fold.ts`, `src/lib/events.ts` | `core/test/fold.test.ts`, `test/expense-edit.test.ts` |
+| REQ-MON-11 | Built | `core/src/types.ts`, `core/src/fold.ts`, `src/lib/payers.ts` | `core/test/fold.test.ts`, `test/payers.test.ts`, `test/phase5-money-acceptance.test.ts` |
+| REQ-MON-12 | Built | `core/src/fold.ts`, `src/lib/freeze-policy.ts` | `core/test/fold.test.ts`, `test/freeze-policy.test.ts` |
+| REQ-MON-13 | Built | `core/src/types.ts`, `src/lib/events.ts`, `src/lib/expense-display.ts` | `test/expense-display.test.ts` |
+| REQ-MON-14 | Built | `core/src/money.ts` | `core/test/money.test.ts` |
+| REQ-MON-15 | Built | `core/src/fold.ts` | `core/test/fold.test.ts`, `core/test/properties.test.ts` |
+| REQ-MON-16 | Built | `core/src/types.ts`, `core/src/fold.ts` | `core/test/fold.test.ts`, `core/test/properties.test.ts` |
+| REQ-MON-17 | Built | `core/src/fold.ts`, `src/lib/expense-history.ts` | `core/test/fold.test.ts`, `core/test/properties.test.ts`, `test/expense-history.test.ts` |
+| REQ-MON-18 | Built | `core/src/money.ts` | `core/test/money.test.ts` |
+| REQ-MON-19 | Built | `core/src/fold.ts` | `core/test/fold.test.ts`, `core/test/properties.test.ts` |
+| REQ-SET-01 | Built | `core/src/settle.ts` | `core/test/settle.test.ts` |
+| REQ-SET-02 | Built | `src/App.svelte`, `src/lib/settlement-command.ts` | `test/platform-boundaries.test.ts` |
+| REQ-SET-03 | Built | `core/src/fold.ts`, `core/src/settle.ts` | `core/test/fold.test.ts`, `core/test/settle.test.ts` |
+| REQ-SET-04 | Built | `core/src/fold.ts`, `src/lib/settlement-history.ts` | `core/test/fold.test.ts`, `test/settlement-history.test.ts` |
+| REQ-SET-05 | Built | `core/src/fold.ts`, `src/lib/settlement-command.ts` | `core/test/fold.test.ts`, `test/settlement-command.test.ts` |
+| REQ-SET-06 | Built | `core/src/fold.ts`, `src/lib/settlement-history.ts` | `core/test/fold.test.ts`, `test/settlement-history.test.ts` |
+| REQ-SET-07 | Built | `core/src/fold.ts`, `src/lib/settlement-history.ts`, `src/App.svelte` | `test/settlement-history.test.ts`, `test/settlement-ui.test.ts` |
+| REQ-SET-08 | Built | `core/src/fold.ts`, `src/lib/settlement-command.ts`, `src/App.svelte` | `core/test/fold.test.ts`, `test/settlement-command.test.ts`, `test/settlement-ui.test.ts` |
+| REQ-SET-09 | Built | `core/src/fold.ts`, `src/lib/verification.ts` | `core/test/fold.test.ts`, `test/verification.test.ts` |
+| REQ-SYN-01 | Built | `api/relay.ts` | `test/relay-api.test.ts`, `test/platform-boundaries.test.ts` |
+| REQ-SYN-02 | Built | `src/relay/types.ts`, `src/relay/http.ts`, `src/relay/nostr.ts`, `src/relay/sync.ts` | `test/relay-create.test.ts`, `test/nostr-relay.test.ts` |
+| REQ-SYN-03 | Built | `src/crypto/envelope.ts` | `test/sync.integration.test.ts`, `test/export-security.test.ts` |
+| REQ-SYN-04 | Built | `src/crypto/group.ts`, `src/crypto/envelope.ts`, `src/relay/http.ts`, `src/relay/nostr.ts` | `test/export-security.test.ts`, `test/join-link.test.ts` |
+| REQ-SYN-05 | Built | `src/relay/sync.ts`, `src/config.ts` | `test/sync.integration.test.ts` |
+| REQ-SYN-06 | Built | `src/db/repo.ts`, `src/relay/sync.ts` | `test/sync.integration.test.ts`, `test/sync-state.test.ts` |
+| REQ-SYN-07 | Built | `src/relay/sync.ts` | `test/sync.integration.test.ts` |
+| REQ-SYN-08 | Built | `core/src/transport.ts`, `src/relay/sync.ts` | `core/test/transport.test.ts`, `test/sync.integration.test.ts` |
+| REQ-SYN-09 | Built | `core/src/transport.ts`, `src/relay/sync.ts`, `src/relay/http.ts` | `core/test/transport.test.ts`, `test/sync.integration.test.ts` |
+| REQ-SYN-10 | Built | `src/lib/sync-labels.ts` | `test/sync-labels.test.ts`, `test/sync-coverage.test.ts` |
+| REQ-SYN-11 | Built | `src/relay/diagnostics.ts`, `src/lib/relay-diagnostics.ts` | `test/relay-diagnostics.test.ts`, `test/relay-diagnostics-ui.test.ts` |
+| REQ-SYN-12 | Built | `core/src/fold.ts` | `core/test/fold.test.ts`, `core/test/properties.test.ts` |
+| REQ-SYN-13 | Built | `src/lib/durability.ts`, `src/lib/manual-fallback.ts`, `src/App.svelte` | `test/manual-fallback.test.ts`, `test/manual-fallback-ui.test.ts` |
+| REQ-SYN-14 | Built | `src/relay/sync.ts` | `test/sync.integration.test.ts` |
+| REQ-SYN-15 | Built | `src/lib/sync-labels.ts`, `src/App.svelte` | `test/sync-labels.test.ts`, `test/sync-honesty-ui.test.ts` |
+| REQ-SYN-16 | Built | `src/lib/manual-fallback.ts`, `src/App.svelte` | `test/manual-fallback.test.ts`, `test/manual-fallback-ui.test.ts` |
+| REQ-SYN-17 | Built | `src/relay/nostr.ts`, `scripts/task0-retention.mjs` | `test/nostr-relay.test.ts` |
+| REQ-SYN-18 | Built | `core/src/identity.ts`, `src/relay/sync.ts` | `test/platform-boundaries.test.ts` |
+| REQ-SYN-19 | Built | `core/src/transport.ts` | `core/test/transport.test.ts`, `core/test/properties.test.ts` |
+| REQ-SYN-20 | Built | `core/src/fold.ts`, `core/src/transport.ts` | `core/test/properties.test.ts`, `core/test/transport.test.ts` |
+| REQ-SYN-21 | Built | `src/relay/sync.ts`, `src/relay/http.ts`, `src/relay/nostr.ts` | `test/sync.integration.test.ts` |
+| REQ-SYN-22 | Built | `core/src/fold.ts`, `src/lib/freeze-policy.ts`, `src/App.svelte` | `core/test/properties.test.ts`, `test/freeze-policy.test.ts`, `test/protection-status-ui.test.ts` |
+| REQ-SYN-23 | Built | `src/relay/sync.ts`, `src/relay/http.ts`, `src/relay/nostr.ts` | `test/sync.integration.test.ts`, `test/relay-create.test.ts` |
+| REQ-SYN-24 | Built | `core/src/hlc.ts`, `core/src/transport.ts` | `core/test/hlc.test.ts`, `core/test/transport.test.ts`, `core/test/properties.test.ts` |
+| REQ-SYN-25 | Built | `src/crypto/envelope.ts`, `src/relay/sync.ts` | `test/sync.integration.test.ts` |
+| REQ-SYN-26 | Built | `src/relay/sync.ts` | `test/sync.integration.test.ts` |
+| REQ-SYN-27 | Built | `core/src/transport.ts`, `src/relay/sync.ts` | `core/test/transport.test.ts`, `test/sync.integration.test.ts` |
+| REQ-SYN-28 | Built | `scripts/task0-retention.mjs`, `src/relay/diagnostics.ts` | `test/relay-diagnostics.test.ts`, `test/config.test.ts` |
+| REQ-DUR-01 | Built | `src/lib/durability.ts`, `src/App.svelte` | `test/storage-persistence-ui.test.ts`, `test/platform-boundaries.test.ts` |
+| REQ-DUR-02 | Built | `src/lib/durability.ts`, `src/App.svelte` | `test/pwa-install.test.ts`, `test/durability-prompts-ui.test.ts` |
+| REQ-DUR-03 | Built | `src/lib/durability.ts` | `test/durability-prompts-ui.test.ts` |
+| REQ-DUR-04 | Built | `src/lib/durability.ts` | `test/durability-prompts-ui.test.ts`, `test/pwa-install.test.ts` |
+| REQ-DUR-05 | Built | `src/lib/durability.ts`, `src/App.svelte` | `test/protection-status-ui.test.ts` |
+| REQ-DUR-06 | Built | `src/lib/join-link.ts`, `src/App.svelte` | `test/join-recovery-boundary.test.ts`, `test/durability.test.ts` |
+| REQ-DUR-07 | Built | `src/lib/durability.ts` | `test/export-prompt-ui.test.ts`, `test/durability-prompts-ui.test.ts` |
+| REQ-DUR-08 | Built | `src/lib/durability.ts`, `src/App.svelte` | `test/durability.test.ts`, `test/durability-prompts-ui.test.ts` |
+| REQ-DUR-09 | Built | `src/lib/join-link.ts`, `src/App.svelte` | `test/join-recovery-boundary.test.ts`, `test/durability.test.ts` |
+| REQ-DUR-10 | Built | `src/lib/join-link.ts`, `src/App.svelte` | `test/join-recovery-boundary.test.ts`, `test/durability.test.ts` |
+| REQ-SEC-01 | Built | `src/crypto/claim.ts`, `src/lib/verification.ts`, `core/src/fold.ts` | `test/claim-crypto.test.ts`, `test/verification.test.ts`, `core/test/fold.test.ts` |
+| REQ-SEC-02 | Built | `src/lib/device-link.ts`, `core/src/identity.ts`, `core/src/fold.ts` | `test/device-link.test.ts`, `test/verification.test.ts` |
+| REQ-SEC-03 | Built | `src/crypto/claim.ts`, `src/lib/verification.ts` | `test/claim-crypto.test.ts`, `test/verification.test.ts` |
+| REQ-SEC-04 | Built | `src/crypto/claim.ts`, `src/lib/verification.ts`, `src/lib/device-link.ts` | `test/claim-crypto.test.ts`, `test/verification.test.ts` |
+| REQ-SEC-05 | Built | `src/lib/durability.ts`, `src/lib/archive.ts` | `test/export-security.test.ts`, `test/identity-backup-ui.test.ts` |
+| REQ-SEC-06 | Built | `core/src/identity.ts`, `src/lib/reattestation.ts`, `core/src/fold.ts` | `test/verification.test.ts`, `test/reattestation.test.ts` |
+| REQ-SEC-07 | Built | `core/src/identity.ts`, `src/lib/participants.ts`, `src/App.svelte` | `test/participants.test.ts`, `test/participant-claim-ui.test.ts` |
+| REQ-SEC-08 | Built | `core/src/fold.ts`, `src/lib/verification.ts` | `core/test/identity.test.ts`, `test/verification.test.ts` |
+| REQ-SEC-09 | Built | `src/lib/durability.ts`, `src/App.svelte` | `test/export-security.test.ts`, `test/identity-backup-ui.test.ts` |
+| REQ-PLT-01 | Built | `vite.config.ts`, `vercel.json` | `test/platform-boundaries.test.ts` |
+| REQ-PLT-02 | Built | `public/manifest.webmanifest`, `index.html`, `src/lib/durability.ts`, `src/App.svelte` | `test/pwa-install.test.ts` |
+| REQ-PLT-03 | Built | `public/sw.js`, `src/main.ts` | `test/service-worker.test.ts`, `test/platform-boundaries.test.ts` |
+| REQ-PLT-04 | Built | `public/sw.js`, `src/main.ts` | `test/service-worker.test.ts`, `test/platform-boundaries.test.ts` |
+| REQ-PLT-05 | Built | `src/db/repo.ts` | `test/platform-boundaries.test.ts` |
+| REQ-PLT-06 | Built | `vite.config.ts`, `tsconfig.json` | `test/platform-boundaries.test.ts` |
+| REQ-PLT-07 | Built | `api/relay.ts` | `test/relay-api.test.ts`, `test/platform-boundaries.test.ts` |
+| REQ-PLT-08 | Built | `api/relay.ts` | `test/relay-api.test.ts`, `test/platform-boundaries.test.ts` |
+| REQ-PLT-09 | Built | `src/relay/sync.ts`, `src/lib/lifecycle.ts` | `test/lifecycle.test.ts`, `test/sync.integration.test.ts` |
+| REQ-LIF-01 | Built | `core/src/fold.ts`, `src/lib/lifecycle.ts` | `test/lifecycle.test.ts`, `test/lifecycle-ui.test.ts` |
+| REQ-LIF-02 | Built | `src/lib/archive.ts`, `src/lib/lifecycle.ts`, `src/App.svelte` | `test/archive.test.ts`, `test/lifecycle.test.ts` |
+| REQ-LIF-03 | Built | `src/lib/archive.ts`, `src/App.svelte` | `test/archive.test.ts`, `test/phase5-archive-acceptance.test.ts` |
+| REQ-LIF-04 | Built | `src/lib/archive.ts`, `src/App.svelte` | `test/archive.test.ts`, `test/phase5-archive-acceptance.test.ts` |
+| REQ-LIF-05 | Built | `src/lib/lifecycle.ts`, `src/relay/sync.ts`, `src/App.svelte` | `test/lifecycle.test.ts`, `test/lifecycle-ui.test.ts` |
+| REQ-LIF-06 | Built | `src/lib/archive.ts`, `src/App.svelte` | `test/archive.test.ts`, `test/lifecycle-ui.test.ts` |
+| REQ-LIF-07 | Built | `src/lib/archive.ts`, `src/App.svelte` | `test/archive.test.ts`, `test/lifecycle-ui.test.ts` |
+| REQ-UX-01 | Built | `src/lib/expense-command.ts`, `src/App.svelte` | `test/expense-workflow-ui.test.ts`, `test/common-expense-ui.test.ts` |
+| REQ-UX-02 | Built | `src/App.svelte`, `src/lib/join-link.ts` | `test/landing-ui.test.ts`, `test/participant-claim-ui.test.ts` |
+| REQ-UX-03 | Built | `src/lib/events.ts`, `src/App.svelte` | `test/currency-onboarding.test.ts` |
+| REQ-UX-04 | Built | `src/App.svelte` | `test/empty-state-ui.test.ts` |
+| REQ-UX-05 | Built | `src/App.svelte`, `src/main.ts`, `index.html` | `test/platform-boundaries.test.ts` |
+| REQ-UX-06 | Built | `src/lib/sync-labels.ts`, `src/App.svelte` | `test/sync-honesty-ui.test.ts`, `test/sync-labels.test.ts` |
+
+## Verification
+
+Five rows marked `Built`, re-evidenced with actual grep output on 2026-08-24:
+
+### 1. MON-01 — integer minor units, deterministic allocation
+```
+$ rg -n "export function allocate\b" core/src/money.ts
+10:export function allocate(total: bigint, weights: bigint[], eventId: string, pids: string[]): bigint[] {
+
+$ rg -n "allocate\(1000n" core/test/money.test.ts
+6:    expect(allocate(1000n, [1n, 1n, 1n], "event-1", ["a", "b", "c"]).reduce((a, b) => a + b, 0n)).toBe(1000n);
+7:    expect(allocate(1000n, [1n, 1n, 1n], "event-1", ["a", "b", "c"]).sort((a, b) => Number(b - a))).toEqual([334n, 333n, 333n]);
+```
+
+### 2. SYN-12 — fold determinism under log reordering
+```
+$ rg -n "^export function fold" core/src/fold.ts
+127:export function fold(events: Event[], opts: FoldOptions, ctx?: VerificationContext): State {
+
+$ rg -n -A2 "keeps folded state identical across 1,000" core/test/properties.test.ts
+26:  it("keeps folded state identical across 1,000 deterministic shuffles", () => {
+27-    const events: Event[] = [
+28-      base("ParticipantAdded", { id: "participant-alice", hlc: hlc(1), pid: "alice", name: "Alice" } as never),
+```
+
+### 3. SEC-03 — claim algorithm fallback when Ed25519 is unavailable
+```
+$ rg -n -A7 "export async function pickAlg" src/crypto/claim.ts
+12:export async function pickAlg(): Promise<ClaimAlg> {
+13-  try {
+14-    await crypto.subtle.generateKey({ name: "Ed25519" }, false, ["sign", "verify"]);
+15-    return "ed25519";
+16-  } catch {
+17-    return "ecdsa-p256";
+18-  }
+19-}
+
+$ rg -n "pickAlg|ecdsa-p256" test/claim-crypto.test.ts
+2:import { pickAlg } from "@/crypto/claim";
+12:    await expect(pickAlg()).resolves.toBe("ecdsa-p256");
+```
+
+### 4. LIF-04 — archive exports the ledger automatically
+```
+$ rg -n 'makeEvent\(f, "GroupArchived"|download-export|downloadExport\(undefined' src/App.svelte
+800:    const archiveEvent = makeEvent(f, "GroupArchived", {
+805:      if (action === "download-export") {
+806:        downloadExport(undefined, archivedExportGroup);
+
+$ rg -n -A5 'const archive = makeEvent' test/phase5-archive-acceptance.test.ts
+35:    const archive = makeEvent(factory, "GroupArchived", { outstanding });
+36:    const archivedTrip = await appendEvents(group.groupId, [archive]);
+37:
+38:    await resetRepositoryForTests(`phase5-archive-restore-${crypto.randomUUID()}`);
+39:    const restored = await replaceFromExport(createExport(archivedTrip));
+40:    const restoredArchive = latestArchiveEvent(restored.events);
+```
+
+### 5. SYN-24 — hybrid logical clock never moves backwards
+```
+$ rg -n -A3 "^export function receive" core/src/hlc.ts
+5:export function receive(local: HLC, remote: HLC, now: number): HLC {
+6-  const wall = Math.max(now, local.wall, remote.wall);
+7-  let ctr = 0;
+8-  if (wall === local.wall && wall === remote.wall) ctr = Math.max(local.ctr, remote.ctr) + 1;
+
+$ rg -n -A2 "never decreases when the local clock moves backwards" core/test/hlc.test.ts
+6:  it("never decreases when the local clock moves backwards", () => {
+7-    expect(receive(hlc(1000, 2, "local"), hlc(900, 0, "remote"), 800)).toEqual({ wall: 1000, ctr: 3, dev: "local" });
+8-  });

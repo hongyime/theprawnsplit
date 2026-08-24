@@ -526,4 +526,160 @@ describe("REQ-SYN-12 property convergence", () => {
       { seed: Number(process.env.FAST_CHECK_SEED ?? 20260822), numRuns: 75, verbose: true },
     );
   }, 20_000);
+
+  it("yields identical drift verdicts on replicas ingesting the same future event at different times", () => {
+    fc.assert(
+      fc.property(
+        fc.record({
+          nowEarly: fc.integer({ min: 0, max: 500_000 }),
+          drift: fc.integer({ min: 121_001, max: 1_000_000 }),
+          counter: fc.integer({ min: 1, max: 1000 }),
+          lateDelay: fc.integer({ min: 0, max: 100_000 }),
+        }),
+        ({ nowEarly, drift, counter, lateDelay }) => {
+          const wall = nowEarly + drift;
+          const retryAt = wall - 120_000;
+          fc.pre(nowEarly < retryAt);
+          const nowLate = retryAt + lateDelay;
+          const future = base("ExpenseAdded", {
+            id: `fast:${counter}`,
+            dev: "fast",
+            hlc: hlc(wall, counter, "fast"),
+            xid: "x-drift-replicas",
+            financials: financials(1n, [["alice", 1n]], [["bob", 1n]]),
+            desc: "Future drift replicas",
+            at: wall,
+            date: "2026-08-22",
+          } as never);
+          const participants: Event[] = [
+            base("ParticipantAdded", { id: "participant-alice", hlc: hlc(1), pid: "alice", name: "Alice" } as never),
+            base("ParticipantAdded", { id: "participant-bob", hlc: hlc(2), pid: "bob", name: "Bob" } as never),
+          ];
+          const opts = {
+            supportedVersion: 1,
+            maxFutureDriftMs: 120_000,
+            capUnknownAuthor: 50,
+            capKnownAuthor: 1000,
+            capGroupTotal: 10_000,
+            bufferMaxEvents: 500,
+          };
+
+          // Replica A hears about the event before its retry time: the verdict is buffer-and-retry.
+          const early = admitTransportEvents([future], [...participants], {}, { ...opts, now: nowEarly });
+          expect(early.admitted).toEqual([]);
+          expect(early.buffered).toEqual([{ event: future, retryAt }]);
+          // Replica B only hears about the same event after the retry window has passed.
+          const late = admitTransportEvents([future], [...participants], {}, { ...opts, now: nowLate });
+          expect(late.buffered).toEqual([]);
+          expect(late.admitted.map((event) => event.id)).toEqual([future.id]);
+
+          // Replica A advances past retryAt and replays the buffered event without mutation,
+          // reaching the same admission verdict and transport vector as replica B.
+          const retried = admitTransportEvents([early.buffered[0]!.event], [...participants], {}, { ...opts, now: nowLate });
+          expect(retried.admitted.map((event) => event.id)).toEqual([future.id]);
+          expect(retried.transportVector.fast).toBe(late.transportVector.fast);
+          expect(future.hlc.wall).toBe(wall);
+
+          // Both replicas fold to byte-identical canonical state regardless of ingestion time.
+          const replicaA = canonicalStateBytes(fold([...participants, ...retried.admitted], { supportedVersion: 1 }));
+          const replicaB = canonicalStateBytes(fold([...participants, ...late.admitted], { supportedVersion: 1 }));
+          expect(replicaA).toBe(replicaB);
+        },
+      ),
+      { seed: Number(process.env.FAST_CHECK_SEED ?? 20260822), numRuns: 75, verbose: true },
+    );
+  }, 20_000);
+
+  it("keeps folds associative across merge regroupings", () => {
+    const pids = ["alice", "bob", "chris", "dave"] as const;
+    const pairArbitrary = fc.tuple(fc.constantFrom(...pids), fc.constantFrom(...pids)).filter(([from, into]) => from !== into);
+
+    fc.assert(
+      fc.property(
+        fc.record({
+          a: fc.array(pairArbitrary, { maxLength: 4 }),
+          b: fc.array(pairArbitrary, { maxLength: 4 }),
+          c: fc.array(pairArbitrary, { maxLength: 4 }),
+        }),
+        ({ a, b, c }) => {
+          const participants: Event[] = pids.map((pid, index) =>
+            base("ParticipantAdded", {
+              id: `participant-${pid}`,
+              hlc: hlc(index + 1),
+              pid,
+              name: pid,
+            } as never),
+          );
+          // Each regrouping mints batch-local HLC counters, so (A∪B)∪C and A∪(B∪C)
+          // carry different wall-clock stamping over the same logical merges and must
+          // still converge to the same folded state.
+          const mintBatch = (pairs: [string, string][], startCounter: number): Event[] =>
+            pairs.map(([from, into], index) => {
+              const occurrence = pairs.slice(0, index).filter(([f, i]) => f === from && i === into).length;
+              return base("ParticipantMerged", {
+                id: `merge-${from}-${into}-${occurrence}`,
+                hlc: hlc(startCounter + index),
+                from,
+                into,
+              } as never);
+            });
+
+          const leftGrouped = fold(
+            [...participants, ...mintBatch([...a, ...b], 11), ...mintBatch(c, 11 + a.length + b.length)],
+            { supportedVersion: 1 },
+          );
+          const rightGrouped = fold(
+            [...participants, ...mintBatch(a, 11), ...mintBatch([...b, ...c], 11 + a.length)],
+            { supportedVersion: 1 },
+          );
+          const singleBatch = fold(
+            [...participants, ...mintBatch([...a, ...b, ...c], 11)],
+            { supportedVersion: 1 },
+          );
+
+          expect(canonicalStateBytes(leftGrouped)).toBe(canonicalStateBytes(rightGrouped));
+          expect(canonicalStateBytes(leftGrouped)).toBe(canonicalStateBytes(singleBatch));
+        },
+      ),
+      { seed: Number(process.env.FAST_CHECK_SEED ?? 20260822), numRuns: 75, verbose: true },
+    );
+  }, 20_000);
+
+  it("converges concurrent opposing-direction participant merges in both delivery orders", () => {
+    resetIds();
+    const participants: Event[] = [
+      base("ParticipantAdded", { id: "participant-alice", hlc: hlc(1), pid: "alice", name: "Alice" } as never),
+      base("ParticipantAdded", { id: "participant-bob", hlc: hlc(2), pid: "bob", name: "Bob" } as never),
+      base("ParticipantAdded", { id: "participant-chris", hlc: hlc(3), pid: "chris", name: "Chris" } as never),
+    ];
+    // Concurrent HLCs: same wall clock and counter, different devices.
+    const ab = base("ParticipantMerged", { id: "merge-alice-bob", dev: "device-a", hlc: hlc(10, 1, "device-a"), from: "alice", into: "bob" } as never);
+    const ba = base("ParticipantMerged", { id: "merge-bob-alice", dev: "device-b", hlc: hlc(10, 1, "device-b"), from: "bob", into: "alice" } as never);
+    const expense = base("ExpenseAdded", {
+      id: "expense-opposing",
+      hlc: hlc(5),
+      xid: "x-opposing",
+      financials: financials(30n, [["alice", 30n]], [["bob", 15n], ["chris", 15n]]),
+      desc: "Before opposing merges",
+      at: 1,
+      date: "2026-08-22",
+    } as never);
+    const orders: Event[][] = [
+      [...participants, expense, ab, ba],
+      [...participants, expense, ba, ab],
+    ];
+
+    const reference = canonicalStateBytes(fold(orders[0]!, { supportedVersion: 1 }));
+    expect(canonicalStateBytes(fold(orders[1]!, { supportedVersion: 1 }))).toBe(reference);
+    for (let seed = 1; seed <= 50; seed += 1) {
+      expect(canonicalStateBytes(fold(shuffleWithSeed(orders[0]!, seed), { supportedVersion: 1 }))).toBe(reference);
+    }
+
+    // Both opposing merges collapse onto one unordered edge: alice and bob share a
+    // canonical root, so only two balance keys remain and they stay zero-sum.
+    const state = fold(orders[0]!, { supportedVersion: 1 });
+    expect(state.balances.size).toBe(2);
+    expect([...state.balances.values()].reduce((sum, minor) => sum + minor, 0n)).toBe(0n);
+    expect(state.expenses.has("x-opposing")).toBe(true);
+  }, 20_000);
 });

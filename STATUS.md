@@ -4,7 +4,8 @@ Tracks implementation against `PRD.md`. **The PRD is the specification; this fil
 report card.** When they disagree, the PRD is right and this file is stale — or the code
 is wrong. Never edit the PRD to match the code without a decision recorded in §11.
 
-Last audited: 2026-08-23 against commit 39d95e4b282d03af33a3715e3aeff3594dc23622
+Last audited: 2026-08-24 against commit 891c281 (cr-009-status-register); every referenced
+implementation/test path re-checked for existence, five Built rows re-evidenced below
 
 | ID | Status | Implementation | Tests |
 |---|---|---|---|
@@ -103,7 +104,7 @@ Last audited: 2026-08-23 against commit 39d95e4b282d03af33a3715e3aeff3594dc23622
 | REQ-SEC-08 | Built | `core/src/fold.ts`, `src/lib/verification.ts` | `core/test/identity.test.ts`, `test/verification.test.ts` |
 | REQ-SEC-09 | Built | `src/lib/durability.ts`, `src/App.svelte` | `test/export-security.test.ts`, `test/identity-backup-ui.test.ts` |
 | REQ-PLT-01 | Built | `vite.config.ts`, `vercel.json` | `test/platform-boundaries.test.ts` |
-| REQ-PLT-02 | Built | `public/manifest.json`, `index.html`, `src/lib/durability.ts`, `src/App.svelte` | `test/pwa-install.test.ts` |
+| REQ-PLT-02 | Built | `public/manifest.webmanifest`, `index.html`, `src/lib/durability.ts`, `src/App.svelte` | `test/pwa-install.test.ts` |
 | REQ-PLT-03 | Built | `public/sw.js`, `src/main.ts` | `test/service-worker.test.ts`, `test/platform-boundaries.test.ts` |
 | REQ-PLT-04 | Built | `public/sw.js`, `src/main.ts` | `test/service-worker.test.ts`, `test/platform-boundaries.test.ts` |
 | REQ-PLT-05 | Built | `src/db/repo.ts` | `test/platform-boundaries.test.ts` |
@@ -127,89 +128,71 @@ Last audited: 2026-08-23 against commit 39d95e4b282d03af33a3715e3aeff3594dc23622
 
 ## Verification
 
-Five random rows marked `Built` with proof of implementation and tests:
+Five rows marked `Built`, re-evidenced with actual grep output on 2026-08-24:
 
-### 1. Verification of MON-01 (Integer minor units, lint rule against float money)
-**Implementation (`core/src/money.ts`):**
-```typescript
-export function allocate(total: bigint, weights: bigint[], eventId: string, pids: string[]): bigint[] {
-  if (weights.length === 0) return [];
-  const sumWeights = weights.reduce((acc, w) => acc + w, 0n);
+### 1. MON-01 — integer minor units, deterministic allocation
 ```
-**Test (`core/test/money.test.ts`):**
-```typescript
-  it("splits equally across 3 participants with deterministic 1-cent remainder distribution", () => {
-    const splits = allocateEqually(1000n, ["p1", "p2", "p3"], "event-1");
-    expect(splits).toEqual([334n, 333n, 333n]);
+$ rg -n "export function allocate\b" core/src/money.ts
+10:export function allocate(total: bigint, weights: bigint[], eventId: string, pids: string[]): bigint[] {
+
+$ rg -n "allocate\(1000n" core/test/money.test.ts
+6:    expect(allocate(1000n, [1n, 1n, 1n], "event-1", ["a", "b", "c"]).reduce((a, b) => a + b, 0n)).toBe(1000n);
+7:    expect(allocate(1000n, [1n, 1n, 1n], "event-1", ["a", "b", "c"]).sort((a, b) => Number(b - a))).toEqual([334n, 333n, 333n]);
 ```
 
-### 2. Verification of SYN-12 (Log merge is set union by event ID; commutative, associative, idempotent)
-**Implementation (`core/src/fold.ts`):**
-```typescript
-export function foldEvents(events: LedgerEvent[], options: FoldOptions = {}): FoldResult {
-  const sorted = sortEventsDeterministically(events);
+### 2. SYN-12 — fold determinism under log reordering
 ```
-**Test (`core/test/properties.test.ts`):**
-```typescript
-  it("keeps folded state identical across 1,000 deterministic shuffles", () => {
-    const baseline = foldEvents(sampleEvents);
-    for (let i = 0; i < 1000; i++) {
-      const shuffled = shuffle(sampleEvents, i);
-      expect(foldEvents(shuffled).balances).toEqual(baseline.balances);
-    }
-  });
+$ rg -n "^export function fold" core/src/fold.ts
+127:export function fold(events: Event[], opts: FoldOptions, ctx?: VerificationContext): State {
+
+$ rg -n -A2 "keeps folded state identical across 1,000" core/test/properties.test.ts
+26:  it("keeps folded state identical across 1,000 deterministic shuffles", () => {
+27-    const events: Event[] = [
+28-      base("ParticipantAdded", { id: "participant-alice", hlc: hlc(1), pid: "alice", name: "Alice" } as never),
 ```
 
-### 3. Verification of SEC-01 (Claim keypair minting and cryptographic settlement confirmation)
-**Implementation (`src/crypto/claim.ts`):**
-```typescript
-export async function mintClaimKeyPair(): Promise<{ keyPair: ClaimKeyPair; alg: "Ed25519" | "ECDSA-P256" }> {
-  try {
-    const keyPair = (await crypto.subtle.generateKey("Ed25519", true, ["sign", "verify"])) as CryptoKeyPair;
+### 3. SEC-03 — claim algorithm fallback when Ed25519 is unavailable
 ```
-**Test (`test/claim-crypto.test.ts`):**
-```typescript
-  it("mints an algorithm-agile claim keypair and verifies signatures binding groupTag", async () => {
-    const { keyPair, alg } = await mintClaimKeyPair();
-    const payload = "groupTag123:confirm:settlement456";
-    const sig = await signClaimPayload(keyPair.privateKey, payload);
-    const valid = await verifyClaimSignature(keyPair.publicKey, alg, payload, sig);
-    expect(valid).toBe(true);
-  });
+$ rg -n -A7 "export async function pickAlg" src/crypto/claim.ts
+12:export async function pickAlg(): Promise<ClaimAlg> {
+13-  try {
+14-    await crypto.subtle.generateKey({ name: "Ed25519" }, false, ["sign", "verify"]);
+15-    return "ed25519";
+16-  } catch {
+17-    return "ecdsa-p256";
+18-  }
+19-}
+
+$ rg -n "pickAlg|ecdsa-p256" test/claim-crypto.test.ts
+2:import { pickAlg } from "@/crypto/claim";
+12:    await expect(pickAlg()).resolves.toBe("ecdsa-p256");
 ```
 
-### 4. Verification of PLT-07 (Operated Vercel relay function with publish and fetch)
-**Implementation (`api/relay.ts`):**
-```typescript
-export default async function handler(req: VercelRequest, res: VercelResponse) {
-  if (req.method === "POST") {
-    // publish endpoint
-  } else if (req.method === "GET") {
-    // fetch endpoint
-  }
+### 4. LIF-04 — archive exports the ledger automatically
 ```
-**Test (`test/relay-api.test.ts`):**
-```typescript
-  it("handles blind publish and fetch without interpreting ciphertext payload", async () => {
-    const res = await handler(mockReq, mockRes);
-    expect(res.status).toBe(200);
-  });
+$ rg -n 'makeEvent\(f, "GroupArchived"|download-export|downloadExport\(undefined' src/App.svelte
+800:    const archiveEvent = makeEvent(f, "GroupArchived", {
+805:      if (action === "download-export") {
+806:        downloadExport(undefined, archivedExportGroup);
+
+$ rg -n -A5 'const archive = makeEvent' test/phase5-archive-acceptance.test.ts
+35:    const archive = makeEvent(factory, "GroupArchived", { outstanding });
+36:    const archivedTrip = await appendEvents(group.groupId, [archive]);
+37:
+38:    await resetRepositoryForTests(`phase5-archive-restore-${crypto.randomUUID()}`);
+39:    const restored = await replaceFromExport(createExport(archivedTrip));
+40:    const restoredArchive = latestArchiveEvent(restored.events);
 ```
 
-### 5. Verification of LIF-04 (Archiving performs JSON export automatically and presents file)
-**Implementation (`src/lib/archive.ts`):**
-```typescript
-export async function archiveGroupWithExport(groupId: string): Promise<TripLedgerExport> {
-  const exportData = await createTripLedgerExport(groupId);
-  await appendGroupArchived(groupId);
-  return exportData;
-}
+### 5. SYN-24 — hybrid logical clock never moves backwards
 ```
-**Test (`test/archive.test.ts`):**
-```typescript
-  it("generates an export bundle automatically when archiving a group", async () => {
-    const exported = await archiveGroupWithExport(group.id);
-    expect(exported.schemaVersion).toBe(2);
-    expect(exported.events.length).toBeGreaterThan(0);
-  });
-```
+$ rg -n -A3 "^export function receive" core/src/hlc.ts
+5:export function receive(local: HLC, remote: HLC, now: number): HLC {
+6-  const wall = Math.max(now, local.wall, remote.wall);
+7-  let ctr = 0;
+8-  if (wall === local.wall && wall === remote.wall) ctr = Math.max(local.ctr, remote.ctr) + 1;
+
+$ rg -n -A2 "never decreases when the local clock moves backwards" core/test/hlc.test.ts
+6:  it("never decreases when the local clock moves backwards", () => {
+7-    expect(receive(hlc(1000, 2, "local"), hlc(900, 0, "remote"), 800)).toEqual({ wall: 1000, ctr: 3, dev: "local" });
+8-  });

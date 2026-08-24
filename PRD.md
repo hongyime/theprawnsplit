@@ -214,6 +214,9 @@ A self-hosted, serverless clone has no monetisation pressure by construction. Th
 ## 7. Requirements
  
 Requirements are testable assertions. Cite by ID in review.
+
+The Phase column is scope planning (§15), not delivery status — STATUS.md owns status.
+
  
 ### 7.1 Identity and participants
  
@@ -250,7 +253,7 @@ Requirements are testable assertions. Cite by ID in review.
 | REQ-MON-05 | Four split modes: Equally, Exact amounts, Shares, Percentage | 1 |
 | REQ-MON-06 | Switching split mode MUST preserve user intent per the mapping in §9.4. Blanking the form on mode change is prohibited | 1 |
 | REQ-MON-07 | One currency per group in v1, inferred from locale, editable, never a setup step | 1 |
-| REQ-MON-08 | Multi-currency stores the exchange rate frozen at entry time inside the expense event | Built |
+| REQ-MON-08 | Multi-currency stores the exchange rate frozen at entry time inside the expense event | 5 |
 | REQ-MON-09 | The recipient of the rounding remainder MUST be visible to the user | 1 |
 | REQ-MON-10 | Expenses are editable and voidable via new events. In-place mutation is prohibited | 1 |
 | REQ-MON-11 | `ExpenseAdded.payers` is an array in schema v1. `Σ payers.minor` MUST equal `minor`. Single-payer is the one-element case. The multi-payer **UI** ships in Phase 5; the **schema** ships in Phase 1 to avoid a log migration | 1 |

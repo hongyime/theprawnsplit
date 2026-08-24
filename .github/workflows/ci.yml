@@ -4,6 +4,26 @@ name: Build Check
 # - concurrency: cancel-in-progress so a new commit cancels the previous PR build.
 # - Existing paths filter kept (already skips markdown-only edits).
 on:
+  push:
+    branches: [main]
+    paths:
+      # Only run when JS/TS source or dependency files change
+      - "**.ts"
+      - "**.tsx"
+      - "**.js"
+      - "**.jsx"
+      - "**.vue"
+      - "**.svelte"
+      - "**.css"
+      - "**.scss"
+      - "package.json"
+      - "package-lock.json"
+      - "pnpm-lock.yaml"
+      - "bun.lockb"
+      - "postcss.config.*"
+      - "tailwind.config.*"
+      - "vite.config.*"
+      - "tsconfig*.json"
   pull_request:
     branches: [main, master]
     paths:
@@ -13,6 +33,7 @@ on:
       - "**.js"
       - "**.jsx"
       - "**.vue"
+      - "**.svelte"
       - "**.css"
       - "**.scss"
       - "package.json"

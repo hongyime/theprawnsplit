@@ -68,3 +68,15 @@ REQ-SYN-17 VALIDATED: `#t` tag queries return counts identical to `ids` queries 
 | 2026-08-24 06:29 | 41.5h | wss://relay.primal.net | 50/50 | 100% | 50/50 (100%) |  |
 | 2026-08-24 06:29 | 41.5h | wss://nostr.mom | 50/50 | 100% | 50/50 (100%) |  |
 | 2026-08-24 06:29 | 41.5h | wss://offchain.pub | 15/15 | 100% | 15/50 (30%) |  |
+
+## A13 batch publish probe (PRD §12 A13)
+
+Measured 2026-08-24 14:09: 50 events x ~3000 B sent as ONE WebSocket message (221449 bytes total) to the current default pool. Verbatim rejection text preserved.
+
+| relay | NIP-11 max_message_length | message bytes | accepted | OK replies | notes |
+|---|---|---|---|---|---|
+| wss://nos.lol | 131072 | 221449 | 0/50 | 0/50 | no OK replies — message dropped without rejection text |
+| wss://relay.primal.net | 1000000 | 221449 | 1/50 | 1/50 | partial acknowledgement without rejection text |
+| wss://nostr.mom | 131072 | 221449 | 0/50 | 0/50 | no OK replies — message dropped without rejection text |
+| wss://offchain.pub | 131072 | 221449 | 0/50 | 0/50 | no OK replies — message dropped without rejection text |
+| wss://relay.snort.social | 524288 | 221449 | 1/50 | 1/50 | partial acknowledgement without rejection text |

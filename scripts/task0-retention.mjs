@@ -476,6 +476,117 @@ async function vet(relay) {
   if (policyBlocked) console.log("  → Structural admission block (WoT / policy). Disqualified.");
   if (socketFail) console.log("  → Socket never opened. Relay unreachable.");
   if (verdict === "WARN") console.log("  → Partial acceptance. Investigate before adding to defaults.");
+
+}
+
+// NIP-11 relay information document — reads limitation.max_message_length (PRD A13).
+async function nip11(relay) {
+  const httpUrl = relay.replace(/^wss:\/\//, "https://").replace(/^ws:\/\//, "http://");
+  const res = await fetch(httpUrl, { headers: { Accept: "application/nostr+json" } });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const doc = await res.json();
+  return { software: doc.software ?? "", version: doc.version ?? "", maxMessageLength: doc.limitation?.max_message_length ?? null };
+}
+
+/**
+ * batch50 — PRD A13 measurement.
+ *
+ * Builds 50 kind-KIND events (~PAYLOAD_BYTES each) and publishes them to each
+ * current-pool default relay as ONE WebSocket message (["EVENT", e0..e49]).
+ * Records NIP-11 limitation.max_message_length plus per-relay accept/reject
+ * counts with verbatim OK reason text, then appends an A13 section to REPORT.
+ */
+async function batch50() {
+  const relays = readCurrentRelays();
+  const sk = generateSecretKey();
+  const seed = webcrypto.getRandomValues(new Uint8Array(32));
+  const digest = await webcrypto.subtle.digest("SHA-256", seed);
+  const tag = Buffer.from(digest).toString("hex");
+
+  console.log(`A13 batch50: ${EVENT_COUNT} events x ~${PAYLOAD_BYTES} B, kind ${KIND}, tag ${tag.slice(0, 12)}…`);
+  console.log(`relays (${relays.length}): ${relays.join(", ")}`);
+
+  const events = [];
+  for (let i = 0; i < EVENT_COUNT; i++) {
+    const content = Buffer.from(webcrypto.getRandomValues(new Uint8Array(PAYLOAD_BYTES))).toString("base64");
+    events.push(finalizeEvent(
+      { kind: KIND, created_at: Math.floor(Date.now() / 1000), tags: [["t", tag], ["s", String(i)]], content },
+      sk,
+    ));
+  }
+  const message = JSON.stringify(["EVENT", ...events]);
+  const messageBytes = Buffer.byteLength(message);
+  console.log(`single message size: ${messageBytes} bytes`);
+
+  const results = [];
+  for (const relay of relays) {
+    const row = { relay, maxMessageLength: null, nip11Error: "", messageBytes, accepted: 0, rejected: [], socketError: "", okCount: 0 };
+
+    try {
+      const info = await nip11(relay);
+      row.maxMessageLength = info.maxMessageLength;
+      row.nip11Software = `${info.software} ${info.version}`.trim();
+    } catch (err) {
+      row.nip11Error = String(err).slice(0, 80);
+    }
+
+    let ws;
+    try {
+      ws = new WebSocket(relay);
+      ws.onerror = () => {};
+      await new Promise((res, rej) => {
+        const timer = setTimeout(() => rej(new Error("open timeout")), 10_000);
+        ws.onopen = () => { clearTimeout(timer); res(); };
+        ws.onerror = () => { clearTimeout(timer); rej(new Error("open error")); };
+      });
+    } catch (err) {
+      row.socketError = String(err && err.message ? err.message : err).slice(0, 80);
+      results.push(row);
+      continue;
+    }
+
+    const oks = new Promise((resolve) => {
+      ws.onmessage = (e) => {
+        try {
+          const d = JSON.parse(e.data);
+          if (d[0] === "OK") {
+            row.okCount++;
+            if (d[2]) row.accepted++;
+            else row.rejected.push(String(d[3] ?? ""));
+          } else if (d[0] === "NOTICE") {
+            row.rejected.push(`NOTICE: ${d[1]}`);
+          } else if (d[0] === "AUTH") {
+            row.rejected.push("AUTH challenge received");
+          }
+        } catch {}
+      };
+      resolve();
+    });
+      await oks;
+    try {
+      ws.send(message);
+    } catch (err) {
+      row.socketError = `send: ${String(err).slice(0, 60)}`;
+    }
+    await sleep(15_000);
+    try { ws.close(); } catch {}
+    results.push(row);
+    console.log(`\n${relay}:`);
+    console.log(`  NIP-11 max_message_length: ${row.maxMessageLength ?? "—"}${row.nip11Error ? ` (${row.nip11Error})` : ""}`);
+    console.log(`  OK replies: ${row.okCount}/50, accepted: ${row.accepted}/50${row.socketError ? `, socket: ${row.socketError}` : ""}`);
+    for (const reason of row.rejected.slice(0, 5)) console.log(`  reject reason: "${reason}"`);
+  }
+
+  const date = new Date().toISOString().slice(0, 16).replace("T", " ");
+  const lines = [``, `## A13 batch publish probe (PRD §12 A13)`, ``, `Measured ${date}: ${EVENT_COUNT} events x ~${PAYLOAD_BYTES} B sent as ONE WebSocket message (${messageBytes} bytes total) to the current default pool. Verbatim rejection text preserved.`, ``, `| relay | NIP-11 max_message_length | message bytes | accepted | OK replies | notes |`, `|---|---|---|---|---|---|`];
+  for (const r of results) {
+    const notes = [r.socketError, r.nip11Error, ...r.rejected.map((x) => `reject: "${x}"`)].filter(Boolean).join("; ")
+      || (r.okCount === 0 ? "no OK replies — message dropped without rejection text" : r.accepted === EVENT_COUNT ? "all accepted" : "partial acknowledgement without rejection text");
+    lines.push(`| ${r.relay} | ${r.maxMessageLength ?? "—"} | ${r.messageBytes} | ${r.accepted}/${EVENT_COUNT} | ${r.okCount}/${EVENT_COUNT} | ${notes} |`);
+  }
+  mkdirSync(".agents", { recursive: true });
+  appendFileSync(REPORT, lines.join("\n") + "\n");
+  console.log(`\nappended A13 section to ${REPORT}`);
 }
 
 function humanElapsed(ms) {
@@ -515,7 +626,12 @@ else if (cmd === "publish-slow") await publishSlow();
 else if (cmd === "check-slow") await check(SLOW_MANIFEST, SLOW_REPORT);
 else if (cmd === "publish-current") await publishCurrent();
 else if (cmd === "check-current") await check(CURRENT_MANIFEST, CURRENT_REPORT);
+else if (cmd === "batch50") await batch50();
+else if (cmd === "nip11") {
+  const info = await nip11(process.argv[3] || "wss://nos.lol");
+  console.log(JSON.stringify(info));
+}
 else {
-  console.error("usage: node scripts/task0-retention.mjs <publish|check|probe <relay>|vet <relay>|publish-slow|check-slow|publish-current|check-current>");
+  console.error("usage: node scripts/task0-retention.mjs <publish|check|probe <relay>|vet <relay>|batch50|nip11 <relay>|publish-slow|check-slow|publish-current|check-current>");
   process.exit(1);
 }

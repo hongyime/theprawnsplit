@@ -1180,7 +1180,7 @@ from `groupSecret`, while preserving the relay's inability to decrypt ledger con
 | **A1** | Public Nostr relays will accept and retain our event kind for ≥30 days | **UNVERIFIED — LOAD-BEARING. External review judges this LIKELY FALSE:** free relays prune aggressively via size caps, anti-spam heuristics, and LRU eviction | Phase 2 Task 0: publish 300 events, check read-back at 1h / 24h / 7d / 30d | Already hedged: D-12 ships the Durable Object dual-write in Phase 2 **regardless of the outcome** — Task 0 now only calibrates how much weight the Nostr pool carries. Snapshots (REQ-SYN-14) mitigate independently. |
 | **A11** | Default relays accept our chosen kind at all, and do not reject unfamiliar kinds by policy | **VERIFIED 2026-08-22.** No relay rejected kind 1512. Failures were WoT policy and socket-level, never kind-related | Phase 2 Task 0; check NIP-11 `supported_nips` and `limitation` | Choose a different kind, or rely on the own-relay path |
 | **A12** | Relay `t`-tag values are not truncated or rejected at 64 hex characters | **VERIFIED 2026-08-22.** `#t` tag queries returned counts identical to `ids` queries on all five relays. 64-char lowercase hex tags are indexed correctly. **REQ-SYN-17 validated on real infrastructure** | Phase 2 Task 0 | Shorten `groupTag` to 32 hex chars (128-bit); collision risk remains negligible |
-| **A13** | Batching ≤50 ledger events stays under every default relay's `max_message_length` | **Still open.** The probe used 3 kB single events, not 50-event batches. Untested | Read NIP-11 `limitation.max_message_length` at startup | Reduce batch size dynamically per relay. Config-only change |
+| **A13** | Batching ≤50 ledger events stays under every default relay's `max_message_length` | **FALSE — measured 2026-08-24 (CR-010).** A single 50-event message is 221,449 bytes. Three of five default relays cap at `max_message_length: 131072` (nos.lol, nostr.mom, offchain.pub) and dropped it with zero OK replies; primal (1,000,000) and snort (524,288) accepted only 1/50 with no rejection text — array-form batch publishing is unreliable even where the byte limit passes. Data: `.agents/task0-retention.md` §A13 | NIP-11 `limitation.max_message_length` probed on all five default relays; one 221 kB `["EVENT", ×50]` message per relay, verbatim results recorded | **Required follow-up, not a contingency:** dynamic per-relay batch sizing from NIP-11 limits AND per-event fallback publish when an array batch is not fully acknowledged (follow-up recorded at the end of §15) |
 | **A2** | iOS home-screen PWAs receive a more lenient storage-eviction counter than Safari tabs | Medium — stated by WebKit, Apple may change | Manual testing across an OS release | Relay recovery (REQ-DUR-06) becomes the sole defence. Already designed for. |
 | **A3** | `navigator.storage.persist()` is granted for installed PWAs on target browsers | Medium — browser-dependent, best-effort by spec | Instrument `persisted()` results during Phase 3 | Protection dot goes amber; nag ladder escalates. Already handled. |
 | **A4** | Groups remain ≤12 participants and ≤400 expenses | High | Observed usage | Version vectors and snapshots grow. Still viable to ~50 devices / 2,000 expenses. |
@@ -1251,7 +1251,7 @@ from `groupSecret`, while preserving the relay's inability to decrypt ledger con
  
 ### 14.3 Still open
 
-**None.** Every question raised across four review rounds is closed. A11, A12, and A8 are verified by Task 0 measurement (2026-08-22). A13 remains open (batch-size under relay limits untested). A15 (export discipline) by Phase 3 instrumentation.
+**None.** Every question raised across four review rounds is closed. A11, A12, and A8 are verified by Task 0 measurement (2026-08-22). A13 measured **FALSE** on 2026-08-24 (§12); its mitigation is recorded as a required follow-up at the end of §15. A15 (export discipline) by Phase 3 instrumentation.
 
 ## 15. Phases and acceptance criteria
  
@@ -1377,6 +1377,11 @@ perform.
 absorbs the algorithm implementation that was previously in Phase 1, and pays that back in
 debugging avoided. Phase 1 is independently useful; Phases 1–3 is the point of handing it
 to friends.
+
+**Follow-up (added by CR-010, from the A13 measurement):** relay publishing needs dynamic
+per-relay batch sizing derived from NIP-11 `limitation.max_message_length`, plus a per-event
+fallback when an array-form batch is not fully acknowledged. This is required work for REQ-SYN-05
+quorum reliability on the current default pool, not a contingency. See `.agents/task0-retention.md` §A13.
  
 ---
  

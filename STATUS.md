@@ -4,11 +4,14 @@ Tracks implementation against `PRD.md`. **The PRD is the specification; this fil
 report card.** When they disagree, the PRD is right and this file is stale — or the code
 is wrong. Never edit the PRD to match the code without a decision recorded in §11.
 
-Last audited: 2026-08-24 against commit 891c281 (cr-009-status-register); every referenced
-implementation/test path re-checked for existence, five Built rows re-evidenced below
+Last audited: 2026-08-24 (CR-010 semantic re-audit against main @ 62b321b): all **36 PRD rows whose
+phase is ≥ 3** were re-checked for ASSERTION-LEVEL coverage — does the cited test assert the
+requirement's behaviour, not merely touch the same files? Three rows downgraded to `Partial` with
+one-line gaps in the Notes column. The CR-009 pass (same day) verified file existence only.
 
+| ID | Status | Implementation | Tests | Notes |
 | ID | Status | Implementation | Tests |
-|---|---|---|---|
+|---|---|---|---|---|
 | REQ-ID-01 | Built | `src/App.svelte`, `src/main.ts` | `test/platform-boundaries.test.ts` |
 | REQ-ID-02 | Built | `src/lib/ids.ts`, `src/db/repo.ts` | `test/device-identity.test.ts`, `test/device-id-privacy-ui.test.ts` |
 | REQ-ID-03 | Built | `core/src/types.ts`, `core/src/identity.ts`, `core/src/fold.ts` | `core/test/identity.test.ts`, `test/participants.test.ts` |
@@ -20,8 +23,8 @@ implementation/test path re-checked for existence, five Built rows re-evidenced 
 | REQ-ID-09 | Built | `src/lib/participants.ts`, `src/App.svelte` | `test/participant-claim-ui.test.ts` |
 | REQ-ID-10 | Built | `src/lib/participants.ts`, `src/App.svelte` | `test/participant-claim-ui.test.ts` |
 | REQ-ID-11 | Built | `src/lib/join-link.ts`, `src/App.svelte` | `test/join-recovery-boundary.test.ts`, `test/durability.test.ts` |
-| REQ-ID-12 | Built | `core/src/identity.ts`, `core/src/fold.ts`, `src/App.svelte` | `core/test/identity.test.ts`, `test/reconciliation-ui.test.ts` |
-| REQ-ID-13 | Built | `core/src/identity.ts`, `core/src/fold.ts` | `core/test/identity.test.ts`, `core/test/properties.test.ts` |
+| REQ-ID-12 | Partial | `core/src/identity.ts`, `core/src/fold.ts`, `src/App.svelte` | `core/test/fold.test.ts`, `test/reconciliation-ui.test.ts` | Fold-side duplicate anomaly is asserted (`core/test/fold.test.ts:367`) but the possible-duplicate-participants banner rendering has no test — reconciliation-ui only covers the marked-distinct-contradiction variant |
+| REQ-ID-13 | Built | `core/src/identity.ts`, `core/src/fold.ts` | `core/test/identity.test.ts`, `core/test/properties.test.ts` | CR-010 added the pinned opposing-direction merge case (`core/test/properties.test.ts`, concurrent HLCs convergent in both delivery orders); convergence is over-determined by four layers (compareHlc dev tiebreak, id tiebreak, fold pre-sort, direction-independent min-root union) |
 | REQ-ID-14 | Built | `core/src/fold.ts`, `src/lib/events.ts` | `core/test/fold.test.ts`, `test/reconciliation-ui.test.ts` |
 | REQ-ID-15 | Built | `src/lib/expense-command.ts`, `src/App.svelte` | `test/expense-command.test.ts`, `test/landing-ui.test.ts` |
 | REQ-ID-16 | Built | `core/src/identity.ts`, `core/src/fold.ts` | `core/test/identity.test.ts`, `test/reconciliation-ui.test.ts` |
@@ -86,14 +89,14 @@ implementation/test path re-checked for existence, five Built rows re-evidenced 
 | REQ-SYN-28 | Built | `scripts/task0-retention.mjs`, `src/relay/diagnostics.ts` | `test/relay-diagnostics.test.ts`, `test/config.test.ts` |
 | REQ-DUR-01 | Built | `src/lib/durability.ts`, `src/App.svelte` | `test/storage-persistence-ui.test.ts`, `test/platform-boundaries.test.ts` |
 | REQ-DUR-02 | Built | `src/lib/durability.ts`, `src/App.svelte` | `test/pwa-install.test.ts`, `test/durability-prompts-ui.test.ts` |
-| REQ-DUR-03 | Built | `src/lib/durability.ts` | `test/durability-prompts-ui.test.ts` |
+| REQ-DUR-03 | Partial | `src/lib/durability.ts` | `test/durability-prompts-ui.test.ts` | Ladder rungs 1/4 and the expense-count trigger (`expenseCount >= 3`) are unasserted; only session-count rungs 2–3 plus the dismissal cap are tested (`test/durability.test.ts:40`) |
 | REQ-DUR-04 | Built | `src/lib/durability.ts` | `test/durability-prompts-ui.test.ts`, `test/pwa-install.test.ts` |
 | REQ-DUR-05 | Built | `src/lib/durability.ts`, `src/App.svelte` | `test/protection-status-ui.test.ts` |
-| REQ-DUR-06 | Built | `src/lib/join-link.ts`, `src/App.svelte` | `test/join-recovery-boundary.test.ts`, `test/durability.test.ts` |
+| REQ-DUR-06 | Partial | `src/lib/join-link.ts`, `src/App.svelte` | `test/join-recovery-boundary.test.ts`, `test/durability.test.ts` | Recovery-before-render ordering is only source-shape containment (`if (joinBlocked) await runSync();`); no behavioural test asserts the sync attempt precedes rendering or that recovery completes |
 | REQ-DUR-07 | Built | `src/lib/durability.ts` | `test/export-prompt-ui.test.ts`, `test/durability-prompts-ui.test.ts` |
 | REQ-DUR-08 | Built | `src/lib/durability.ts`, `src/App.svelte` | `test/durability.test.ts`, `test/durability-prompts-ui.test.ts` |
-| REQ-DUR-09 | Built | `src/lib/join-link.ts`, `src/App.svelte` | `test/join-recovery-boundary.test.ts`, `test/durability.test.ts` |
-| REQ-DUR-10 | Built | `src/lib/join-link.ts`, `src/App.svelte` | `test/join-recovery-boundary.test.ts`, `test/durability.test.ts` |
+| REQ-DUR-09 | Built | `src/lib/join-link.ts`, `src/App.svelte` | `test/join-recovery-boundary.test.ts`, `test/manual-fallback-ui.test.ts` | Import-as-primary asserted at `test/manual-fallback-ui.test.ts:32` (`primary-link` + `Import JSON` in the recovery panel), not in the previously cited durability tests |
+| REQ-DUR-10 | Built | `src/lib/join-link.ts`, `src/App.svelte` | `test/manual-fallback-ui.test.ts` | First-join vs eviction distinction asserted at `test/manual-fallback-ui.test.ts:32` (`recoveryMode === "evicted"` headings, primary-link import promoted only when evicted) |
 | REQ-SEC-01 | Built | `src/crypto/claim.ts`, `src/lib/verification.ts`, `core/src/fold.ts` | `test/claim-crypto.test.ts`, `test/verification.test.ts`, `core/test/fold.test.ts` |
 | REQ-SEC-02 | Built | `src/lib/device-link.ts`, `core/src/identity.ts`, `core/src/fold.ts` | `test/device-link.test.ts`, `test/verification.test.ts` |
 | REQ-SEC-03 | Built | `src/crypto/claim.ts`, `src/lib/verification.ts` | `test/claim-crypto.test.ts`, `test/verification.test.ts` |
@@ -196,3 +199,45 @@ $ rg -n -A2 "never decreases when the local clock moves backwards" core/test/hlc
 6:  it("never decreases when the local clock moves backwards", () => {
 7-    expect(receive(hlc(1000, 2, "local"), hlc(900, 0, "remote"), 800)).toEqual({ wall: 1000, ctr: 3, dev: "local" });
 8-  });
+```
+
+## CR-010 semantic re-audit (2026-08-24)
+
+Scope: every row whose PRD phase column is ≥ 3 — 36 rows total (12× phase 3: DUR-01..10,
+SEC-05, SEC-09; 16× phase-4 component: ID-12/13/14/16/19, MON-17, SET-04..09, SEC-01's verify half,
+SEC-02/06/08; 8× phase 5: MON-08, LIF-01..07). The work order estimated 37; the PRD contains 36 rows
+with a phase ≥ 3 component. For each row the requirement text and the cited test assertions were read;
+the question was whether the test ASSERTS the requirement or merely touches the same area.
+
+Result: **33 Built / 3 Partial / 0 Not started**.
+
+- **DUR-03 → Partial.** `test/durability.test.ts:40` asserts rungs 2–3 via session counts and the
+  four-dismissal retirement, but no test exercises rung 1, rung 4 (`daysSinceLastSeen >= 7d`), or the
+  `expenseCount >= 3` trigger branch in `src/lib/durability.ts:69`.
+- **DUR-06 → Partial.** `test/join-recovery-boundary.test.ts` pins source shape (`await runSync()` on
+  joinBlocked, waiting panel replacing empty roster) but nothing asserts recovery is attempted BEFORE
+  rendering or that recovery actually completes end-to-end.
+- **ID-12 → Partial.** The fold-side duplicate anomaly is asserted (`core/test/fold.test.ts:367`) and
+  `src/App.svelte:1409` renders its banner, but no test covers that banner for
+  `possible-duplicate-participants`; `test/reconciliation-ui.test.ts` only covers the
+  `distinct-participants-merged` contradiction variant.
+
+Representative assertion-level evidence for rows kept Built (all verified verbatim during this audit):
+
+- SET-09 contested confirmations hold pending: `core/test/fold.test.ts` "keeps contested settlement
+  confirmations pending" asserts `pending === true`, `confirmed === false`, `contestedConfirmation === true`
+  plus `unverified-reclaim` anomaly under a second unpaired claim.
+- SEC-02 real-signature delegation: `test/verification.test.ts:125` proves WebCrypto-signed `DeviceLinked`
+  authority confirms while an impostor same-participant claim leaves the settlement `pending` with
+  `contestedConfirmation`.
+- SEC-05 export split: `test/export-security.test.ts:69` asserts no `identities`/`secretB64`/`claimSk`/
+  `private-d` in `TripLedgerExport`, with `DeviceIdentityBackup` separately carrying `claimSkJwk` (:112).
+- LIF-05 archived read-only + polling stop: `test/lifecycle.test.ts:77` stops polling when archived/hidden;
+  `test/lifecycle-ui.test.ts:10` keeps archived trips readable but read-only.
+- MON-08 frozen rate: `test/multicurrency.test.ts:13` freezes rate at entry; `test/phase5-money-acceptance.test.ts`
+  round-trips the rate-bearing event through export/restore.
+- DUR-09/10 citation corrected to `test/manual-fallback-ui.test.ts:32`, which carries the actual assertions
+  (primary-link import promotion, evicted vs first-join headings); the previously cited durability tests do not.
+
+No row was upgraded without new evidence; no evidence was fabricated. Rows outside this scope retain their
+CR-009 existence-level verification.

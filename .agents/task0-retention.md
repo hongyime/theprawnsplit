@@ -80,3 +80,8 @@ Measured 2026-08-24 14:09: 50 events x ~3000 B sent as ONE WebSocket message (22
 | wss://nostr.mom | 131072 | 221449 | 0/50 | 0/50 | no OK replies — message dropped without rejection text |
 | wss://offchain.pub | 131072 | 221449 | 0/50 | 0/50 | no OK replies — message dropped without rejection text |
 | wss://relay.snort.social | 524288 | 221449 | 1/50 | 1/50 | partial acknowledgement without rejection text |
+| 2026-08-25 06:22 | 2.7d | wss://relay.damus.io | 6/6 | 100% | 6/50 (12%) |  |
+| 2026-08-25 06:22 | 2.7d | wss://nos.lol | 50/50 | 100% | 50/50 (100%) |  |
+| 2026-08-25 06:22 | 2.7d | wss://relay.primal.net | 50/50 | 100% | 50/50 (100%) |  |
+| 2026-08-25 06:22 | 2.7d | wss://nostr.mom | 50/50 | 100% | 50/50 (100%) |  |
+| 2026-08-25 06:22 | 2.7d | wss://offchain.pub | 15/15 | 100% | 15/50 (30%) |  |

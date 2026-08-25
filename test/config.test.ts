@@ -72,4 +72,44 @@ describe("client numeric config parsing", () => {
       duplicated: [],
     });
   });
+
+  it("every assumption ID referenced in PRD prose exists in the §12 register (CR-011)", () => {
+    const prd = readFileSync("PRD.md", "utf8");
+    const lines = prd.split(/\r?\n/);
+
+    // Collect the register IDs from the §12 assumptions table: | **A13** | ... |
+    const sectionBounds = lines.reduce<{ start: number; end: number }>((bounds, line, index) => {
+      if (/^## 12\. Assumptions register/.test(line)) bounds.start = index;
+      if (bounds.start >= 0 && bounds.end < 0 && /^## 13\./.test(line)) bounds.end = index;
+      return bounds;
+    }, { start: -1, end: -1 });
+    expect(sectionBounds.start).toBeGreaterThanOrEqual(0);
+
+    const registerIds = new Set(
+      lines
+        .slice(sectionBounds.start, sectionBounds.end)
+        .map((line) => line.match(/^\| \*\*(A\d+)\*\*/)?.[1])
+        .filter((id): id is string => Boolean(id)),
+    );
+    expect(registerIds.size).toBeGreaterThan(0);
+
+    // Scan every prose line outside the §12 table for assumption references.
+    // A prose note explaining that an ID was DELETED may name it without the ID
+    // existing in the register, so those mentions are recognised and allowed.
+    const unknown = new Map<string, string[]>();
+    const deletedMentions = /\bA\d+\s+deleted\b/i;
+    lines.forEach((line, index) => {
+      if (index >= sectionBounds.start && index <= sectionBounds.end) return;
+      if (deletedMentions.test(line)) return;
+      for (const match of line.match(/\bA\d+\b/g) ?? []) {
+        if (!registerIds.has(match)) {
+          const seen = unknown.get(match) ?? [];
+          seen.push(String(index + 1));
+          unknown.set(match, seen);
+        }
+      }
+    });
+
+    expect([...unknown.entries()].map(([id, at]) => `${id} first referenced at PRD.md:${at[0]}`)).toEqual([]);
+  });
 });

@@ -1756,7 +1756,7 @@ Adaptive polling is adopted anyway — it is right on battery and headroom groun
 | Q14 | Majority of claimed peers; at N=2 one peer suffices, noted in UI |
 | Q15 | No export passwords; isolate the key instead |
  
-**Nothing architectural remains open.** Residual uncertainty is empirical: A1/A11/A12/A13 fall to Task 0, A15 to Phase 3 instrumentation.
+**Nothing architectural remains open.** Residual uncertainty is empirical: A11 and A12 VERIFIED by Task 0 measurement (2026-08-22); A13 measured FALSE (2026-08-24, §12 — its mitigation is required follow-up work, see end of §15); A1 remains under the 30-day Task 0 retention clock; A15 by Phase 3 instrumentation.
  
 ### Process changes (§0.4)
  

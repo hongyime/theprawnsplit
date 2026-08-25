@@ -4,13 +4,9 @@ Tracks implementation against `PRD.md`. **The PRD is the specification; this fil
 report card.** When they disagree, the PRD is right and this file is stale — or the code
 is wrong. Never edit the PRD to match the code without a decision recorded in §11.
 
-Last audited: 2026-08-24 (CR-010 semantic re-audit against main @ 62b321b): all **36 PRD rows whose
-phase is ≥ 3** were re-checked for ASSERTION-LEVEL coverage — does the cited test assert the
-requirement's behaviour, not merely touch the same files? Three rows downgraded to `Partial` with
-one-line gaps in the Notes column. The CR-009 pass (same day) verified file existence only.
+Last audited: 2026-08-24 (CR-010 semantic re-audit against main @ 62b321b): every PRD row whose phase is ≥ 3 was re-checked for ASSERTION-LEVEL coverage — does the cited test assert the requirement's behaviour, not merely touch the same files? Count stated exactly: **35 rows carry a purely numeric phase ≥ 3** (12× phase 3, 15× phase 4, 8× phase 5); SEC-01 (`2 (mint) / 4 (verify)`) is a 37th register row whose **phase-4 verify half received an assertion-level audit** too — see its Notes row. Result: 3 rows downgraded to `Partial` with one-line gaps in the Notes column. The CR-009 pass (same day) verified file existence only.
 
 | ID | Status | Implementation | Tests | Notes |
-| ID | Status | Implementation | Tests |
 |---|---|---|---|---|
 | REQ-ID-01 | Built | `src/App.svelte`, `src/main.ts` | `test/platform-boundaries.test.ts` |
 | REQ-ID-02 | Built | `src/lib/ids.ts`, `src/db/repo.ts` | `test/device-identity.test.ts`, `test/device-id-privacy-ui.test.ts` |
@@ -23,8 +19,8 @@ one-line gaps in the Notes column. The CR-009 pass (same day) verified file exis
 | REQ-ID-09 | Built | `src/lib/participants.ts`, `src/App.svelte` | `test/participant-claim-ui.test.ts` |
 | REQ-ID-10 | Built | `src/lib/participants.ts`, `src/App.svelte` | `test/participant-claim-ui.test.ts` |
 | REQ-ID-11 | Built | `src/lib/join-link.ts`, `src/App.svelte` | `test/join-recovery-boundary.test.ts`, `test/durability.test.ts` |
-| REQ-ID-12 | Partial | `core/src/identity.ts`, `core/src/fold.ts`, `src/App.svelte` | `core/test/fold.test.ts`, `test/reconciliation-ui.test.ts` | Fold-side duplicate anomaly is asserted (`core/test/fold.test.ts:367`) but the possible-duplicate-participants banner rendering has no test — reconciliation-ui only covers the marked-distinct-contradiction variant |
-| REQ-ID-13 | Built | `core/src/identity.ts`, `core/src/fold.ts` | `core/test/identity.test.ts`, `core/test/properties.test.ts` | CR-010 added the pinned opposing-direction merge case (`core/test/properties.test.ts`, concurrent HLCs convergent in both delivery orders); convergence is over-determined by four layers (compareHlc dev tiebreak, id tiebreak, fold pre-sort, direction-independent min-root union) |
+| REQ-ID-12 | Built | `core/src/identity.ts`, `core/src/fold.ts`, `src/App.svelte` | `core/test/fold.test.ts`, `test/duplicate-banner-ui.test.ts` | CR-011 closed the CR-010 gap: `test/duplicate-banner-ui.test.ts` now asserts the possible-duplicate-participants banner (both labels, "without changing balances automatically", Merge / Not same append-only actions); fold-side assertion remains at `core/test/fold.test.ts:367` |
+| REQ-ID-13 | Built | `core/src/identity.ts`, `core/src/fold.ts` | `core/test/identity.test.ts`, `core/test/properties.test.ts` | CR-010 added the pinned opposing-direction merge case (`core/test/properties.test.ts`, concurrent HLCs convergent in both delivery orders); convergence is over-determined by four layers (compareHlc dev tiebreak, id tiebreak, fold pre-sort, direction-independent min-root union). CR-011 mutation runs: dropping the id tiebreak left every §16.2 property green — only the new pinned comparator test catches it |
 | REQ-ID-14 | Built | `core/src/fold.ts`, `src/lib/events.ts` | `core/test/fold.test.ts`, `test/reconciliation-ui.test.ts` |
 | REQ-ID-15 | Built | `src/lib/expense-command.ts`, `src/App.svelte` | `test/expense-command.test.ts`, `test/landing-ui.test.ts` |
 | REQ-ID-16 | Built | `core/src/identity.ts`, `core/src/fold.ts` | `core/test/identity.test.ts`, `test/reconciliation-ui.test.ts` |
@@ -97,7 +93,7 @@ one-line gaps in the Notes column. The CR-009 pass (same day) verified file exis
 | REQ-DUR-08 | Built | `src/lib/durability.ts`, `src/App.svelte` | `test/durability.test.ts`, `test/durability-prompts-ui.test.ts` |
 | REQ-DUR-09 | Built | `src/lib/join-link.ts`, `src/App.svelte` | `test/join-recovery-boundary.test.ts`, `test/manual-fallback-ui.test.ts` | Import-as-primary asserted at `test/manual-fallback-ui.test.ts:32` (`primary-link` + `Import JSON` in the recovery panel), not in the previously cited durability tests |
 | REQ-DUR-10 | Built | `src/lib/join-link.ts`, `src/App.svelte` | `test/manual-fallback-ui.test.ts` | First-join vs eviction distinction asserted at `test/manual-fallback-ui.test.ts:32` (`recoveryMode === "evicted"` headings, primary-link import promoted only when evicted) |
-| REQ-SEC-01 | Built | `src/crypto/claim.ts`, `src/lib/verification.ts`, `core/src/fold.ts` | `test/claim-crypto.test.ts`, `test/verification.test.ts`, `core/test/fold.test.ts` |
+| REQ-SEC-01 | Built | `src/crypto/claim.ts`, `src/lib/verification.ts`, `core/src/fold.ts` | `test/claim-crypto.test.ts`, `test/verification.test.ts`, `core/test/fold.test.ts` | Phase-4 verify half received an assertion-level audit in CR-010: real WebCrypto signature clears pending (`test/verification.test.ts:24`), cross-tag replay leaves it unconfirmed and cash-unconfirmable (:47), contested payee confirmations stay pending with `contested-settlement-confirmation` (`core/test/fold.test.ts:237`), invalid signatures ignored (:253), confirmation pid must match literal payee (:271) |
 | REQ-SEC-02 | Built | `src/lib/device-link.ts`, `core/src/identity.ts`, `core/src/fold.ts` | `test/device-link.test.ts`, `test/verification.test.ts` |
 | REQ-SEC-03 | Built | `src/crypto/claim.ts`, `src/lib/verification.ts` | `test/claim-crypto.test.ts`, `test/verification.test.ts` |
 | REQ-SEC-04 | Built | `src/crypto/claim.ts`, `src/lib/verification.ts`, `src/lib/device-link.ts` | `test/claim-crypto.test.ts`, `test/verification.test.ts` |
@@ -203,13 +199,16 @@ $ rg -n -A2 "never decreases when the local clock moves backwards" core/test/hlc
 
 ## CR-010 semantic re-audit (2026-08-24)
 
-Scope: every row whose PRD phase column is ≥ 3 — 36 rows total (12× phase 3: DUR-01..10,
-SEC-05, SEC-09; 16× phase-4 component: ID-12/13/14/16/19, MON-17, SET-04..09, SEC-01's verify half,
-SEC-02/06/08; 8× phase 5: MON-08, LIF-01..07). The work order estimated 37; the PRD contains 36 rows
-with a phase ≥ 3 component. For each row the requirement text and the cited test assertions were read;
+Scope: every row whose PRD phase column is ≥ 3. Count stated exactly: **35 rows carry a purely numeric
+phase ≥ 3** (12× phase 3: DUR-01..10, SEC-05, SEC-09; 15× phase 4: ID-12/13/14/16/19, MON-17, SET-04..09,
+SEC-02/06/08; 8× phase 5: MON-08, LIF-01..07). SEC-01 (`2 (mint) / 4 (verify)`) is a 37th register row
+**outside that set**; its phase-4 verify half was assertion-level audited as well (36 audited units across
+37 register rows; the CR-010 report's "36 including SEC-01" phrasing conflated these two counts — corrected
+here per CR-011). For each unit the requirement text and the cited test assertions were read;
 the question was whether the test ASSERTS the requirement or merely touches the same area.
 
-Result: **33 Built / 3 Partial / 0 Not started**.
+Result at audit time: **33 Built / 3 Partial / 0 Not started.** ID-12 was subsequently returned to Built
+by CR-011 Task 5 (see below); current standing: **34 Built / 2 Partial**.
 
 - **DUR-03 → Partial.** `test/durability.test.ts:40` asserts rungs 2–3 via session counts and the
   four-dismissal retirement, but no test exercises rung 1, rung 4 (`daysSinceLastSeen >= 7d`), or the
@@ -217,10 +216,14 @@ Result: **33 Built / 3 Partial / 0 Not started**.
 - **DUR-06 → Partial.** `test/join-recovery-boundary.test.ts` pins source shape (`await runSync()` on
   joinBlocked, waiting panel replacing empty roster) but nothing asserts recovery is attempted BEFORE
   rendering or that recovery actually completes end-to-end.
-- **ID-12 → Partial.** The fold-side duplicate anomaly is asserted (`core/test/fold.test.ts:367`) and
-  `src/App.svelte:1409` renders its banner, but no test covers that banner for
-  `possible-duplicate-participants`; `test/reconciliation-ui.test.ts` only covers the
-  `distinct-participants-merged` contradiction variant.
+- **ID-12 → Partial (closed by CR-011 Task 5).** The fold-side duplicate anomaly is asserted
+  (`core/test/fold.test.ts:367`) and `src/App.svelte:1409` renders its banner, but no test covered that
+  banner for `possible-duplicate-participants`; `test/reconciliation-ui.test.ts` only covered the
+  `distinct-participants-merged` contradiction variant. `test/duplicate-banner-ui.test.ts` now asserts it.
+- **SEC-01 phase-4 verify half — Built, assertion-level evidence:** real WebCrypto signature clears pending
+  (`test/verification.test.ts:24`), cross-tag replay stays unconfirmed (:47), contested payee confirmations
+  stay pending (`core/test/fold.test.ts:237`), invalid signatures ignored (:253), confirmation pid must match
+  the literal pre-merge payee (:271).
 
 Representative assertion-level evidence for rows kept Built (all verified verbatim during this audit):
 

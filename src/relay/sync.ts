@@ -24,6 +24,8 @@ import { normalizeRelaySettings } from "@/lib/relay-settings";
 import { HttpRelay } from "./http";
 import { NostrRelay } from "./nostr";
 import { classifyRelayIssue, isDuplicateRelayAck } from "./diagnostics";
+import { BATCH_SAFETY_MARGIN_BYTES, fitCountWithinLimit, projectBatchSize, resolveMessageLimit } from "./batch-limits";
+import { fetchMaxMessageLength } from "./nip11";
 import type { Relay, SyncResult } from "./types";
 
 const FETCH_LIMIT = 500;
@@ -77,7 +79,21 @@ export function createRelays(group: GroupRecord): Relay[] {
   return relays;
 }
 
-export async function syncOnce(groupId: string, relayOverride?: Relay[]): Promise<SyncResult> {
+export interface SyncOnceOptions {
+  /**
+   * CR-011 A13 mitigation: maximum relay message size in bytes. Production
+   * resolves this from NIP-11 max_message_length of the default Nostr relays;
+   * tests inject recorded measurements directly. `null` disables limiting.
+   */
+  messageLimitBytes?: number | null;
+}
+
+async function defaultMessageLimitBytes(): Promise<number | null> {
+  const limits = await Promise.all(config.nostrRelays.map((url) => fetchMaxMessageLength(url)));
+  return resolveMessageLimit(limits, Number.POSITIVE_INFINITY);
+}
+
+export async function syncOnce(groupId: string, relayOverride?: Relay[], opts: SyncOnceOptions = {}): Promise<SyncResult> {
   const group = await readGroup(groupId);
   const relays = relayOverride ?? createRelays(group);
   if (!relayOverride) await saveMeta(group.meta);
@@ -100,17 +116,37 @@ export async function syncOnce(groupId: string, relayOverride?: Relay[]): Promis
   };
 
   if (batch.length > 0) {
-    const blob = await encryptEvents(key, batch);
-    const acks = await Promise.all(
-      relays.map(async (relay) => {
-        try {
-          return { relay: relay.name, ack: await relay.publish(group.tagHex, group.deviceId, blob, writeProof) };
-        } catch (reason) {
-          return { relay: relay.name, reason };
-        }
-      }),
-    );
-    const ok = acks.filter((result) => "ack" in result && (result.ack.ok || isDuplicateRelayAck(result.ack.reason))).length;
+    // CR-011 A13 mitigation, part 1: size the batch against the weakest relay's
+    // NIP-11 max_message_length before publishing. A probe encryption projects
+    // the serialized size; the batch is sliced to fit and the remainder waits
+    // for the next polling cycle instead of being rejected by the relay.
+    let effectiveRows = batchRows;
+    const limit = opts.messageLimitBytes !== undefined ? opts.messageLimitBytes : await defaultMessageLimitBytes();
+    if (limit !== null && Number.isFinite(limit)) {
+      const target = limit - BATCH_SAFETY_MARGIN_BYTES;
+      const probeBlob = await encryptEvents(key, batch);
+      const fitted = fitCountWithinLimit(batch.length, (n) => projectBatchSize(probeBlob.length, batch.length, n), target);
+      if (fitted > 0 && fitted < effectiveRows.length) effectiveRows = effectiveRows.slice(0, fitted);
+    }
+
+    const publishBlob = async (events: Event[]): Promise<string> => encryptEvents(key, events);
+    const collectAcks = async (blob: string) =>
+      Promise.all(
+        relays.map(async (relay) => {
+          try {
+            return { relay: relay.name, ack: await relay.publish(group.tagHex, group.deviceId, blob, writeProof) };
+          } catch (reason) {
+            return { relay: relay.name, reason };
+          }
+        }),
+      );
+    const countOk = (ackResults: Awaited<ReturnType<typeof collectAcks>>) =>
+      ackResults.filter((entry) => "ack" in entry && (entry.ack.ok || isDuplicateRelayAck(entry.ack.reason))).length;
+
+    const localEffectiveRows = effectiveRows.filter((row) => row.syncState === "local");
+    const blob = await publishBlob(effectiveRows.map((row) => row.event));
+    const acks = await collectAcks(blob);
+    const ok = countOk(acks);
     for (const ack of acks) {
       if ("reason" in ack) {
         const reason = ack.reason instanceof Error ? ack.reason.message : String(ack.reason);
@@ -125,10 +161,28 @@ export async function syncOnce(groupId: string, relayOverride?: Relay[]): Promis
     const ackQuorum = config.ackQuorum;
     const publishQuorumMet = publishQuorumReached(ok, ackQuorum);
     if (publishQuorumMet) {
-      await markEvents(groupId, localBatchRows.map((row) => row.event.id), "published");
-      result.published = localBatchRows.length;
+      await markEvents(groupId, localEffectiveRows.map((row) => row.event.id), "published");
+      result.published = localEffectiveRows.length;
     } else if (localBatchRows.length > 0) {
-      result.errors.push(`relay quorum not reached (${ok}/${ackQuorum} acknowledgements)`);
+      // CR-011 A13 mitigation, part 2 — per-event fallback (the load-bearing half).
+      // CR-010 measured relays rejecting or partially acknowledging batch messages
+      // even under their byte caps, so when the batched write cannot reach quorum,
+      // each pending ledger event is published as its own message and kept only if
+      // it reaches quorum on its own.
+      let fallbackPublished = 0;
+      for (const row of localBatchRows) {
+        const singleBlob = await publishBlob([row.event]);
+        const singleAcks = await collectAcks(singleBlob);
+        if (publishQuorumReached(countOk(singleAcks), ackQuorum)) {
+          await markEvents(groupId, [row.event.id], "published");
+          fallbackPublished += 1;
+        }
+      }
+      if (fallbackPublished === 0) {
+        result.errors.push(`relay quorum not reached (${ok}/${ackQuorum} acknowledgements)`);
+      } else {
+        result.published = fallbackPublished;
+      }
     }
   }
 

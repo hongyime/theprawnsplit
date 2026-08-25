@@ -106,6 +106,19 @@ describe("eventSortKey totality", () => {
       { seed: Number(process.env.FAST_CHECK_SEED ?? 20260825), numRuns: 300, verbose: true },
     );
   }, 20_000);
+
+  // Deterministic counterpart to the generated property above. Independent
+  // generation almost never produces HLC collisions, so only this pinned case
+  // actually exercises the id tiebreak (CR-011 mutation 3a proved the suite
+  // stayed green with the tiebreak deleted).
+  it("breaks HLC ties by id — two events with identical HLCs never tie", () => {
+    const tied: HLC = { wall: 42, ctr: 7, dev: "dev_a" };
+    const a = eventFrom(tied, "dev_a:1");
+    const b = eventFrom({ ...tied }, "dev_a:2");
+    expect(eventSortKey(a, b)).not.toBe(0);
+    expect(sign(eventSortKey(a, b))).toBe(-sign(eventSortKey(b, a)));
+    expect(sign(eventSortKey(a, b))).toBe(-1); // "dev_a:1" < "dev_a:2" codepoint-wise
+  });
 });
 
 describe("observed comparator behaviour on adversarial inputs (documented, not assumed)", () => {

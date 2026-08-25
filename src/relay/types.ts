@@ -1,6 +1,15 @@
 export interface RelayEntry {
   blob: string;
   author: string;
+  /**
+   * Cursor is relay-kind-specific and MUST NOT be compared across kinds (CR-012):
+   * - HttpRelay (operated relay): opaque server-side token, interpreted only by the server.
+   * - NostrRelay: created_at watermark — a decimal-seconds string fed back as the NIP-01
+   *   `since` filter. Event ids are sha256 digests and MUST NOT be used as cursors here:
+   *   ordering them is random, so an id cursor silently discarded an arbitrary fraction of
+   *   every fetch after the first. The boundary second may re-deliver events; ingestion
+   *   dedupes by event id (REQ-SYN-09).
+   */
   cursor: string;
 }
 

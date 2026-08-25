@@ -1,3 +1,4 @@
+import { compareCodepoints } from "@theprawnsplit/core";
 import { finalizeEvent, generateSecretKey, getPublicKey, SimplePool } from "nostr-tools";
 import { bytesToHex, hexToBytes } from "@/crypto/bytes";
 import { config } from "@/config";
@@ -10,11 +11,17 @@ export interface NostrEventLike {
   pubkey: string;
 }
 
-export function selectNostrEntries(events: NostrEventLike[], opts: { cursor?: string | null }): RelayEntry[] {
+export function selectNostrEntries(events: NostrEventLike[], opts: { since?: number | null }): RelayEntry[] {
+  // CR-012: the cursor on this path is a created_at watermark (seconds), not an
+  // event id. Event ids are sha256 digests — effectively random — so filtering
+  // them against the watermark discarded an arbitrary fraction of fresh events.
+  // The relay applies `since` server-side; the boundary second may re-deliver
+  // events, which ingest dedupes by id (REQ-SYN-09).
+  const seen = new Set<string>();
   return events
-    .sort((a, b) => a.created_at - b.created_at || a.id.localeCompare(b.id))
-    .filter((event) => !opts.cursor || event.id > opts.cursor)
-    .map((event) => ({ blob: event.content, author: event.pubkey, cursor: event.id }));
+    .filter((event) => (seen.has(event.id) ? false : (seen.add(event.id), true)))
+    .sort((a, b) => a.created_at - b.created_at || compareCodepoints(a.id, b.id))
+    .map((event) => ({ blob: event.content, author: event.pubkey, cursor: String(event.created_at) }));
 }
 const GROUP_TAG_RE = /^[0-9a-f]{64}$/;
 
@@ -40,12 +47,17 @@ export function nostrEventTemplate(tag: string, blob: string, kind: number, nowM
   };
 }
 
-export function nostrFetchFilter(tag: string, kind: number, opts: { author?: string; limit?: number }) {
+export function nostrFetchFilter(
+  tag: string,
+  kind: number,
+  opts: { author?: string; limit?: number; since?: number | null },
+) {
   assertLowercaseGroupTag(tag);
   return {
     kinds: [kind],
     "#t": [tag],
     ...(opts.author ? { authors: [opts.author] } : {}),
+    ...(opts.since ? { since: opts.since } : {}),
     limit: opts.limit ?? 500,
   };
 }
@@ -78,8 +90,10 @@ export class NostrRelay implements Relay {
   }
 
   async fetch(tag: string, opts: { author?: string; cursor?: string | null; limit?: number }): Promise<RelayEntry[]> {
-    const filter = nostrFetchFilter(tag, this.kind, opts);
+    // The stored cursor on this relay kind is a created_at watermark (see RelayEntry).
+    const since = opts.cursor ? Number(opts.cursor) : null;
+    const filter = nostrFetchFilter(tag, this.kind, { ...opts, since });
     const events = await this.pool.querySync(this.relayUrls, filter);
-    return selectNostrEntries(events, opts);
+    return selectNostrEntries(events, { since });
   }
 }

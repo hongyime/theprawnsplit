@@ -18,7 +18,7 @@ export interface BufferedEvent {
 
 export interface DroppedEvent {
   event: Event;
-  reason: "cap" | "buffer-cap";
+  reason: "cap" | "buffer-cap" | "malformed";
 }
 
 export interface TransportAdmissionResult {
@@ -68,6 +68,16 @@ export function admitTransportEvents(
   let groupCount = current.length;
 
   for (const event of incoming) {
+    // CR-011 convergence decision: events whose HLC numbers are not finite are
+    // rejected at admission. A non-finite wall makes `a.wall - b.wall` NaN, which
+    // is falsy, so the comparator would silently fall through to ctr/dev and the
+    // resulting order is intransitive between malformed and well-formed events —
+    // sort() output would then depend on input permutation (divergence).
+    if (!Number.isFinite(event.hlc.wall) || !Number.isFinite(event.hlc.ctr)) {
+      dropped.push({ event, reason: "malformed" });
+      bump(discardVector, event);
+      continue;
+    }
     bump(transportVector, event);
     const nextCount = (counts.get(event.dev) ?? 0) + 1;
     counts.set(event.dev, nextCount);

@@ -1,5 +1,5 @@
 import type { Anomaly, Event, VerificationContext } from "./types";
-import { eventSortKey } from "./types";
+import { compareCodepoints, eventSortKey } from "./types";
 
 class DSU {
   private parent = new Map<string, string>();
@@ -233,10 +233,10 @@ export function claimAnomalies(events: Event[], ctx: VerificationContext): Anoma
   }
 
   return anomalies.sort((a, b) =>
-    a.code.localeCompare(b.code) ||
-    (a.pid ?? "").localeCompare(b.pid ?? "") ||
-    (a.eventId ?? "").localeCompare(b.eventId ?? "") ||
-    (a.relatedEventId ?? "").localeCompare(b.relatedEventId ?? ""),
+    compareCodepoints(a.code, b.code) ||
+    compareCodepoints(a.pid ?? "", b.pid ?? "") ||
+    compareCodepoints(a.eventId ?? "", b.eventId ?? "") ||
+    compareCodepoints(a.relatedEventId ?? "", b.relatedEventId ?? ""),
   );
 }
 

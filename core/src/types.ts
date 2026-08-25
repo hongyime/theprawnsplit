@@ -145,8 +145,14 @@ export interface VerificationContext {
   verifySignature(input: SignatureInput): boolean;
 }
 
+// Locale-independent string ordering. localeCompare() is not specified to be
+// deterministic across devices or locales (measured: "_" vs ":" and "z" vs "ä"
+// flip against codepoint order), and every comparison below feeds output that
+// must be byte-identical on every replica.
+export const compareCodepoints = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0);
+
 export const compareHlc = (a: HLC, b: HLC): number =>
-  a.wall - b.wall || a.ctr - b.ctr || a.dev.localeCompare(b.dev);
+  a.wall - b.wall || a.ctr - b.ctr || compareCodepoints(a.dev, b.dev);
 
 export const eventSortKey = (a: Event, b: Event): number =>
-  compareHlc(a.hlc, b.hlc) || a.id.localeCompare(b.id);
+  compareHlc(a.hlc, b.hlc) || compareCodepoints(a.id, b.id);

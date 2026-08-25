@@ -1,3 +1,4 @@
+import { compareCodepoints } from "./types";
 import type { State } from "./types";
 
 export type CanonicalValue =
@@ -20,7 +21,7 @@ export function canonicalize(value: unknown): CanonicalValue {
   if (value instanceof Set) return [...value].map(canonicalize).sort(compareCanonical);
   if (value instanceof Map) {
     return [...value.entries()]
-      .sort(([a], [b]) => String(a).localeCompare(String(b)))
+      .sort(([a], [b]) => compareCodepoints(String(a), String(b)))
       .map(([key, entry]) => [canonicalize(key), canonicalize(entry)]);
   }
   if (typeof value === "object") {
@@ -35,7 +36,7 @@ export function canonicalize(value: unknown): CanonicalValue {
 }
 
 const compareCanonical = (a: CanonicalValue, b: CanonicalValue): number =>
-  JSON.stringify(a).localeCompare(JSON.stringify(b));
+  compareCodepoints(JSON.stringify(a), JSON.stringify(b));
 
 export function stableStringify(value: unknown): string {
   return JSON.stringify(canonicalize(value));

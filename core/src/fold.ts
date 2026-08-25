@@ -19,7 +19,7 @@ import type {
   State,
   VerificationContext,
 } from "./types";
-import { compareHlc, eventSortKey } from "./types";
+import { compareCodepoints, compareHlc, eventSortKey } from "./types";
 
 const add = (balances: Map<string, Money>, pid: string, minor: Money): void => {
   balances.set(pid, (balances.get(pid) ?? 0n) + minor);
@@ -346,19 +346,19 @@ export function fold(events: Event[], opts: FoldOptions, ctx?: VerificationConte
   }
 
   anomalies.sort((a, b) =>
-    a.code.localeCompare(b.code) ||
-    (a.eventId ?? "").localeCompare(b.eventId ?? "") ||
-    (a.relatedEventId ?? "").localeCompare(b.relatedEventId ?? "") ||
-    (a.pid ?? "").localeCompare(b.pid ?? "") ||
-    (a.relatedPid ?? "").localeCompare(b.relatedPid ?? "") ||
-    (a.sid ?? "").localeCompare(b.sid ?? ""),
+    compareCodepoints(a.code, b.code) ||
+    compareCodepoints(a.eventId ?? "", b.eventId ?? "") ||
+    compareCodepoints(a.relatedEventId ?? "", b.relatedEventId ?? "") ||
+    compareCodepoints(a.pid ?? "", b.pid ?? "") ||
+    compareCodepoints(a.relatedPid ?? "", b.relatedPid ?? "") ||
+    compareCodepoints(a.sid ?? "", b.sid ?? ""),
   );
 
   return {
-    participants: new Map([...participants.entries()].sort(([a], [b]) => a.localeCompare(b))),
-    expenses: new Map([...expenses.entries()].sort(([a], [b]) => a.localeCompare(b))),
-    settlements: new Map([...settlements.entries()].sort(([a], [b]) => a.localeCompare(b))),
-    balances: new Map([...balances.entries()].sort(([a], [b]) => a.localeCompare(b))),
+    participants: new Map([...participants.entries()].sort(([a], [b]) => compareCodepoints(a, b))),
+    expenses: new Map([...expenses.entries()].sort(([a], [b]) => compareCodepoints(a, b))),
+    settlements: new Map([...settlements.entries()].sort(([a], [b]) => compareCodepoints(a, b))),
+    balances: new Map([...balances.entries()].sort(([a], [b]) => compareCodepoints(a, b))),
     anomalies,
     quarantined: [...new Set(quarantined)].sort(),
     frozen: quarantined.length > 0,

@@ -94,4 +94,32 @@ describe("REQ-SYN-19/24/27 transport admission", () => {
     expect(result.dropped.map((drop) => [drop.event.id, drop.reason])).toEqual([["peer-d:1", "cap"]]);
     expect(result.discardVector).toEqual({ "peer-d": 1 });
   });
+
+  it("rejects non-finite HLC numbers as malformed before any other admission rule (CR-011)", () => {
+    const nanWall = event("broken", 1);
+    if (nanWall.t !== "ExpenseAdded") throw new Error("wrong fixture");
+    nanWall.hlc = { wall: Number.NaN, ctr: 1, dev: "broken" };
+    const infCtr = event("broken", 2);
+    if (infCtr.t !== "ExpenseAdded") throw new Error("wrong fixture");
+    infCtr.hlc = { wall: 5, ctr: Number.POSITIVE_INFINITY, dev: "broken" };
+    const wellFormed = event("peer", 1);
+
+    const result = admitTransportEvents([nanWall, infCtr, wellFormed], [], {}, {
+      now: 10,
+      supportedVersion: 1,
+      maxFutureDriftMs: 120_000,
+      capUnknownAuthor: 50,
+      capKnownAuthor: 1000,
+      capGroupTotal: 10_000,
+      bufferMaxEvents: 500,
+    });
+
+    expect(result.dropped.map((drop) => [drop.event.dev, drop.reason])).toEqual([
+      ["broken", "malformed"],
+      ["broken", "malformed"],
+    ]);
+    expect(result.admitted.map((e) => e.id)).toEqual([wellFormed.id]);
+    // Malformed events still advance the discard vector so they are never refetched.
+    expect(result.discardVector).toEqual({ broken: 2 });
+  });
 });

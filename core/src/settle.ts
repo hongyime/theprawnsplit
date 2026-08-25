@@ -1,4 +1,4 @@
-import type { Money } from "./types";
+import { compareCodepoints, type Money } from "./types";
 
 export interface Transfer {
   from: string;
@@ -13,7 +13,7 @@ interface Entry {
 
 const byAmountDescPidAsc = (a: Entry, b: Entry): number => {
   if (a.minor !== b.minor) return a.minor > b.minor ? -1 : 1;
-  return a.pid.localeCompare(b.pid);
+  return compareCodepoints(a.pid, b.pid);
 };
 
 export function greedySettlement(balances: Map<string, Money>): Transfer[] {

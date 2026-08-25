@@ -35,7 +35,11 @@ export function allocate(total: bigint, weights: bigint[], eventId: string, pids
     const hashA = fnv1a(`${eventId}${pids[a]}`);
     const hashB = fnv1a(`${eventId}${pids[b]}`);
     if (hashA !== hashB) return hashA - hashB;
-    return pids[a]!.localeCompare(pids[b]!);
+    // Local codepoint tiebreak: money.ts stays import-free by design, and this
+    // ordering must not depend on locale (CR-011).
+    const pa = pids[a]!;
+    const pb = pids[b]!;
+    return pa < pb ? -1 : pa > pb ? 1 : 0;
   });
 
   for (let k = 0; k < Number(leftover); k += 1) {

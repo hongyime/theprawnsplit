@@ -3,6 +3,19 @@ import { bytesToHex, hexToBytes } from "@/crypto/bytes";
 import { config } from "@/config";
 import type { AckResult, Relay, RelayEntry } from "./types";
 
+export interface NostrEventLike {
+  id: string;
+  created_at: number;
+  content: string;
+  pubkey: string;
+}
+
+export function selectNostrEntries(events: NostrEventLike[], opts: { cursor?: string | null }): RelayEntry[] {
+  return events
+    .sort((a, b) => a.created_at - b.created_at || a.id.localeCompare(b.id))
+    .filter((event) => !opts.cursor || event.id > opts.cursor)
+    .map((event) => ({ blob: event.content, author: event.pubkey, cursor: event.id }));
+}
 const GROUP_TAG_RE = /^[0-9a-f]{64}$/;
 
 function secretFromHex(hex?: string): Uint8Array {
@@ -67,9 +80,6 @@ export class NostrRelay implements Relay {
   async fetch(tag: string, opts: { author?: string; cursor?: string | null; limit?: number }): Promise<RelayEntry[]> {
     const filter = nostrFetchFilter(tag, this.kind, opts);
     const events = await this.pool.querySync(this.relayUrls, filter);
-    return events
-      .sort((a, b) => a.created_at - b.created_at || a.id.localeCompare(b.id))
-      .filter((event) => !opts.cursor || event.id > opts.cursor)
-      .map((event) => ({ blob: event.content, author: event.pubkey, cursor: event.id }));
+    return selectNostrEntries(events, opts);
   }
 }

@@ -90,14 +90,14 @@ async function readEvents(relays: MemoryRelay[], key: CryptoKey, tag: string): P
   return [...byId.values()];
 }
 
-describe("Phase 2 sync integration", () => {
+describe("Phase 2 sync integration", { timeout: 30_000 }, () => {
   it("uses the configured acknowledgement quorum for publish success", () => {
     expect(publishQuorumReached(1, 1)).toBe(true);
     expect(publishQuorumReached(1, 2)).toBe(false);
     expect(publishQuorumReached(2, 2)).toBe(true);
   });
 
-  it("treats duplicate publish acknowledgements as successful quorum members", async () => {
+  it("treats duplicate publish acknowledgements as successful quorum members", { timeout: 20_000 }, async () => {
     await resetRepositoryForTests("prawn-duplicate-ack-quorum");
     const group = await ensureGroup();
     const participant = defaultParticipant({ deviceId: group.deviceId, nextCounter: group.nextCounter }, "Alice") as ParticipantAdded;

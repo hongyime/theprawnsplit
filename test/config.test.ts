@@ -112,4 +112,50 @@ describe("client numeric config parsing", () => {
 
     expect([...unknown.entries()].map(([id, at]) => `${id} first referenced at PRD.md:${at[0]}`)).toEqual([]);
   });
+
+  it("phase-column histogram computed from PRD matches STATUS audit scope (CR-012)", () => {
+    const prd = readFileSync("PRD.md", "utf8");
+    const status = readFileSync("STATUS.md", "utf8");
+    const lines = prd.split(/\r?\n/);
+
+    // Section 7 spans from "## 7. Requirements" to "## 8. Data model".
+    const start = lines.findIndex((l) => /^## 7\. Requirements/.test(l));
+    const end = lines.findIndex((l) => /^## 8\. Data model/.test(l));
+    expect(start).toBeGreaterThan(0);
+    expect(end).toBeGreaterThan(start);
+
+    const histogram = new Map<number, number>();
+    const splitPhaseRows: string[] = [];
+    for (const line of lines.slice(start, end)) {
+      const m = line.match(/^\| (REQ-[A-Z]+-\d+) \| .+ \| (.+) \|$/);
+      const id = m?.[1];
+      const phaseCell = m?.[2]?.trim();
+      if (!m || !id || !phaseCell) continue;
+      if (/^\d+$/.test(phaseCell)) {
+        const phase = Number(phaseCell);
+        histogram.set(phase, (histogram.get(phase) ?? 0) + 1);
+      } else {
+        splitPhaseRows.push(`${id}: ${phaseCell}`);
+      }
+    }
+
+    // The phase >= 3 population the audits cover. If PRD phases change, the
+    // numbers change HERE first — and the STATUS prose below must follow.
+    expect(histogram.get(3)).toBe(12);
+    expect(histogram.get(4)).toBe(16);
+    expect(histogram.get(5)).toBe(8);
+
+    // Exactly one row carries a split-phase cell.
+    expect(splitPhaseRows).toEqual(["REQ-SEC-01: 2 (mint) / 4 (verify)"]);
+
+    // STATUS stated audit scope must quote the computed histogram. Normalize
+    // the Unicode multiplication sign used in STATUS prose to ASCII x first.
+    const normalizedStatus = status.replace(/\u00d7/g, "x");
+    for (const phase of [3, 4, 5]) {
+      const stated = new RegExp("(\\d+)x phase " + phase);
+      const match = normalizedStatus.match(stated);
+      expect(match, `STATUS must state the phase-${phase} count`).not.toBeNull();
+      expect(Number(match![1])).toBe(histogram.get(phase));
+    }
+  });
 });

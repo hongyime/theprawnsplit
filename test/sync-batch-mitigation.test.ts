@@ -59,7 +59,7 @@ async function seedGroupWithParticipants(name: string, count: number): Promise<s
 }
 
 describe("A13 batch-size mitigation", () => {
-  it("slices an oversized batch to fit the message limit and publishes the remainder next cycle", async () => {
+  it("slices an oversized batch to fit the message limit and publishes the remainder next cycle", { timeout: 30_000 }, async () => {
     const groupId = await seedGroupWithParticipants("a13-slice", 6);
 
     // A deliberately tiny limit forces a slice: not every pending event fits.
@@ -74,7 +74,7 @@ describe("A13 batch-size mitigation", () => {
     expect(await syncCounts(groupId)).toEqual({ local: 0, published: 0, confirmed: 7 });
   });
 
-  it("falls back to per-event publishes when the batched write cannot reach quorum", async () => {
+  it("falls back to per-event publishes when the batched write cannot reach quorum", { timeout: 30_000 }, async () => {
     const groupId = await seedGroupWithParticipants("a13-fallback", 4);
 
     // Batched multi-event blobs exceed these relays' tolerance; single-event

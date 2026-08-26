@@ -1,6 +1,6 @@
 # Project State
 
-Current task: completed CR-011 (comparator total-order tests + hardening, mutation-proofed §16.2 suite, status housekeeping, ID-12 closed, A13 mitigation shipped). Previous: CR-010 (trunk-based workflow switch, CI push trigger + svelte paths, §16.2 property gaps closed, 36-row status truthing with 3 downgrades, A13 measured FALSE).
+Current task: completed CR-012 (Nostr cursor correctness bug fixed with RED proof; UI renderer pilot — 3 tests converted to jsdom renders, 4 source-text assertions wrong on render; Evidence column added to STATUS.md; ID-17 audited; phase-histogram guard test). Previous: CR-011.
 
 **WORKFLOW RULE (CR-010): work directly on main. No feature branches, no PRs. Commit and push to main.
 This rule lives here and NOT in AGENTS.md because AGENTS.md is overwritten by the sync-repo-settings workflow.**

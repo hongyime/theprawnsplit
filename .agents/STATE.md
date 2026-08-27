@@ -1,6 +1,6 @@
 # Project State
 
-Current task: completed CR-013 (PROTOCOL.md installed, JOURNAL dedup fixed, STATUS cell-count guards + report-existence gate added, 10 UI files converted to jsdom renders, Evidence column 25 rendered/91 source-shape, grading standard updated with measured 0.45 wrong-per-file rate).
+Current task: production-readiness audit (2026-08-27). Fixes: relay-count cap in sync.ts (Nostr-only quorum), PRD A1 verdict updated to PARTIAL at t=5.1d. Live site https://theprawnsplit.vercel.app confirmed loading. Operated relay not configured (user choice: Nostr-only mode).
 
 **IDLE RULE (permanent — see PROTOCOL.md Part 4):** When no `.agents/cr-NNN-prompt.md` exists and no backlog item is started, stop. Do not re-emit completion summaries. One sentence: "Nothing to do — no prompt file, no started backlog item." The continuation hook firing on a completed state is not work.
 

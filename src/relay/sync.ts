@@ -158,7 +158,10 @@ export async function syncOnce(groupId: string, relayOverride?: Relay[], opts: S
         if (diagnostic.severity !== "info") result.errors.push(ack.ack.reason);
       }
     }
-    const ackQuorum = config.ackQuorum;
+    // Cap effective quorum at the number of available relays: if only Nostr relays are
+    // present (operated relay not configured), min(1, 2) = 1 so any single Nostr ACK
+    // satisfies quorum rather than leaving events permanently local.
+    const ackQuorum = Math.min(relays.length, config.ackQuorum);
     const publishQuorumMet = publishQuorumReached(ok, ackQuorum);
     if (publishQuorumMet) {
       await markEvents(groupId, localEffectiveRows.map((row) => row.event.id), "published");
@@ -292,7 +295,7 @@ export async function syncOnce(groupId: string, relayOverride?: Relay[], opts: S
         if (diagnostic.severity !== "info") result.errors.push(ack.ack.reason);
       }
     }
-    if (publishQuorumReached(ok)) {
+    if (publishQuorumReached(ok, Math.min(relays.length, config.ackQuorum))) {
       await markSnapshotPublished(groupId, snapshotSeq);
       result.snapshotsPublished = 1;
     }

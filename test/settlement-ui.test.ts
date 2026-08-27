@@ -112,7 +112,6 @@ describe("settlement rows (rendered)", () => {
     expect(row).not.toBeNull();
     expect(row.textContent).toContain("USD 10.00");
     expect(row.textContent).toContain("cash");
-    expect(row!.textContent).toContain("cash");
 
     expect(screen.queryByRole("button", { name: "Confirm" })).toBeNull();
     const dispute = screen.getByRole("button", { name: "Dispute" }) as HTMLButtonElement;

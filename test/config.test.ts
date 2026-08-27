@@ -158,4 +158,65 @@ describe("client numeric config parsing", () => {
       expect(Number(match![1])).toBe(histogram.get(phase));
     }
   });
+
+  it("JOURNAL.md has no duplicate content lines (root cause: edit-with-single-pos replaces one line then survivors duplicate) (CR-013)", () => {
+    const journal = readFileSync(".agents/JOURNAL.md", "utf8");
+    const contentLines = journal.split(/\r?\n/)
+      .map((l) => l.trim())
+      .filter((l) => l.startsWith("- ") && !l.includes("MOLT_AUTO") && !l.includes("[PRAWN-"));
+    const seen = new Set<string>();
+    const duplicates: string[] = [];
+    for (const line of contentLines) {
+      if (seen.has(line)) duplicates.push(line.slice(0, 80));
+      seen.add(line);
+    }
+    expect(duplicates).toEqual([]);
+  });
+
+  it("every STATUS.md requirement row has exactly the header cell count (CR-013)", () => {
+    const status = readFileSync("STATUS.md", "utf8");
+    const lines = status.split(/\r?\n/);
+    const headerLine = lines.find((l) => /^\| ID \| Status \|/.test(l));
+    expect(headerLine, "STATUS header row not found").toBeTruthy();
+    const expectedPipes = (headerLine!.match(/\|/g) ?? []).length;
+    const badRows: string[] = [];
+    for (const line of lines) {
+      if (!/^\| REQ-/.test(line)) continue;
+      const pipes = (line.match(/\|/g) ?? []).length;
+      if (pipes !== expectedPipes)
+        badRows.push(`${line.slice(0, 30).trim()} (${pipes} pipes, expected ${expectedPipes})`);
+    }
+    expect(badRows).toEqual([]);
+  });
+
+  it("every STATUS.md requirement row Evidence cell is 'rendered' or 'source-shape' (CR-013)", () => {
+    const status = readFileSync("STATUS.md", "utf8");
+    const badRows: string[] = [];
+    for (const line of status.split(/\r?\n/)) {
+      if (!/^\| REQ-/.test(line)) continue;
+      const cells = line.split("|").map((c) => c.trim()).filter(Boolean);
+      const evidence = cells[cells.length - 1];
+      if (evidence !== "rendered" && evidence !== "source-shape")
+        badRows.push(`${cells[0]}: "${evidence}"`);
+    }
+    expect(badRows).toEqual([]);
+  });
+
+  it("most recent CR commit has a .agents/cr-NNN-report.md file (CR-013)", () => {
+    let commitMsg: string;
+    try {
+      commitMsg = readFileSync(".git/COMMIT_EDITMSG", "utf8").trim();
+    } catch {
+      return; // not running inside a git repo (e.g. fresh CI checkout without history)
+    }
+    const match = commitMsg.match(/\bcr-(\d{3})\b/i);
+    if (!match) return; // most recent commit is not a CR commit
+    const crNum = match[1];
+    const reportPath = `.agents/cr-${crNum}-report.md`;
+    try {
+      readFileSync(reportPath);
+    } catch {
+      throw new Error(`${reportPath} must exist — add it before pushing the CR commit`);
+    }
+  });
 });

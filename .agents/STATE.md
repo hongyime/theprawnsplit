@@ -1,6 +1,10 @@
 # Project State
 
-Current task: completed CR-012 (Nostr cursor correctness bug fixed with RED proof; UI renderer pilot — 3 tests converted to jsdom renders, 4 source-text assertions wrong on render; Evidence column added to STATUS.md; ID-17 audited; phase-histogram guard test). Previous: CR-011.
+Current task: executing CR-013 (protocol installation, JOURNAL dedup, 15 UI conversions, Evidence re-grade).
+
+**IDLE RULE (permanent — see PROTOCOL.md Part 4):** When no `.agents/cr-NNN-prompt.md` exists and no backlog item is started, stop. Do not re-emit completion summaries. One sentence: "Nothing to do — no prompt file, no started backlog item." The continuation hook firing on a completed state is not work.
+
+**PROTOCOL reference:** `.agents/PROTOCOL.md` contains the permanent verification protocol, backlog, and standing rules. Read it at the start of every CR.
 
 **WORKFLOW RULE (CR-010): work directly on main. No feature branches, no PRs. Commit and push to main.
 This rule lives here and NOT in AGENTS.md because AGENTS.md is overwritten by the sync-repo-settings workflow.**

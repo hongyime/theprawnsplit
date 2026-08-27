@@ -4,7 +4,7 @@ Tracks implementation against `PRD.md`. **The PRD is the specification; this fil
 report card.** When they disagree, the PRD is right and this file is stale — or the code
 is wrong. Never edit the PRD to match the code without a decision recorded in §11.
 
-Last audited: 2026-08-24 (CR-010 semantic re-audit against main @ 62b321b): every PRD row whose phase is ≥ 3 was re-checked for ASSERTION-LEVEL coverage — does the cited test assert the requirement's behaviour, not merely touch the same files? Count stated exactly: **36 rows carry a purely numeric phase ≥ 3** (12× phase 3, 16× phase 4, 8× phase 5); SEC-01 (`2 (mint) / 4 (verify)`) adds a 37th in-scope register row whose **phase-4 verify half received an assertion-level audit** too — see its Notes row. Result: 3 rows downgraded to `Partial` with one-line gaps in the Notes column. The CR-009 pass (same day) verified file existence only. CR-012 added the Evidence column and the grading standard it encodes: **a row may be Built when cited tests assert the requirement's semantics; the column records whether that assertion ran against a real render (rendered) or against source text / pure modules (source-shape).** Three pilots were converted to rendered assertions (CR-012): reconciliation-ui, settlement-ui, manual-fallback-ui.
+Last audited: 2026-08-24 (CR-010 semantic re-audit against main @ 62b321b): every PRD row whose phase is ≥ 3 was re-checked for ASSERTION-LEVEL coverage — does the cited test assert the requirement's behaviour, not merely touch the same files? Count stated exactly: **36 rows carry a purely numeric phase ≥ 3** (12× phase 3, 16× phase 4, 8× phase 5); SEC-01 (`2 (mint) / 4 (verify)`) adds a 37th in-scope register row whose **phase-4 verify half received an assertion-level audit** too — see its Notes row. Result: 3 rows downgraded to `Partial` with one-line gaps in the Notes column. The CR-009 pass (same day) verified file existence only. CR-012 added the Evidence column and the grading standard it encodes: **a row may be Built when cited tests assert the requirement's semantics; the column records whether that assertion ran against a real render (rendered) or against source text / pure modules (source-shape).** CR-012 piloted 3 files (reconciliation-ui, settlement-ui, manual-fallback-ui); CR-013 converted 10 more, totalling 13 rendered files. Measured error rate: ~0.45 wrong source-text assertions per converted file. Grading standard (CR-013): source-shape is sufficient for structural/existence claims; rendered is required for behavioral rendering claims. Final Evidence distribution: **25 rendered / 91 source-shape** (116 total). See `.agents/cr-013-report.md`.
 
 | ID | Status | Implementation | Tests | Notes | Evidence |
 |---|---|---|---|---|
@@ -14,15 +14,15 @@ Last audited: 2026-08-24 (CR-010 semantic re-audit against main @ 62b321b): ever
 | REQ-ID-04 | Built | `src/lib/events.ts`, `core/src/fold.ts`, `src/App.svelte` | `core/test/fold.test.ts`, `test/participants.test.ts`  | | source-shape |
 | REQ-ID-05 | Built | `core/src/fold.ts`, `core/src/settle.ts` | `core/test/fold.test.ts`, `core/test/settle.test.ts`  | | source-shape |
 | REQ-ID-06 | Built | `core/src/identity.ts`, `core/src/fold.ts` | `core/test/identity.test.ts`, `test/participants.test.ts`  | | source-shape |
-| REQ-ID-07 | Built | `core/src/identity.ts`, `core/src/fold.ts` | `core/test/identity.test.ts`, `test/verification.test.ts`, `test/participant-claim-ui.test.ts`  | | source-shape |
-| REQ-ID-08 | Built | `src/lib/participants.ts`, `src/App.svelte` | `test/participant-claim-ui.test.ts`, `test/landing-ui.test.ts`  | | source-shape |
-| REQ-ID-09 | Built | `src/lib/participants.ts`, `src/App.svelte` | `test/participant-claim-ui.test.ts`  | | source-shape |
-| REQ-ID-10 | Built | `src/lib/participants.ts`, `src/App.svelte` | `test/participant-claim-ui.test.ts`  | | source-shape |
-| REQ-ID-11 | Built | `src/lib/join-link.ts`, `src/App.svelte` | `test/join-recovery-boundary.test.ts`, `test/durability.test.ts`  | | source-shape |
+| REQ-ID-07 | Built | `core/src/identity.ts`, `core/src/fold.ts` | `core/test/identity.test.ts`, `test/verification.test.ts`, `test/participant-claim-ui.test.ts`  | | rendered |
+| REQ-ID-08 | Built | `src/lib/participants.ts`, `src/App.svelte` | `test/participant-claim-ui.test.ts`, `test/landing-ui.test.ts`  | | rendered |
+| REQ-ID-09 | Built | `src/lib/participants.ts`, `src/App.svelte` | `test/participant-claim-ui.test.ts`  | | rendered |
+| REQ-ID-10 | Built | `src/lib/participants.ts`, `src/App.svelte` | `test/participant-claim-ui.test.ts`  | | rendered |
+| REQ-ID-11 | Built | `src/lib/join-link.ts`, `src/App.svelte` | `test/join-recovery-boundary.test.ts`, `test/durability.test.ts`  | | rendered |
 | REQ-ID-12 | Built | `core/src/identity.ts`, `core/src/fold.ts`, `src/App.svelte` | `core/test/fold.test.ts`, `test/duplicate-banner-ui.test.ts` | CR-011 closed the CR-010 gap: `test/duplicate-banner-ui.test.ts` now asserts the possible-duplicate-participants banner (both labels, "without changing balances automatically", Merge / Not same append-only actions); fold-side assertion remains at `core/test/fold.test.ts:367` | rendered |
 | REQ-ID-13 | Built | `core/src/identity.ts`, `core/src/fold.ts` | `core/test/identity.test.ts`, `core/test/properties.test.ts` | CR-010 added the pinned opposing-direction merge case (`core/test/properties.test.ts`, concurrent HLCs convergent in both delivery orders); convergence is over-determined by four layers (compareHlc dev tiebreak, id tiebreak, fold pre-sort, direction-independent min-root union). CR-011 mutation runs: dropping the id tiebreak left every §16.2 property green — only the new pinned comparator test catches it | source-shape |
 | REQ-ID-14 | Built | `core/src/fold.ts`, `src/lib/events.ts` | `core/test/fold.test.ts`, `test/reconciliation-ui.test.ts` | | source-shape |
-| REQ-ID-15 | Built | `src/lib/expense-command.ts`, `src/App.svelte` | `test/expense-command.test.ts`, `test/landing-ui.test.ts`  | | source-shape |
+| REQ-ID-15 | Built | `src/lib/expense-command.ts`, `src/App.svelte` | `test/expense-command.test.ts`, `test/landing-ui.test.ts`  | | rendered |
 | REQ-ID-16 | Built | `core/src/identity.ts`, `core/src/fold.ts` | `core/test/identity.test.ts`, `test/reconciliation-ui.test.ts` | | source-shape |
 | REQ-ID-17 | Built | `core/src/identity.ts`, `core/src/fold.ts` | `core/test/identity.test.ts`, `test/reconciliation-ui.test.ts` | CR-012 assertion-level audit: `core/test/fold.test.ts` asserts contradiction surfacing WITHOUT altering merge balances (:382) and that EVERY transitive merge edge appears with per-edge undo (:403); `test/reconciliation-ui.test.ts` asserts one undo action per edge. Matches PRD:241 semantics | source-shape |
 | REQ-ID-18 | Built | `core/src/identity.ts`, `src/lib/verification.ts`, `src/lib/device-link.ts`, `src/lib/reattestation.ts` | `core/test/identity.test.ts`, `test/verification.test.ts`, `test/device-link.test.ts`, `test/reattestation.test.ts`  | | source-shape |
@@ -35,7 +35,7 @@ Last audited: 2026-08-24 (CR-010 semantic re-audit against main @ 62b321b): ever
 | REQ-MON-06 | Built | `src/lib/split-preservation.ts` | `test/split-preservation.test.ts`  | | source-shape |
 | REQ-MON-07 | Built | `src/lib/events.ts`, `src/db/repo.ts`, `src/App.svelte` | `test/currency-onboarding.test.ts`  | | source-shape |
 | REQ-MON-08 | Built | `core/src/types.ts`, `core/src/fold.ts`, `src/lib/multicurrency.ts` | `core/test/fold.test.ts`, `test/multicurrency.test.ts`, `test/phase5-money-acceptance.test.ts`  | | source-shape |
-| REQ-MON-09 | Built | `src/lib/expense-display.ts`, `src/App.svelte` | `test/expense-display.test.ts`, `test/common-expense-ui.test.ts`  | | source-shape |
+| REQ-MON-09 | Built | `src/lib/expense-display.ts`, `src/App.svelte` | `test/expense-display.test.ts`, `test/common-expense-ui.test.ts`  | | rendered |
 | REQ-MON-10 | Built | `core/src/fold.ts`, `src/lib/events.ts` | `core/test/fold.test.ts`, `test/expense-edit.test.ts`  | | source-shape |
 | REQ-MON-11 | Built | `core/src/types.ts`, `core/src/fold.ts`, `src/lib/payers.ts` | `core/test/fold.test.ts`, `test/payers.test.ts`, `test/phase5-money-acceptance.test.ts`  | | source-shape |
 | REQ-MON-12 | Built | `core/src/fold.ts`, `src/lib/freeze-policy.ts` | `core/test/fold.test.ts`, `test/freeze-policy.test.ts`  | | source-shape |
@@ -69,14 +69,14 @@ Last audited: 2026-08-24 (CR-010 semantic re-audit against main @ 62b321b): ever
 | REQ-SYN-12 | Built | `core/src/fold.ts` | `core/test/fold.test.ts`, `core/test/properties.test.ts`  | | source-shape |
 | REQ-SYN-13 | Built | `src/lib/durability.ts`, `src/lib/manual-fallback.ts`, `src/App.svelte` | `test/manual-fallback.test.ts`, `test/manual-fallback-ui.test.ts`  | | source-shape |
 | REQ-SYN-14 | Built | `src/relay/sync.ts` | `test/sync.integration.test.ts`  | | source-shape |
-| REQ-SYN-15 | Built | `src/lib/sync-labels.ts`, `src/App.svelte` | `test/sync-labels.test.ts`, `test/sync-honesty-ui.test.ts`  | | source-shape |
+| REQ-SYN-15 | Built | `src/lib/sync-labels.ts`, `src/App.svelte` | `test/sync-labels.test.ts`, `test/sync-honesty-ui.test.ts`  | | rendered |
 | REQ-SYN-16 | Built | `src/lib/manual-fallback.ts`, `src/App.svelte` | `test/manual-fallback.test.ts`, `test/manual-fallback-ui.test.ts`  | | source-shape |
 | REQ-SYN-17 | Built | `src/relay/nostr.ts`, `scripts/task0-retention.mjs` | `test/nostr-relay.test.ts`  | | source-shape |
 | REQ-SYN-18 | Built | `core/src/identity.ts`, `src/relay/sync.ts` | `test/platform-boundaries.test.ts`  | | source-shape |
 | REQ-SYN-19 | Built | `core/src/transport.ts` | `core/test/transport.test.ts`, `core/test/properties.test.ts`  | | source-shape |
 | REQ-SYN-20 | Built | `core/src/fold.ts`, `core/src/transport.ts` | `core/test/properties.test.ts`, `core/test/transport.test.ts`  | | source-shape |
 | REQ-SYN-21 | Built | `src/relay/sync.ts`, `src/relay/http.ts`, `src/relay/nostr.ts` | `test/sync.integration.test.ts`  | | source-shape |
-| REQ-SYN-22 | Built | `core/src/fold.ts`, `src/lib/freeze-policy.ts`, `src/App.svelte` | `core/test/properties.test.ts`, `test/freeze-policy.test.ts`, `test/protection-status-ui.test.ts`  | | source-shape |
+| REQ-SYN-22 | Built | `core/src/fold.ts`, `src/lib/freeze-policy.ts`, `src/App.svelte` | `core/test/properties.test.ts`, `test/freeze-policy.test.ts`, `test/protection-status-ui.test.ts`  | | rendered |
 | REQ-SYN-23 | Built | `src/relay/sync.ts`, `src/relay/http.ts`, `src/relay/nostr.ts` | `test/sync.integration.test.ts`, `test/relay-create.test.ts`  | | source-shape |
 | REQ-SYN-24 | Built | `core/src/hlc.ts`, `core/src/transport.ts` | `core/test/hlc.test.ts`, `core/test/transport.test.ts`, `core/test/properties.test.ts`  | | source-shape |
 | REQ-SYN-25 | Built | `src/crypto/envelope.ts`, `src/relay/sync.ts` | `test/sync.integration.test.ts`  | | source-shape |
@@ -87,8 +87,8 @@ Last audited: 2026-08-24 (CR-010 semantic re-audit against main @ 62b321b): ever
 | REQ-DUR-02 | Built | `src/lib/durability.ts`, `src/App.svelte` | `test/pwa-install.test.ts`, `test/durability-prompts-ui.test.ts`  | | source-shape |
 | REQ-DUR-03 | Partial | `src/lib/durability.ts` | `test/durability-prompts-ui.test.ts` | Ladder rungs 1/4 and the expense-count trigger (`expenseCount >= 3`) are unasserted; only session-count rungs 2–3 plus the dismissal cap are tested (`test/durability.test.ts:40`) | source-shape |
 | REQ-DUR-04 | Built | `src/lib/durability.ts` | `test/durability-prompts-ui.test.ts`, `test/pwa-install.test.ts`  | | source-shape |
-| REQ-DUR-05 | Built | `src/lib/durability.ts`, `src/App.svelte` | `test/protection-status-ui.test.ts`  | | source-shape |
-| REQ-DUR-06 | Partial | `src/lib/join-link.ts`, `src/App.svelte` | `test/join-recovery-boundary.test.ts`, `test/durability.test.ts` | Recovery-before-render ordering is only source-shape containment (`if (joinBlocked) await runSync();`); no behavioural test asserts the sync attempt precedes rendering or that recovery completes | source-shape |
+| REQ-DUR-05 | Built | `src/lib/durability.ts`, `src/App.svelte` | `test/protection-status-ui.test.ts`  | | rendered |
+| REQ-DUR-06 | Partial | `src/lib/join-link.ts`, `src/App.svelte` | `test/join-recovery-boundary.test.ts`, `test/durability.test.ts` | Recovery-before-render ordering is only source-shape containment (`if (joinBlocked) await runSync();`); no behavioural test asserts the sync attempt precedes rendering or that recovery completes | rendered |
 | REQ-DUR-07 | Built | `src/lib/durability.ts` | `test/export-prompt-ui.test.ts`, `test/durability-prompts-ui.test.ts`  | | source-shape |
 | REQ-DUR-08 | Built | `src/lib/durability.ts`, `src/App.svelte` | `test/durability.test.ts`, `test/durability-prompts-ui.test.ts`  | | source-shape |
 | REQ-DUR-09 | Built | `src/lib/join-link.ts`, `src/App.svelte` | `test/join-recovery-boundary.test.ts`, `test/manual-fallback-ui.test.ts` | Import-as-primary asserted at `test/manual-fallback-ui.test.ts:32` (`primary-link` + `Import JSON` in the recovery panel), not in the previously cited durability tests | rendered |
@@ -99,7 +99,7 @@ Last audited: 2026-08-24 (CR-010 semantic re-audit against main @ 62b321b): ever
 | REQ-SEC-04 | Built | `src/crypto/claim.ts`, `src/lib/verification.ts`, `src/lib/device-link.ts` | `test/claim-crypto.test.ts`, `test/verification.test.ts`  | | source-shape |
 | REQ-SEC-05 | Built | `src/lib/durability.ts`, `src/lib/archive.ts` | `test/export-security.test.ts`, `test/identity-backup-ui.test.ts`  | | source-shape |
 | REQ-SEC-06 | Built | `core/src/identity.ts`, `src/lib/reattestation.ts`, `core/src/fold.ts` | `test/verification.test.ts`, `test/reattestation.test.ts`  | | source-shape |
-| REQ-SEC-07 | Built | `core/src/identity.ts`, `src/lib/participants.ts`, `src/App.svelte` | `test/participants.test.ts`, `test/participant-claim-ui.test.ts`  | | source-shape |
+| REQ-SEC-07 | Built | `core/src/identity.ts`, `src/lib/participants.ts`, `src/App.svelte` | `test/participants.test.ts`, `test/participant-claim-ui.test.ts`  | | rendered |
 | REQ-SEC-08 | Built | `core/src/fold.ts`, `src/lib/verification.ts` | `core/test/identity.test.ts`, `test/verification.test.ts`  | | source-shape |
 | REQ-SEC-09 | Built | `src/lib/durability.ts`, `src/App.svelte` | `test/export-security.test.ts`, `test/identity-backup-ui.test.ts`  | | source-shape |
 | REQ-PLT-01 | Built | `vite.config.ts`, `vercel.json` | `test/platform-boundaries.test.ts`  | | source-shape |
@@ -111,19 +111,19 @@ Last audited: 2026-08-24 (CR-010 semantic re-audit against main @ 62b321b): ever
 | REQ-PLT-07 | Built | `api/relay.ts` | `test/relay-api.test.ts`, `test/platform-boundaries.test.ts`  | | source-shape |
 | REQ-PLT-08 | Built | `api/relay.ts` | `test/relay-api.test.ts`, `test/platform-boundaries.test.ts`  | | source-shape |
 | REQ-PLT-09 | Built | `src/relay/sync.ts`, `src/lib/lifecycle.ts` | `test/lifecycle.test.ts`, `test/sync.integration.test.ts`  | | source-shape |
-| REQ-LIF-01 | Built | `core/src/fold.ts`, `src/lib/lifecycle.ts` | `test/lifecycle.test.ts`, `test/lifecycle-ui.test.ts`  | | source-shape |
+| REQ-LIF-01 | Built | `core/src/fold.ts`, `src/lib/lifecycle.ts` | `test/lifecycle.test.ts`, `test/lifecycle-ui.test.ts`  | | rendered |
 | REQ-LIF-02 | Built | `src/lib/archive.ts`, `src/lib/lifecycle.ts`, `src/App.svelte` | `test/archive.test.ts`, `test/lifecycle.test.ts`  | | source-shape |
 | REQ-LIF-03 | Built | `src/lib/archive.ts`, `src/App.svelte` | `test/archive.test.ts`, `test/phase5-archive-acceptance.test.ts`  | | source-shape |
 | REQ-LIF-04 | Built | `src/lib/archive.ts`, `src/App.svelte` | `test/archive.test.ts`, `test/phase5-archive-acceptance.test.ts`  | | source-shape |
-| REQ-LIF-05 | Built | `src/lib/lifecycle.ts`, `src/relay/sync.ts`, `src/App.svelte` | `test/lifecycle.test.ts`, `test/lifecycle-ui.test.ts`  | | source-shape |
-| REQ-LIF-06 | Built | `src/lib/archive.ts`, `src/App.svelte` | `test/archive.test.ts`, `test/lifecycle-ui.test.ts`  | | source-shape |
-| REQ-LIF-07 | Built | `src/lib/archive.ts`, `src/App.svelte` | `test/archive.test.ts`, `test/lifecycle-ui.test.ts`  | | source-shape |
-| REQ-UX-01 | Built | `src/lib/expense-command.ts`, `src/App.svelte` | `test/expense-workflow-ui.test.ts`, `test/common-expense-ui.test.ts`  | | source-shape |
-| REQ-UX-02 | Built | `src/App.svelte`, `src/lib/join-link.ts` | `test/landing-ui.test.ts`, `test/participant-claim-ui.test.ts`  | | source-shape |
+| REQ-LIF-05 | Built | `src/lib/lifecycle.ts`, `src/relay/sync.ts`, `src/App.svelte` | `test/lifecycle.test.ts`, `test/lifecycle-ui.test.ts`  | | rendered |
+| REQ-LIF-06 | Built | `src/lib/archive.ts`, `src/App.svelte` | `test/archive.test.ts`, `test/lifecycle-ui.test.ts`  | | rendered |
+| REQ-LIF-07 | Built | `src/lib/archive.ts`, `src/App.svelte` | `test/archive.test.ts`, `test/lifecycle-ui.test.ts`  | | rendered |
+| REQ-UX-01 | Built | `src/lib/expense-command.ts`, `src/App.svelte` | `test/expense-workflow-ui.test.ts`, `test/common-expense-ui.test.ts`  | | rendered |
+| REQ-UX-02 | Built | `src/App.svelte`, `src/lib/join-link.ts` | `test/landing-ui.test.ts`, `test/participant-claim-ui.test.ts`  | | rendered |
 | REQ-UX-03 | Built | `src/lib/events.ts`, `src/App.svelte` | `test/currency-onboarding.test.ts`  | | source-shape |
-| REQ-UX-04 | Built | `src/App.svelte` | `test/empty-state-ui.test.ts`  | | source-shape |
+| REQ-UX-04 | Built | `src/App.svelte` | `test/empty-state-ui.test.ts`  | | rendered |
 | REQ-UX-05 | Built | `src/App.svelte`, `src/main.ts`, `index.html` | `test/platform-boundaries.test.ts`  | | source-shape |
-| REQ-UX-06 | Built | `src/lib/sync-labels.ts`, `src/App.svelte` | `test/sync-honesty-ui.test.ts`, `test/sync-labels.test.ts`  | | source-shape |
+| REQ-UX-06 | Built | `src/lib/sync-labels.ts`, `src/App.svelte` | `test/sync-honesty-ui.test.ts`, `test/sync-labels.test.ts`  | | rendered |
 
 ## Verification
 

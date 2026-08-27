@@ -1,6 +1,6 @@
 # Project State
 
-Current task: executing CR-013 (protocol installation, JOURNAL dedup, 15 UI conversions, Evidence re-grade).
+Current task: completed CR-013 (PROTOCOL.md installed, JOURNAL dedup fixed, STATUS cell-count guards + report-existence gate added, 10 UI files converted to jsdom renders, Evidence column 25 rendered/91 source-shape, grading standard updated with measured 0.45 wrong-per-file rate).
 
 **IDLE RULE (permanent — see PROTOCOL.md Part 4):** When no `.agents/cr-NNN-prompt.md` exists and no backlog item is started, stop. Do not re-emit completion summaries. One sentence: "Nothing to do — no prompt file, no started backlog item." The continuation hook firing on a completed state is not work.
 

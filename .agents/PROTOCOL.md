@@ -150,10 +150,18 @@ Do this before the 30-day gate (clock started 2026-08-22T12:59:41Z, gate ≈2026
 - **REQ-DUR-03** (Partial): ladder rungs 1 and 4 and the `expenseCount >= 3` trigger
   are unasserted; only session rungs 2–3 and the dismissal cap are tested.
 - **REQ-DUR-06** (Partial): recovery-before-render ordering is source-shape containment
-  only. Re-evaluate once its test file is converted in CR-013 Task 2.
+  only. CR-013 Task 2 converted join-recovery-boundary.test.ts to rendered — the recovery
+  panel renders correctly, but the ordering (recovery attempted BEFORE first render) is still
+  only source-shape. DUR-06 remains Partial.
 - **A13 mitigation is untested against real relays.** Dynamic batch sizing and
   per-event fallback shipped in CR-011 and were tested against recorded measurements,
   not live. Run the real batch publish against all five defaults and record it.
+- **jsdom test-setup blocks (CR-013 discoveries):** Two test scenarios failed to drive app
+  state in jsdom and remain undiagnosed: (1) `identity-backup-ui` — `refreshDurabilityPrompts`
+  runs once at session init before Svelte re-evaluates `$: hasLocalClaim`; the backup prompt
+  never shows with a fake-sig claim. (2) `lifecycle-ui` archived branch — `isGroupArchived()`
+  never returns true after seeding a GroupArchived event via makeEvent+appendEvents. Both need
+  a follow-up investigation before those two tests can be marked rendered.
 - **A15** — awaiting Phase 3 instrumentation.
 
 ### P3 — Product work not yet started

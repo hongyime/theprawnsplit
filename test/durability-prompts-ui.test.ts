@@ -1,3 +1,7 @@
+// CR-013 Task 2 — BLOCKED from rendered conversion.
+// Assertions check refreshDurabilityPrompts() function-body wiring — which helpers it calls and with what arguments. Source-level only.
+// Evidence for all assertions in this file: source-shape.
+
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";

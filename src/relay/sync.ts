@@ -158,10 +158,13 @@ export async function syncOnce(groupId: string, relayOverride?: Relay[], opts: S
         if (diagnostic.severity !== "info") result.errors.push(ack.ack.reason);
       }
     }
-    // Cap effective quorum at the number of available relays: if only Nostr relays are
-    // present (operated relay not configured), min(1, 2) = 1 so any single Nostr ACK
-    // satisfies quorum rather than leaving events permanently local.
-    const ackQuorum = Math.min(relays.length, config.ackQuorum);
+    // Exclude relays that are definitively unconfigured (e.g. operated relay without
+    // Upstash credentials) from the effective quorum. Those relays cannot store data
+    // regardless of event content, so requiring their ACK would leave events permanently
+    // local in Nostr-only deployments.
+    const isRelayUnconfigured = (reason?: string): boolean => reason !== undefined && reason.includes("not configured");
+    const unconfiguredCount = acks.filter((a) => "ack" in a && !a.ack.ok && isRelayUnconfigured(a.ack.reason)).length;
+    const ackQuorum = Math.max(1, Math.min(relays.length - unconfiguredCount, config.ackQuorum));
     const publishQuorumMet = publishQuorumReached(ok, ackQuorum);
     if (publishQuorumMet) {
       await markEvents(groupId, localEffectiveRows.map((row) => row.event.id), "published");

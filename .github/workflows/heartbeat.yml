@@ -28,6 +28,18 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+      - name: Upstash Redis keepalive
+        env:
+          UPSTASH_REDIS_REST_URL: ${{ secrets.UPSTASH_REDIS_REST_URL }}
+          UPSTASH_REDIS_REST_TOKEN: ${{ secrets.UPSTASH_REDIS_REST_TOKEN }}
+        run: |
+          test -n "$UPSTASH_REDIS_REST_URL"
+          test -n "$UPSTASH_REDIS_REST_TOKEN"
+          curl --fail --show-error --silent \
+            "$UPSTASH_REDIS_REST_URL" \
+            -H "Authorization: Bearer $UPSTASH_REDIS_REST_TOKEN" \
+            -H "Content-Type: application/json" \
+            --data "[\"SET\",\"theprawnsplit:keepalive\",\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\",\"EX\",2678400]"
       - name: Heartbeat commit (keeps cron alive)
         run: |
           git config user.name "github-actions[bot]"

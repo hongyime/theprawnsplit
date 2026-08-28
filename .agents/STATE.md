@@ -1,6 +1,6 @@
 # Project State
 
-Current task: production-readiness audit (2026-08-27). Fixes: relay-count cap in sync.ts (Nostr-only quorum), PRD A1 verdict updated to PARTIAL at t=5.1d. Live site https://theprawnsplit.vercel.app confirmed loading. Operated relay not configured (user choice: Nostr-only mode).
+Current task: production-readiness complete (2026-08-28). Sync quorum fix deployed: unconfigured relays excluded from ackQuorum calculation so Nostr-only mode works. PRD A1 verdict updated to PARTIAL. CI green on eb7b4be. Next: operate per PROTOCOL.md backlog (P0: retention clock running, gate 2026-09-21).
 
 **IDLE RULE (permanent — see PROTOCOL.md Part 4):** When no `.agents/cr-NNN-prompt.md` exists and no backlog item is started, stop. Do not re-emit completion summaries. One sentence: "Nothing to do — no prompt file, no started backlog item." The continuation hook firing on a completed state is not work.
 

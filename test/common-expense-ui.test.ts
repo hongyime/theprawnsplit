@@ -37,10 +37,10 @@ describe("common expense UI boundary (rendered)", () => {
     await screen.findByText("Set Up The Split Before Adding Bills.", {}, { timeout: 15000 });
     expect(screen.queryByText("Add Expense")).toBeNull();
 
-    await fireEvent.input(screen.getByPlaceholderText("e.g. Bryan"), { target: { value: "Bryan" } });
+    await fireEvent.input(screen.getByPlaceholderText("e.g. John Smith"), { target: { value: "John Smith" } });
     await fireEvent.click(screen.getByRole("button", { name: /Create My Spot/i }));
 
-    await screen.findByText("Bryan Is Ready. Add The First Expense.", {}, { timeout: 15000 });
+    await screen.findByText("John Smith Is Ready. Add The First Expense.", {}, { timeout: 15000 });
     await screen.findByText("Add Expense", {}, { timeout: 15000 });
     const groups = await listGroups();
     const stored = await readGroup(groups[0]!.groupId);

@@ -1347,7 +1347,7 @@
           </label>
           <label>
             <span>Your Name</span>
-            <input bind:value={setupName} placeholder="e.g. Bryan" />
+            <input bind:value={setupName} placeholder="e.g. John Smith" />
           </label>
           {#if setupNameMatch}<p class="hint duplicate-hint">{matchText(setupNameMatch)} Use That Person Instead.</p>{/if}
           <button type="button" class="setup-primary" disabled={!setupName.trim() || Boolean(setupNameMatch)} on:click={completeSetup}>Create My Spot</button>

@@ -29,12 +29,12 @@ describe("expense workflow UI boundary", () => {
     expect(changePayerMode).toContain('if (nextMode === "multiple")');
     expect(changePayerMode).toContain("payerAmounts = { ...payerAmounts, [payerPid]: formatMinorInput(amountPreview.baseMinor) };");
 
-    expect(expensePanel).toContain('aria-label="Payer mode"');
-    expect(expensePanel).toContain('on:click={() => changePayerMode("multiple")}>many paid');
+    expect(expensePanel).toContain('aria-label="Payer Mode"');
+    expect(expensePanel).toContain('on:click={() => changePayerMode("multiple")}>Many Paid');
     expect(expensePanel).toContain('bind:value={payerAmounts[participant.pid]} inputmode="decimal"');
     expect(expensePanel).toContain("{#each [\"equal\", \"exact\", \"shares\", \"percentage\"] as mode}");
     expect(expensePanel).toContain("on:click={() => changeSplitMode(mode as SplitMode)}");
-    expect(expensePanel).toContain("Rounding remainder goes to {participantLabel(sharePreview.remainderPid)}.");
+    expect(expensePanel).toContain("Rounding Remainder Goes To {participantLabel(sharePreview.remainderPid)}.");
 
     expect(addExpense).toContain("const dates = defaultExpenseDate();");
     expect(addExpense).toContain("const financials = makeExpenseFinancials(amountPreview.baseMinor, payerPreview.payers, sharePreview.shares);");
@@ -49,7 +49,7 @@ describe("expense workflow UI boundary", () => {
     expect(ledgerPanel).toContain("<span>{expense.date}</span>");
     expect(ledgerPanel).toContain("{payerSummary(expense.financials.payers)}");
     expect(ledgerPanel).toContain("{rateSummary(expense.financials.rate)}");
-    expect(ledgerPanel).toContain("{expense.financialHistory.length - 1} correction");
+    expect(ledgerPanel).toContain("{expense.financialHistory.length - 1} Correction");
     expect(ledgerPanel).toContain("on:click={() => editExpense(expense.xid)}");
     expect(ledgerPanel).toContain("on:click={() => voidExpense(expense.xid)}");
     expect(ledgerPanel).not.toMatch(/new Date\(expense\.at\)|toLocaleDateString\(.*expense\.at/);

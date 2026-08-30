@@ -24,8 +24,8 @@ describe("export prompt UI boundary", () => {
     expect(markExportPromptHandled).toContain('firstZeroExportPromptedAt: reason === "first-zero" ? Date.now() : durability.firstZeroExportPromptedAt');
     expect(markExportPromptHandled).toContain('sevenDayExportPromptedAt: reason === "seven-day" ? Date.now() : durability.sevenDayExportPromptedAt');
 
-    expect(exportPromptBanner).toContain('activeExportPrompt === "first-zero" ? "Balances are settled" : "Export a recovery copy"');
-    expect(exportPromptBanner).toContain('activeExportPrompt === "first-zero" ? "All balances reached zero for the first time." : "This device returned after more than 7 days without protected storage."');
+    expect(exportPromptBanner).toContain('activeExportPrompt === "first-zero" ? "Balances Are Settled" : "Export A Recovery Copy"');
+    expect(exportPromptBanner).toContain('activeExportPrompt === "first-zero" ? "All Balances Reached Zero For The First Time." : "This Device Returned After More Than 7 Days Without Protected Storage."');
     expect(exportPromptBanner).toContain("on:click={downloadPromptExport}");
     expect(exportPromptBanner).toContain("on:click={dismissActiveExportPrompt}");
 

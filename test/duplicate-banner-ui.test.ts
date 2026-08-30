@@ -38,8 +38,8 @@ describe("duplicate participant banner (rendered)", () => {
 
     await screen.findByText(/may be the same as/, {}, { timeout: 15000 });
     expect(screen.getByRole("button", { name: "Merge" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Not same" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Not Same" })).toBeTruthy();
     // Balance text confirms duplicate detection does not automatically alter balances.
-    expect(document.body.textContent).toContain("without changing balances automatically");
+    expect(document.body.textContent).toContain("Without Changing Balances Automatically");
   }, 90_000);
 });

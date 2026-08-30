@@ -65,7 +65,7 @@ describe("reconciliation banner (rendered)", () => {
     await screen.findByText(/may be the same as/, {}, { timeout: 15000 });
 
     const merge = screen.getByRole("button", { name: "Merge" }) as HTMLButtonElement;
-    const notSame = screen.getByRole("button", { name: "Not same" });
+    const notSame = screen.getByRole("button", { name: "Not Same" });
     expect(merge.disabled).toBe(false);
     expect(notSame).toBeTruthy();
   });

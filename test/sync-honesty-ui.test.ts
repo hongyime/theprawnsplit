@@ -32,10 +32,10 @@ describe("sync honesty UI boundary (rendered)", () => {
     // Topbar shows unconfirmed count — at least one event is local/unconfirmed.
     await waitFor(() => {
       const topbar = document.querySelector("header.topbar");
-      if (!topbar?.textContent?.match(/\d+ unconfirmed/)) throw new Error("no unconfirmed count");
+      if (!topbar?.textContent?.match(/\d+ Unconfirmed/)) throw new Error("no unconfirmed count");
     }, { timeout: 15000 });
     const topbarText = document.querySelector("header.topbar")?.textContent ?? "";
-    expect(topbarText).toMatch(/\d+ unconfirmed/);
+    expect(topbarText).toMatch(/\d+ Unconfirmed/);
     // The topbar must NOT claim events are synced/shared while local events remain.
     expect(topbarText).not.toMatch(/\b(synced|shared|success|confirmed)\b/i);
   }, 90_000);

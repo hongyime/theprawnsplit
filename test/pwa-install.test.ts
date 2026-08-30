@@ -52,7 +52,7 @@ describe("PWA install boundary", () => {
     );
 
     expect(serviceWorker).toContain('const APP_SHELL = ["/", "/manifest.webmanifest", "/favicon.svg"];');
-    expect(appSource).toContain("Add to Home Screen");
+    expect(appSource).toContain("Add To Home Screen");
     expect(appSource).toContain('window.matchMedia("(display-mode: standalone)")');
     expect(appSource).toContain("standalone?: boolean");
   });

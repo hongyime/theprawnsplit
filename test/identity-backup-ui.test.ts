@@ -31,8 +31,8 @@ describe("identity backup UI", () => {
     const shareDelta = source.match(/async function shareDelta\(\): Promise<void> \{([\s\S]*?)\n  \}/)?.[1] ?? "";
     const backupDownload = source.match(/function downloadIdentityBackup\(\): boolean \{([\s\S]*?)\n  \}/)?.[1] ?? "";
 
-    expect(prompt).toContain("grants impersonation power");
-    expect(backupDownload).toContain("Anyone with it can impersonate your device");
+    expect(prompt).toContain("Grants Impersonation Power");
+    expect(backupDownload).toContain("Anyone With It Can Impersonate Your Device");
     expect(prompt).toContain("on:click={downloadPromptIdentityBackup}");
     expect(syncStrip).toContain("downloadIdentityBackup()");
     expect(prompt).not.toContain("shareDelta");

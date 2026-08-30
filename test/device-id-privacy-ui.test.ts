@@ -16,8 +16,8 @@ describe("device ID privacy UI boundary", () => {
     const shortDevice = source.match(/function shortDevice\(deviceId\?: string\): string \{([\s\S]*?)\n  \}/)?.[1] ?? "";
     const unverifiedReclaim = source.match(/\{:else if anomaly\.code === "unverified-reclaim" && anomaly\.pid\}([\s\S]*?)\{:else\}/)?.[1] ?? "";
 
-    expect(shortDevice).toContain('if (deviceId === group?.deviceId) return "this device";');
-    expect(shortDevice).toContain('return "another device";');
+    expect(shortDevice).toContain('if (deviceId === group?.deviceId) return "This Device";');
+    expect(shortDevice).toContain('return "Another Device";');
     expect(shortDevice).not.toMatch(/slice|substring|substr|deviceId\}/);
     expect(unverifiedReclaim).toContain("shortDevice(participantClaimEvent(anomaly.eventId)?.deviceId)");
     expect(unverifiedReclaim).not.toContain("?.deviceId ??");

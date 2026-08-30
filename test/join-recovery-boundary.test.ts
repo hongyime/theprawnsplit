@@ -33,7 +33,7 @@ describe("join recovery boundary (rendered)", () => {
     renderApp();
 
     // Recovery panel appears instead of empty roster.
-    await screen.findByText("Waiting for recovered trip data.", {}, { timeout: 15000 });
+    await screen.findByText("Waiting For Recovered Trip Data.", {}, { timeout: 15000 });
 
     // Participant creation is blocked (Add submit button disabled).
     const addBtn = document.querySelector<HTMLButtonElement>('button[type="submit"]');

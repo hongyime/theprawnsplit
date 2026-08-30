@@ -33,10 +33,10 @@ describe("lifecycle UI boundary (rendered)", () => {
 
     renderApp();
     await openTrip();
-    await screen.findByText("This trip is still active. Adding a new expense will update balances automatically.", {}, { timeout: 15000 });
+    await screen.findByText("This Trip Is Still Active. Adding A New Expense Will Update Balances Automatically.", {}, { timeout: 15000 });
 
     // Archive button present and enabled on an active trip.
-    const archiveBtn = [...document.querySelectorAll("button")].find((b) => b.getAttribute("title") === "Archive trip");
+    const archiveBtn = [...document.querySelectorAll("button")].find((b) => b.getAttribute("title") === "Archive Trip");
     expect(archiveBtn).not.toBeNull();
     expect((archiveBtn as HTMLButtonElement | undefined)?.disabled).toBeFalsy();
   }, 90_000);

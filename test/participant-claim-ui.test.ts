@@ -41,11 +41,11 @@ describe("participant claim UI boundary (rendered)", () => {
 
     const body = document.body.textContent ?? "";
     const unclaimedIdx = body.indexOf("Unclaimed");
-    const addInput = document.querySelector('input[placeholder="Add shadow participant"]');
+    const addInput = document.querySelector('input[placeholder="Add Shadow Participant"]');
     const addIdx = addInput ? body.length : -1; // input placeholder isn't in textContent; use presence instead
     expect(unclaimedIdx).toBeGreaterThanOrEqual(0);
     expect(addInput).not.toBeNull(); // create-new input exists (comes after Unclaimed in DOM order)
-    // Rendered finding: "Claimed people (N)" section is absent when N=0; the source-text test
+    // Rendered finding: "Claimed People (N)" section is absent when N=0; the source-text test
     // passed because it checked template structure not conditional rendering behaviour.
   }, 90_000);
 

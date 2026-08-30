@@ -24,8 +24,8 @@ describe("landing and root routing UI (rendered)", () => {
     renderApp();
     // Landing renders immediately with no groups.
     await screen.findByText("The Prawn Split", {}, { timeout: 15000 });
-    expect(document.body.textContent).toContain("Split trip costs with friends.");
-    expect(document.body.textContent).toContain("No accounts.");
+    expect(document.body.textContent).toContain("Split Trip Costs With Friends.");
+    expect(document.body.textContent).toContain("No Accounts.");
     expect(screen.getByRole("button", { name: /Start a new trip/i })).toBeTruthy();
   }, 90_000);
 

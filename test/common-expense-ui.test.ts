@@ -34,14 +34,14 @@ describe("common expense UI boundary (rendered)", () => {
     renderApp();
     fireEvent.click(await screen.findByRole("button", { name: /Start a new trip/i }, { timeout: 15000 }));
 
-    await screen.findByText("Set up the split before adding bills.", {}, { timeout: 15000 });
-    expect(screen.queryByText("Add expense")).toBeNull();
+    await screen.findByText("Set Up The Split Before Adding Bills.", {}, { timeout: 15000 });
+    expect(screen.queryByText("Add Expense")).toBeNull();
 
     await fireEvent.input(screen.getByPlaceholderText("e.g. Bryan"), { target: { value: "Bryan" } });
-    await fireEvent.click(screen.getByRole("button", { name: /Create my spot/i }));
+    await fireEvent.click(screen.getByRole("button", { name: /Create My Spot/i }));
 
-    await screen.findByText("Bryan is ready. Add the first expense.", {}, { timeout: 15000 });
-    await screen.findByText("Add expense", {}, { timeout: 15000 });
+    await screen.findByText("Bryan Is Ready. Add The First Expense.", {}, { timeout: 15000 });
+    await screen.findByText("Add Expense", {}, { timeout: 15000 });
     const groups = await listGroups();
     const stored = await readGroup(groups[0]!.groupId);
     expect(stored.identities).toHaveLength(1);
@@ -60,7 +60,7 @@ describe("common expense UI boundary (rendered)", () => {
     }, { timeout: 15000 });
     await fireEvent.click(save);
 
-    await screen.findByText("Expense saved.", {}, { timeout: 15000 });
+    await screen.findByText("Expense Saved.", {}, { timeout: 15000 });
     await screen.findByText("Lunch", {}, { timeout: 15000 });
   }, 90_000);
 

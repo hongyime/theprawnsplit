@@ -30,15 +30,15 @@ describe("protection status UI (rendered)", () => {
     const card = await waitFor(() => { const el = document.querySelector<HTMLButtonElement>(".trip-card"); if (!el) throw new Error("no card"); return el; }, { timeout: 15000 });
     fireEvent.click(card);
     await waitFor(() => { if (!document.querySelector(".app-shell")) throw new Error("no shell"); }, { timeout: 15000 });
-    fireEvent.click(await screen.findByText("Sync, backup, and recovery", {}, { timeout: 15000 }));
+    fireEvent.click(await screen.findByText("Sync, Backup, And Recovery", {}, { timeout: 15000 }));
     await waitFor(() => { if (!document.querySelector(".protection-status")) throw new Error("no prot-status"); }, { timeout: 15000 });
 
     const prot = document.querySelector(".protection-status");
     expect(prot).not.toBeNull();
-    // jsdom has matchMedia returning false → isStandalone=false → "browser tab"
-    expect(prot!.textContent).toContain("browser tab");
-    // jsdom has no navigator.storage → persistedStorage=null → "storage unknown"
-    expect(prot!.textContent).toContain("storage unknown");
-    expect(prot!.getAttribute("aria-label")).toBe("Protection status");
+    // jsdom has matchMedia returning false -> isStandalone=false -> "Browser Tab"
+    expect(prot!.textContent).toContain("Browser Tab");
+    // jsdom has no navigator.storage -> persistedStorage=null -> "Storage Unknown"
+    expect(prot!.textContent).toContain("Storage Unknown");
+    expect(prot!.getAttribute("aria-label")).toBe("Protection Status");
   }, 90_000);
 });

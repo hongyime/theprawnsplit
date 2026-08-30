@@ -46,29 +46,29 @@ describe("durability prompt UI boundary", () => {
     expect(source).toContain("identityBackupPromptedAt: Date.now()");
     expect(source).toContain("async function markExportPromptHandled(reason: ExportPromptReason)");
 
-    expect(pinBanner).toContain("Pin the trip link");
-    expect(pinBanner).toContain("wiped device can recover before showing an empty ledger");
+    expect(pinBanner).toContain("Pin The Trip Link");
+    expect(pinBanner).toContain("Wiped Device Can Recover Before Showing An Empty Ledger");
     expect(pinBanner).toContain("on:click={() => markPinLinkPromptHandled(true)}");
     expect(pinBanner).toContain("on:click={() => markPinLinkPromptHandled(false)}");
 
-    expect(identityBanner).toContain("Back up this device identity");
-    expect(identityBanner).toContain("grants impersonation power");
+    expect(identityBanner).toContain("Back Up This Device Identity");
+    expect(identityBanner).toContain("Grants Impersonation Power");
     expect(identityBanner).toContain("on:click={downloadPromptIdentityBackup}");
     expect(identityBanner).toContain("on:click={markIdentityBackupPromptHandled}");
 
-    expect(exportBanner).toContain('activeExportPrompt === "first-zero" ? "Balances are settled" : "Export a recovery copy"');
-    expect(exportBanner).toContain("All balances reached zero for the first time.");
-    expect(exportBanner).toContain("returned after more than 7 days without protected storage");
+    expect(exportBanner).toContain('activeExportPrompt === "first-zero" ? "Balances Are Settled" : "Export A Recovery Copy"');
+    expect(exportBanner).toContain("All Balances Reached Zero For The First Time.");
+    expect(exportBanner).toContain("Returned After More Than 7 Days Without Protected Storage");
     expect(exportBanner).toContain("on:click={downloadPromptExport}");
     expect(exportBanner).toContain("on:click={dismissActiveExportPrompt}");
 
     expect(installBanner).toContain("class:sticky-install={activeInstallLevel === 2}");
-    expect(installBanner).toContain('activeInstallLevel === 1 ? "Install for safer storage" : "Protect this trip"');
-    expect(installBanner).toContain("Add to Home Screen");
+    expect(installBanner).toContain('activeInstallLevel === 1 ? "Install For Safer Storage" : "Protect This Trip"');
+    expect(installBanner).toContain("Add To Home Screen");
     expect(installBanner).toContain("on:click={dismissActiveInstallPrompt}");
-    expect(installModal).toContain('aria-label="Protect this trip"');
-    expect(installModal).toContain('activeInstallLevel === 4 ? "Storage survived" : "Storage is still best effort"');
-    expect(installModal).toContain("Install the app so the browser can give this trip stronger storage protection.");
+    expect(installModal).toContain('aria-label="Protect This Trip"');
+    expect(installModal).toContain('activeInstallLevel === 4 ? "Storage Survived" : "Storage Is Still Best Effort"');
+    expect(installModal).toContain("Install The App So The Browser Can Give This Trip Stronger Storage Protection.");
     expect(installModal).toContain("on:click={dismissActiveInstallPrompt}");
   });
 });

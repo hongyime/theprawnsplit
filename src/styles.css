@@ -599,7 +599,10 @@ button.secondary {
 
 .grid {
   display: grid;
-  grid-template-columns: minmax(240px, 0.85fr) minmax(260px, 1fr) minmax(320px, 1.35fr);
+  grid-template-columns: minmax(280px, 1fr) minmax(340px, 1.35fr);
+  grid-template-areas:
+    "people expense"
+    "balances settle";
   gap: 12px;
   align-items: start;
 }
@@ -734,8 +737,20 @@ button.secondary {
   color: #b42318;
 }
 
+.roster {
+  grid-area: people;
+}
+
+.balances {
+  grid-area: balances;
+}
+
 .expense {
-  grid-row: span 2;
+  grid-area: expense;
+}
+
+.settlements {
+  grid-area: settle;
 }
 
 .form-grid {
@@ -780,6 +795,11 @@ button.secondary {
 
 button.blocked {
   box-shadow: none;
+}
+
+button.copied {
+  border-color: #087f5b;
+  background: #087f5b;
 }
 
 .split-table {
@@ -883,6 +903,22 @@ button.blocked {
 .ledger,
 .import-panel {
   margin-top: 12px;
+}
+
+.top-import-panel {
+  margin-bottom: 12px;
+  animation: panel-in 160ms ease-out;
+}
+
+@keyframes panel-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .import-panel textarea {
@@ -997,6 +1033,11 @@ button.blocked {
 
   .grid {
     grid-template-columns: 1fr;
+    grid-template-areas:
+      "people"
+      "expense"
+      "balances"
+      "settle";
   }
 
   .setup-card {

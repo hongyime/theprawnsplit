@@ -34,8 +34,10 @@ describe("currency onboarding", () => {
     expect(currencyOptions()).toContain("ZAR");
 
     const source = readFileSync(join(process.cwd(), "src", "App.svelte"), "utf8");
-    expect(source).toContain('aria-label="Trip currency"');
-    expect(source).toContain('aria-label="Expense currency"');
+    expect(source).not.toContain('aria-label="Trip Currency"');
+    expect(source).not.toContain('aria-label="Trip currency"');
+    expect(source).toContain('aria-label="Main Currency"');
+    expect(source).toContain('aria-label="Expense Currency"');
     expect(source).not.toContain('aria-label="Currency"');
   });
 });

@@ -24,7 +24,6 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@lucide/svelte": "^1.33.0",
     "@upstash/redis": "^1.38.2",
     "idb": "^8.0.0",
     "nostr-tools": "^2.24.3",

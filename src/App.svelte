@@ -1,22 +1,5 @@
 <script lang="ts">
-  import {
-    Download,
-    Plus,
-    ReceiptText,
-    RefreshCcw,
-    KeyRound,
-    Link,
-    QrCode,
-    ShieldCheck,
-    Trash2,
-    Upload,
-    Users,
-    WalletCards,
-    Archive,
-    GitMerge,
-    Share2,
-    Settings,
-  } from "@lucide/svelte";
+  import Icon from "@/lib/Icon.svelte";
   import { allocate, eventSortKey, fold, greedySettlement, type Event, type Financials, type VerificationContext, type State } from "@theprawnsplit/core";
   import {
     appendEvents,
@@ -1233,15 +1216,15 @@
       <div class="header-actions">
         <input class="currency" value={group.currency} aria-label="Currency" disabled={!groupProfileEditable} on:change={(e) => setCurrency((e.currentTarget as HTMLInputElement).value)} />
         <button type="button" class="secondary" on:click={showTripList} title="All trips">Trips</button>
-        <button type="button" disabled={syncing} on:click={runSync} title="Sync now"><RefreshCcw size={18} /> {syncing ? "Syncing" : "Sync"}</button>
-        <button type="button" on:click={copyJoinLink} title="Copy join link"><Link size={18} /> Link</button>
-        <button type="button" on:click={showJoinQrCode} title="Show join QR"><QrCode size={18} /> QR</button>
-        <button type="button" on:click={shareDelta} title="Share unsynced delta"><Share2 size={18} /> Share</button>
-        <button type="button" on:click={() => downloadExport()} title="Export ledger"><Download size={18} /> Export</button>
+        <button type="button" disabled={syncing} on:click={runSync} title="Sync now"><Icon name="refresh-ccw" size={18} /> {syncing ? "Syncing" : "Sync"}</button>
+        <button type="button" on:click={copyJoinLink} title="Copy join link"><Icon name="link" size={18} /> Link</button>
+        <button type="button" on:click={showJoinQrCode} title="Show join QR"><Icon name="qr-code" size={18} /> QR</button>
+        <button type="button" on:click={shareDelta} title="Share unsynced delta"><Icon name="share" size={18} /> Share</button>
+        <button type="button" on:click={() => downloadExport()} title="Export ledger"><Icon name="download" size={18} /> Export</button>
         {#if archived}
-          <button type="button" on:click={unarchiveGroup} title="Unarchive trip"><RefreshCcw size={18} /> Unarchive</button>
+          <button type="button" on:click={unarchiveGroup} title="Unarchive trip"><Icon name="refresh-ccw" size={18} /> Unarchive</button>
         {:else}
-          <button type="button" on:click={archiveGroup} title="Archive trip"><Archive size={18} /> Archive</button>
+          <button type="button" on:click={archiveGroup} title="Archive trip"><Icon name="archive" size={18} /> Archive</button>
         {/if}
       </div>
     </header>
@@ -1278,9 +1261,9 @@
           <p>Use manual sharing now so another device can catch up without waiting for relay quorum.</p>
         </div>
         <div class="prompt-actions">
-          <button type="button" on:click={shareDelta}><Share2 size={17} /> Share delta</button>
-          <button type="button" class="secondary" on:click={() => downloadExport()}><Download size={17} /> Export</button>
-          <button type="button" class="secondary" on:click={copyJoinLink}><Link size={17} /> Copy link</button>
+          <button type="button" on:click={shareDelta}><Icon name="share" size={17} /> Share delta</button>
+          <button type="button" class="secondary" on:click={() => downloadExport()}><Icon name="download" size={17} /> Export</button>
+          <button type="button" class="secondary" on:click={copyJoinLink}><Icon name="link" size={17} /> Copy link</button>
         </div>
       </section>
     {/if}
@@ -1291,7 +1274,7 @@
           <p>Keep the join link in your group chat so a wiped device can recover before showing an empty ledger.</p>
         </div>
         <div class="prompt-actions">
-          <button type="button" on:click={() => markPinLinkPromptHandled(true)}><Link size={17} /> Copy link</button>
+          <button type="button" on:click={() => markPinLinkPromptHandled(true)}><Icon name="link" size={17} /> Copy link</button>
           <button type="button" class="secondary" on:click={() => markPinLinkPromptHandled(false)}>Dismiss</button>
         </div>
       </section>
@@ -1303,7 +1286,7 @@
           <p>This file grants impersonation power for this trip. It is separate from the shareable trip export and restores settlement authority if this browser loses storage.</p>
         </div>
         <div class="prompt-actions">
-          <button type="button" on:click={downloadPromptIdentityBackup}><KeyRound size={17} /> Identity backup</button>
+          <button type="button" on:click={downloadPromptIdentityBackup}><Icon name="key-round" size={17} /> Identity backup</button>
           <button type="button" class="secondary" on:click={markIdentityBackupPromptHandled}>Later</button>
         </div>
       </section>
@@ -1315,7 +1298,7 @@
           <p>{activeExportPrompt === "first-zero" ? "All balances reached zero for the first time." : "This device returned after more than 7 days without protected storage."}</p>
         </div>
         <div class="prompt-actions">
-          <button type="button" on:click={downloadPromptExport}><Download size={17} /> Export</button>
+          <button type="button" on:click={downloadPromptExport}><Icon name="download" size={17} /> Export</button>
           <button type="button" class="secondary" on:click={dismissActiveExportPrompt}>Dismiss</button>
         </div>
       </section>
@@ -1344,27 +1327,27 @@
         <div class="recovery-actions">
           {#if recoveryMode === "evicted"}
             <a class="primary-link" href="#manual-import">Import JSON</a>
-            <button type="button" disabled={syncing} on:click={runSync}><RefreshCcw size={17} /> {syncing ? "Recovering" : "Retry sync"}</button>
+            <button type="button" disabled={syncing} on:click={runSync}><Icon name="refresh-ccw" size={17} /> {syncing ? "Recovering" : "Retry sync"}</button>
           {:else}
-            <button type="button" disabled={syncing} on:click={runSync}><RefreshCcw size={17} /> {syncing ? "Recovering" : "Retry sync"}</button>
+            <button type="button" disabled={syncing} on:click={runSync}><Icon name="refresh-ccw" size={17} /> {syncing ? "Recovering" : "Retry sync"}</button>
             <a href="#manual-import">Import JSON</a>
           {/if}
         </div>
       </section>
     {/if}
     <section class="sync-strip">
-      <span><ShieldCheck size={17} /> {syncStatus}</span>
+      <span><Icon name="shield" size={17} /> {syncStatus}</span>
       <span class="protection-status" aria-label="Protection status">
         <span class:ok={isStandalone}>{isStandalone ? "installed" : "browser tab"}</span>
         <span class:ok={persistedStorage === true} class:warn={persistedStorage === false}>{storageLabel}</span>
         <span class:ok={unconfirmedCount === 0 && state.quarantined.length === 0} class:warn={unconfirmedCount > 0 || state.quarantined.length > 0}>{syncLabels.protection}</span>
       </span>
       {#if hasLocalClaim}
-        <button type="button" on:click={() => { if (downloadIdentityBackup()) void markIdentityBackupPromptHandled(); }}><KeyRound size={17} /> Identity backup</button>
+        <button type="button" on:click={() => { if (downloadIdentityBackup()) void markIdentityBackupPromptHandled(); }}><Icon name="key-round" size={17} /> Identity backup</button>
       {:else}
         <span>Claim a person before adding expenses.</span>
       {/if}
-      <button type="button" class="secondary" on:click={() => (relaySettingsOpen = !relaySettingsOpen)} title="Relay settings"><Settings size={17} /> Relays</button>
+      <button type="button" class="secondary" on:click={() => (relaySettingsOpen = !relaySettingsOpen)} title="Relay settings"><Icon name="settings" size={17} /> Relays</button>
     </section>
     {#if relaySettingsOpen}
       <section class="relay-settings-panel" aria-label="Relay settings">
@@ -1402,7 +1385,7 @@
 
     {#if reconciliationAnomalies.length}
       <section class="reconcile-panel" aria-label="Reconciliation issues">
-        <h2><GitMerge size={18} /> Reconcile People</h2>
+        <h2><Icon name="git-merge" size={18} /> Reconcile People</h2>
         {#each reconciliationAnomalies as anomaly}
           <div class="reconcile-row">
             <div>
@@ -1447,17 +1430,17 @@
 
     <section class="grid">
       <article class="panel roster">
-        <h2><Users size={18} /> People</h2>
+        <h2><Icon name="users" size={18} /> People</h2>
         {#if participants.length === 0}
           <div class="empty">
             {#if recoveryActive}
               <p>Waiting for recovered trip data.</p>
-              <button type="button" disabled={syncing} on:click={runSync}><RefreshCcw size={17} /> Retry sync</button>
+              <button type="button" disabled={syncing} on:click={runSync}><Icon name="refresh-ccw" size={17} /> Retry sync</button>
             {:else}
               <p>Add people to start a trip ledger.</p>
               <div class="empty-actions">
-                <button type="button" on:click={() => participantNameInput?.focus()}><Users size={17} /> Add people</button>
-                <button type="button" on:click={() => downloadExport()}><Download size={17} /> Share trip file</button>
+                <button type="button" on:click={() => participantNameInput?.focus()}><Icon name="users" size={17} /> Add people</button>
+                <button type="button" on:click={() => downloadExport()}><Icon name="download" size={17} /> Share trip file</button>
               </div>
             {/if}
           </div>
@@ -1479,7 +1462,7 @@
                     <span class="person-actions">
                       {participant.deactivated ? "hidden" : "shadow"}
                       {#if !archived}
-                        <button type="button" on:click={() => requestClaimParticipant(participant.pid)} title="Claim participant"><KeyRound size={15} /> Claim</button>
+                        <button type="button" on:click={() => requestClaimParticipant(participant.pid)} title="Claim participant"><Icon name="key-round" size={15} /> Claim</button>
                         {#if hiddenEvent}
                           <button type="button" class="secondary" on:click={() => voidEvent(hiddenEvent.id)} title="Restore default splits">Restore</button>
                         {:else}
@@ -1511,7 +1494,7 @@
                       {#if localClaimPids.has(participant.pid)}
                         <span>you</span>
                       {:else if !archived}
-                        <button type="button" class="secondary" on:click={() => requestDeviceLink(participant.pid)} title="Request device link"><Link size={15} /> Link</button>
+                        <button type="button" class="secondary" on:click={() => requestDeviceLink(participant.pid)} title="Request device link"><Icon name="link" size={15} /> Link</button>
                       {/if}
                       {#if !archived}
                         {#if !localClaimPids.has(participant.pid)}
@@ -1532,7 +1515,7 @@
         {/if}
         <form class="row create-person" on:submit|preventDefault={addParticipant}>
           <input bind:this={participantNameInput} bind:value={participantName} placeholder="Add shadow participant" disabled={archived} />
-          <button type="submit" disabled={joinBlocked || archived}><Plus size={17} /> Add</button>
+          <button type="submit" disabled={joinBlocked || archived}><Icon name="plus" size={17} /> Add</button>
         </form>
         {#if participantNameMatch}
           <p class="hint duplicate-hint">{matchText(participantNameMatch)} Select the existing person before creating a new one.</p>
@@ -1540,7 +1523,7 @@
       </article>
 
       <article class="panel balances">
-        <h2><WalletCards size={18} /> Balances</h2>
+        <h2><Icon name="wallet" size={18} /> Balances</h2>
         {#if frozenPolicy.displayBalances}
           {#each balances as [pid, minor]}
             <div class:positive={minor > 0n} class:negative={minor < 0n} class="balance-row">
@@ -1554,7 +1537,7 @@
       </article>
 
       <article class="panel expense">
-        <h2><ReceiptText size={18} /> Expense</h2>
+        <h2><Icon name="receipt-text" size={18} /> Expense</h2>
         <div class="form-grid">
           <input bind:value={expenseDesc} placeholder="Description" disabled={archived} />
           <input bind:value={expenseTotal} inputmode="decimal" placeholder="Total" disabled={archived} />
@@ -1626,11 +1609,11 @@
         {#if archived}<p class="hint">Archived trips are read-only.</p>{:else if !hasLocalClaim}<p class="hint">Viewing is enabled. Expense creation requires claiming one participant on this device.</p>{/if}
         {#if !payerPreview.ok}<p class="hint">{payerPreview.message}</p>{/if}
         {#if !amountPreview.ok}<p class="hint">{amountPreview.message}</p>{:else if !sharePreview.ok}<p class="hint">{sharePreview.message}</p>{:else if sharePreview.remainderPid}<p class="hint">Rounding remainder goes to {participantLabel(sharePreview.remainderPid)}.</p>{/if}
-        <button type="button" disabled={!canSaveExpense} on:click={addExpense}><Plus size={17} /> Save expense</button>
+        <button type="button" disabled={!canSaveExpense} on:click={addExpense}><Icon name="plus" size={17} /> Save expense</button>
       </article>
 
       <article class="panel settlements">
-        <h2><RefreshCcw size={18} /> Settle</h2>
+        <h2><Icon name="refresh-ccw" size={18} /> Settle</h2>
         {#if !frozenPolicy.allowSettlementActions}
           <p class="warning compact-warning">Settlement is frozen until the newer retained event can be folded.</p>
         {:else}
@@ -1708,8 +1691,8 @@
           </div>
           <div>
             <strong>{formatMinor(expense.financials.minor, group.currency)}</strong>
-            <button type="button" disabled={archived} on:click={() => editExpense(expense.xid)} title="Edit expense"><ReceiptText size={16} /></button>
-            <button type="button" disabled={archived} on:click={() => voidExpense(expense.xid)} title="Void expense"><Trash2 size={16} /></button>
+            <button type="button" disabled={archived} on:click={() => editExpense(expense.xid)} title="Edit expense"><Icon name="receipt-text" size={16} /></button>
+            <button type="button" disabled={archived} on:click={() => voidExpense(expense.xid)} title="Void expense"><Icon name="trash" size={16} /></button>
           </div>
         </div>
       {/each}
@@ -1717,7 +1700,7 @@
     </section>
 
     <section class="panel import-panel" id="manual-import">
-      <h2><Upload size={18} /> Import Recovery JSON</h2>
+      <h2><Icon name="upload" size={18} /> Import Recovery JSON</h2>
       <textarea bind:value={importText} placeholder="Paste a TripLedgerExport, TripLedgerDelta, DeviceIdentityBackup, or DeviceLinkRequest JSON file here"></textarea>
       <button type="button" disabled={!importText.trim()} on:click={importExport}>Import</button>
     </section>
@@ -1741,7 +1724,7 @@
           </dl>
           <div class="prompt-actions">
             <button type="button" class="secondary" on:click={() => (claimCandidatePid = "")}>Cancel</button>
-            <button type="button" on:click={() => claimParticipant(claimCandidate.pid)}><KeyRound size={16} /> Claim</button>
+            <button type="button" on:click={() => claimParticipant(claimCandidate.pid)}><Icon name="key-round" size={16} /> Claim</button>
           </div>
         </div>
       </div>
@@ -1764,7 +1747,7 @@
           <img class="join-qr" src={joinQrDataUrl} alt="Join QR code" />
           <div class="prompt-actions">
             <button type="button" class="secondary" on:click={() => (joinQrDataUrl = "")}>Close</button>
-            <button type="button" on:click={copyJoinLink}><Link size={16} /> Copy link</button>
+            <button type="button" on:click={copyJoinLink}><Icon name="link" size={16} /> Copy link</button>
           </div>
         </div>
       </div>

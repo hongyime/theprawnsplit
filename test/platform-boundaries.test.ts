@@ -86,6 +86,14 @@ describe("platform boundaries", () => {
     expect(offenders).toEqual([]);
   });
 
+  it("keeps production source off lucide-svelte runtime components", () => {
+    const offenders = sourceEntries()
+      .filter((entry) => /@lucide\/svelte/.test(entry.source))
+      .map((entry) => relative(process.cwd(), entry.path));
+
+    expect(offenders).toEqual([]);
+  });
+
   it("keeps relay adapter construction behind the sync relay factory", () => {
     const factoryPath = join(sourceRoot, "relay", "sync.ts");
     const offenders = sourceEntries()

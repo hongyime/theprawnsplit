@@ -19,7 +19,7 @@ beforeEach(() => { document.body.textContent = ""; });
 afterEach(() => { if (instance) { try { unmount(instance as never); } catch {} instance = null; } });
 
 describe("empty state UI (rendered)", () => {
-  it("presents add-people and share-trip as primary actions when the trip has no participants", async () => {
+  it("presents setup as the primary action when the trip has no participants", async () => {
     await resetRepositoryForTests(`empty-state-render-${Date.now()}`);
     await ensureGroup();
 
@@ -29,16 +29,14 @@ describe("empty state UI (rendered)", () => {
     fireEvent.click(card);
     await waitFor(() => { if (!document.querySelector(".app-shell")) throw new Error("no shell"); }, { timeout: 15000 });
 
-    // Empty participants list renders the two primary actions.
-    await screen.findByText("Add people to start a trip ledger.", {}, { timeout: 15000 });
-    // "Add people" button exists and is enabled.
+    await screen.findByText("Set up the split before adding bills.", {}, { timeout: 15000 });
+    expect(document.body.textContent).toContain("Add yourself first.");
     const addBtn = await waitFor(() => {
-      const btn = document.querySelector<HTMLButtonElement>('button[type="submit"]');
-      if (!btn) throw new Error("no submit");
+      const btn = [...document.querySelectorAll<HTMLButtonElement>("button")].find((button) => /Create my spot/i.test(button.textContent ?? ""));
+      if (!btn) throw new Error("no setup submit");
       return btn;
     }, { timeout: 10000 });
-    expect(addBtn.disabled).toBe(false);
-    // Share trip file download action present.
-    expect(document.body.textContent).toContain("Share trip file");
+    expect(addBtn.disabled).toBe(true);
+    expect(document.body.textContent).not.toContain("Share trip file");
   }, 90_000);
 });

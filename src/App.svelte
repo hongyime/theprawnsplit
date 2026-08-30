@@ -41,6 +41,7 @@
   import { signClaim } from "@/crypto/claim";
   import { config } from "@/config";
   import { peerClockSkewWarning } from "@/lib/clock-skew";
+  import { commonCurrencies, currencyOptions } from "@/lib/currencies";
   import { defaultExpenseDate, defaultParticipant, makeEvent, makeExpenseFinancials, type EventFactory } from "@/lib/events";
   import { formatMinor, formatMinorInput, parseMinor, parsePercentageBasisPoints, parseShareWeight, type SplitMode } from "@/lib/money";
   import { isArchivedEventLog } from "@/lib/archive";
@@ -62,7 +63,7 @@
     shouldPollGroup,
     unarchiveConfirmationText,
   } from "@/lib/lifecycle";
-  import { currencyAmountPreview, normalizeCurrency } from "@/lib/multicurrency";
+  import { currencyAmountPreview, normalizeCurrency, type CurrencyAmountResult } from "@/lib/multicurrency";
   import { buildPayerPreview, type PayerMode } from "@/lib/payers";
   import { claimAttributionText, defaultPayerPid, defaultSplitSelection, findParticipantNameMatch, groupParticipantsForClaim, type ParticipantNameMatch } from "@/lib/participants";
   import { relayDiagnosticActionText } from "@/lib/relay-diagnostics";
@@ -83,6 +84,11 @@
   let loading = true;
   let error = "";
   let participantName = "";
+  let setupName = "";
+  let toast = "";
+  let toastHandle: number | undefined;
+  let expenseBlockReason = "";
+  let showExpenseHint = false;
   let payerPid = "";
   let payerMode: PayerMode = "single";
   let payerAmounts: Record<string, string> = {};
@@ -147,15 +153,25 @@
     baseCurrency: group?.currency || "USD",
     rateText: exchangeRate,
   });
-  $: sharePreview = buildSharePreview();
+  $: sharePreview = buildSharePreview(amountPreview, participants, selectedPids, splitMode, exactShares, shareWeights, percentages);
   $: payerPreview = buildPayerPreview(amountPreview.ok ? amountPreview.baseMinor : null, payerMode, payerPid, payerAmounts, participantPids);
   $: localClaimPids = new Set(group?.identities.map((identity) => identity.pid) ?? []);
   $: hasLocalClaim = localClaimPids.size > 0;
+  $: needsSetup = Boolean(group && state && participants.length === 0 && !recoveryActive && !archived);
   $: unconfirmedCount = counts.local + counts.published;
   $: manualFallbackDue = isManualFallbackDue(group?.meta.unsyncedSince, nowMs);
   $: joinBlocked = Boolean(group && !group.events.some((event) => event.t === "GroupCreated"));
   $: recoveryActive = Boolean(joiningFromLink && joinBlocked);
   $: canSaveExpense = canAppendExpense({ archived, hasLocalClaim, description: expenseDesc, amountOk: amountPreview.ok, sharesOk: sharePreview.ok, payersOk: payerPreview.ok });
+  $: {
+    if (archived) expenseBlockReason = "This trip is archived.";
+    else if (!hasLocalClaim) expenseBlockReason = participants.length === 0 ? "Add and claim yourself first." : "Claim yourself before saving expenses.";
+    else if (!expenseDesc.trim()) expenseBlockReason = "Add a short description.";
+    else if (!amountPreview.ok) expenseBlockReason = amountPreview.message;
+    else if (!payerPreview.ok) expenseBlockReason = payerPreview.message;
+    else if (!sharePreview.ok) expenseBlockReason = sharePreview.message;
+    else expenseBlockReason = "";
+  }
   $: canRecordManualSettlement = canRecordSettlement({
     archived,
     allowSettlementActions: frozenPolicy.allowSettlementActions,
@@ -176,8 +192,20 @@
   $: relayTargetLabel = `${relaySettingsTargetCount(relaySettings)} relay target${relaySettingsTargetCount(relaySettings) === 1 ? "" : "s"}`;
   $: subgroupPresets = group?.meta.subgroups ?? [];
   $: participantNameMatch = findParticipantNameMatch(participantName, participants);
+  $: setupNameMatch = findParticipantNameMatch(setupName, participants);
   $: participantClaimGroups = groupParticipantsForClaim(participants);
   $: claimCandidate = claimCandidatePid ? participants.find((participant) => participant.pid === claimCandidatePid) : undefined;
+  $: groupCurrencyOptions = currencyOptions(group?.currency);
+  $: expenseCurrencyOptions = currencyOptions(expenseCurrency || group?.currency);
+
+  function showToast(message: string): void {
+    toast = message;
+    if (toastHandle) window.clearTimeout(toastHandle);
+    toastHandle = window.setTimeout(() => {
+      toast = "";
+      toastHandle = undefined;
+    }, 2800);
+  }
 
   async function load(): Promise<void> {
     loading = true;
@@ -291,6 +319,35 @@
     const f = factory();
     await commit([defaultParticipant(f, name)], f);
     participantName = "";
+    showToast(`${name} added.`);
+  }
+
+  async function completeSetup(): Promise<void> {
+    const name = setupName.trim();
+    if (!name || !group || joinBlocked || archived || setupNameMatch) return;
+    const f = factory();
+    const event = defaultParticipant(f, name);
+    if (event.t !== "ParticipantAdded") return;
+    await commit([event], f);
+    setupName = "";
+    const identity = await ensureClaimIdentity(group, event.pid);
+    const claimFactory = factory();
+    const sig = await signClaim(identity.claimSkJwk, identity.alg, `${group.tagHex}:${event.pid}:${group.deviceId}:${identity.claimPk}`);
+    await commit(
+      [
+        makeEvent(claimFactory, "ParticipantClaimed", {
+          pid: event.pid,
+          deviceId: group.deviceId,
+          claimPk: identity.claimPk,
+          alg: identity.alg,
+          sig,
+        }),
+      ],
+      claimFactory,
+    );
+    selectedPids = { ...selectedPids, [event.pid]: true };
+    payerPid = event.pid;
+    showToast(`${name} is ready. Add the first expense.`);
   }
 
   function requestClaimParticipant(pid: string): void {
@@ -303,7 +360,7 @@
     claimCandidatePid = pid;
   }
 
-  async function claimParticipant(pid: string): Promise<void> {
+  async function claimParticipant(pid: string, options: { quiet?: boolean } = {}): Promise<void> {
     if (!group || localClaimPids.has(pid) || archived) return;
     const participant = participants.find((p) => p.pid === pid);
     if (!participant || participant.devices.length > 0) {
@@ -327,6 +384,7 @@
       f,
     );
     claimCandidatePid = "";
+    if (!options.quiet) showToast(`${participantLabel(pid)} claimed on this device.`);
   }
 
   async function requestDeviceLink(pid: string): Promise<void> {
@@ -529,30 +587,38 @@
     return remainderPid ? { shares, remainderPid } : { shares };
   }
 
-  function buildSharePreview(): { ok: true; shares: { pid: string; minor: bigint }[]; remainderPid?: string } | { ok: false; message: string } {
-    if (!amountPreview.ok) return { ok: false, message: amountPreview.message };
-    const total = amountPreview.baseMinor;
-    const pids = selectedPidList();
+  function buildSharePreview(
+    amount: CurrencyAmountResult,
+    currentParticipants: typeof participants,
+    currentSelectedPids: Record<string, boolean>,
+    currentSplitMode: SplitMode,
+    currentExactShares: Record<string, string>,
+    currentShareWeights: Record<string, string>,
+    currentPercentages: Record<string, string>,
+  ): { ok: true; shares: { pid: string; minor: bigint }[]; remainderPid?: string } | { ok: false; message: string } {
+    if (!amount.ok) return { ok: false, message: amount.message };
+    const total = amount.baseMinor;
+    const pids = currentParticipants.filter((participant) => currentSelectedPids[participant.pid]).map((participant) => participant.pid);
     if (pids.length === 0) return { ok: false, message: "Select at least one participant." };
-    if (splitMode === "equal") {
+    if (currentSplitMode === "equal") {
       const result = allocatedShares(total, pids.map(() => 1n), "preview", pids);
       return result.remainderPid ? { ok: true, shares: result.shares, remainderPid: result.remainderPid } : { ok: true, shares: result.shares };
     }
-    if (splitMode === "exact") {
-      const shares = pids.map((pid) => ({ pid, minor: parseMinor(exactShares[pid] ?? "") ?? -1n }));
+    if (currentSplitMode === "exact") {
+      const shares = pids.map((pid) => ({ pid, minor: parseMinor(currentExactShares[pid] ?? "") ?? -1n }));
       if (shares.some((share) => share.minor < 0n)) return { ok: false, message: "Every exact share needs an amount." };
       const sum = shares.reduce((a, b) => a + b.minor, 0n);
       if (sum !== total) return { ok: false, message: "Exact shares must sum to the total." };
       return { ok: true, shares };
     }
-    if (splitMode === "shares") {
-      const weights = pids.map((pid) => parseShareWeight(shareWeights[pid] ?? "0") ?? -1n);
+    if (currentSplitMode === "shares") {
+      const weights = pids.map((pid) => parseShareWeight(currentShareWeights[pid] ?? "0") ?? -1n);
       if (weights.some((weight) => weight < 0n)) return { ok: false, message: "Share weights must be whole numbers." };
       if (weights.every((weight) => weight === 0n)) return { ok: false, message: "Enter at least one share weight." };
       const result = allocatedShares(total, weights, "preview", pids);
       return result.remainderPid ? { ok: true, shares: result.shares, remainderPid: result.remainderPid } : { ok: true, shares: result.shares };
     }
-    const weights = pids.map((pid) => parsePercentageBasisPoints(percentages[pid] ?? "0") ?? -1n);
+    const weights = pids.map((pid) => parsePercentageBasisPoints(currentPercentages[pid] ?? "0") ?? -1n);
     if (weights.some((weight) => weight < 0n)) return { ok: false, message: "Percentages must be valid." };
     if (weights.reduce((a, b) => a + b, 0n) !== 10_000n) return { ok: false, message: "Percentages must total 100%." };
     const result = allocatedShares(total, weights, "preview", pids);
@@ -607,7 +673,11 @@
   }
 
   async function addExpense(): Promise<void> {
-    if (!group || !sharePreview.ok || !payerPreview.ok || !canSaveExpense) return;
+    if (!group || !sharePreview.ok || !payerPreview.ok || !canSaveExpense) {
+      showExpenseHint = true;
+      if (expenseBlockReason) showToast(expenseBlockReason);
+      return;
+    }
     if (!amountPreview.ok) return;
     const wasFirstExpense = expenses.length === 0;
     const f = factory();
@@ -629,6 +699,8 @@
     expenseTotal = "";
     exchangeRate = "";
     payerAmounts = {};
+    showExpenseHint = false;
+    showToast("Expense saved.");
   }
 
   async function voidExpense(xid: string): Promise<void> {
@@ -664,6 +736,7 @@
     const f = factory();
     await commit([makeEvent(f, "SettlementRecorded", { sid: crypto.randomUUID(), from, to, minor })], f);
     settleAmount = "";
+    showToast("Settlement recorded.");
   }
 
   function localIdentityForPid(pid: string) {
@@ -883,8 +956,9 @@
   async function setCurrency(currency: string): Promise<void> {
     if (!group || !groupProfileEditable) return;
     group = { ...group, currency: normalizeCurrency(currency) };
-    expenseCurrency ||= group.currency;
+    expenseCurrency = group.currency;
     await saveGroup(group);
+    showToast(`Currency set to ${group.currency}.`);
   }
 
   async function runSync(): Promise<void> {
@@ -1210,26 +1284,50 @@
     <header class="topbar">
       <div>
         <input class="title-input" value={group.name} aria-label="Trip name" disabled={!groupProfileEditable} on:change={(e) => renameGroup((e.currentTarget as HTMLInputElement).value)} />
-        <div class="subtle">No accounts · {unconfirmedCount} unconfirmed · {syncLabels.topbar}</div>
-        {#if showInstallHint}<div class="subtle">On iOS, use Share then Add to Home Screen for offline launch.</div>{/if}
+        <div class="subtle">Private trip ledger · {unconfirmedCount} unconfirmed · {syncLabels.topbar}</div>
       </div>
       <div class="header-actions">
-        <input class="currency" value={group.currency} aria-label="Currency" disabled={!groupProfileEditable} on:change={(e) => setCurrency((e.currentTarget as HTMLInputElement).value)} />
+        <select class="currency" value={group.currency} aria-label="Trip currency" disabled={!groupProfileEditable} on:change={(e) => setCurrency((e.currentTarget as HTMLSelectElement).value)}>
+          {#each groupCurrencyOptions as code}
+            <option value={code}>{code}</option>
+          {/each}
+        </select>
         <button type="button" class="secondary" on:click={showTripList} title="All trips">Trips</button>
-        <button type="button" disabled={syncing} on:click={runSync} title="Sync now"><Icon name="refresh-ccw" size={18} /> {syncing ? "Syncing" : "Sync"}</button>
         <button type="button" on:click={copyJoinLink} title="Copy join link"><Icon name="link" size={18} /> Link</button>
-        <button type="button" on:click={showJoinQrCode} title="Show join QR"><Icon name="qr-code" size={18} /> QR</button>
-        <button type="button" on:click={shareDelta} title="Share unsynced delta"><Icon name="share" size={18} /> Share</button>
-        <button type="button" on:click={() => downloadExport()} title="Export ledger"><Icon name="download" size={18} /> Export</button>
-        {#if archived}
-          <button type="button" on:click={unarchiveGroup} title="Unarchive trip"><Icon name="refresh-ccw" size={18} /> Unarchive</button>
-        {:else}
-          <button type="button" on:click={archiveGroup} title="Archive trip"><Icon name="archive" size={18} /> Archive</button>
-        {/if}
       </div>
     </header>
 
+    {#if toast}<div class="toast" role="status">{toast}</div>{/if}
     {#if error}<p class="error">{error}</p>{/if}
+    {#if needsSetup}
+      <section class="setup-card" aria-label="Trip setup">
+        <div class="setup-receipt">
+          <span class="receipt-kicker">First receipt</span>
+          <h2>Set up the split before adding bills.</h2>
+          <p>Add yourself first. This device will claim that person so expense saving unlocks immediately.</p>
+        </div>
+        <div class="setup-form">
+          <label>
+            <span>Trip name</span>
+            <input value={group.name} disabled={!groupProfileEditable} on:change={(e) => renameGroup((e.currentTarget as HTMLInputElement).value)} />
+          </label>
+          <label>
+            <span>Main currency</span>
+            <select value={group.currency} disabled={!groupProfileEditable} on:change={(e) => setCurrency((e.currentTarget as HTMLSelectElement).value)}>
+              {#each groupCurrencyOptions as code}
+                <option value={code}>{code}{commonCurrencies.includes(code as typeof commonCurrencies[number]) ? " · common" : ""}</option>
+              {/each}
+            </select>
+          </label>
+          <label>
+            <span>Your name</span>
+            <input bind:value={setupName} placeholder="e.g. Bryan" />
+          </label>
+          {#if setupNameMatch}<p class="hint duplicate-hint">{matchText(setupNameMatch)} Use that person instead.</p>{/if}
+          <button type="button" class="setup-primary" disabled={!setupName.trim() || Boolean(setupNameMatch)} on:click={completeSetup}>Create my spot</button>
+        </div>
+      </section>
+    {/if}
     {#if archived}<p class="warning">This trip is archived. The ledger remains readable and exportable. Relay retention is outside this app's control; archiving does not delete relay data.</p>{/if}
     {#if clockSkewWarning}<p class="warning">{clockSkewWarning}</p>{/if}
     {#if settledView}
@@ -1335,7 +1433,11 @@
         </div>
       </section>
     {/if}
-    <section class="sync-strip">
+    {#if !needsSetup}
+      <details class="advanced-panel">
+        <summary><Icon name="settings" size={17} /> Sync, backup, and recovery</summary>
+        {#if showInstallHint}<p class="subtle">On iOS, use Share then Add to Home Screen for offline launch.</p>{/if}
+        <section class="sync-strip">
       <span><Icon name="shield" size={17} /> {syncStatus}</span>
       <span class="protection-status" aria-label="Protection status">
         <span class:ok={isStandalone}>{isStandalone ? "installed" : "browser tab"}</span>
@@ -1348,7 +1450,7 @@
         <span>Claim a person before adding expenses.</span>
       {/if}
       <button type="button" class="secondary" on:click={() => (relaySettingsOpen = !relaySettingsOpen)} title="Relay settings"><Icon name="settings" size={17} /> Relays</button>
-    </section>
+        </section>
     {#if relaySettingsOpen}
       <section class="relay-settings-panel" aria-label="Relay settings">
         <div>
@@ -1427,7 +1529,10 @@
         {/each}
       </section>
     {/if}
+      </details>
+    {/if}
 
+    {#if !needsSetup}
     <section class="grid">
       <article class="panel roster">
         <h2><Icon name="users" size={18} /> People</h2>
@@ -1537,14 +1642,18 @@
       </article>
 
       <article class="panel expense">
-        <h2><Icon name="receipt-text" size={18} /> Expense</h2>
+        <h2><Icon name="receipt-text" size={18} /> Add expense</h2>
         <div class="form-grid">
-          <input bind:value={expenseDesc} placeholder="Description" disabled={archived} />
-          <input bind:value={expenseTotal} inputmode="decimal" placeholder="Total" disabled={archived} />
+          <input value={expenseDesc} placeholder="Description" disabled={archived} on:input={(e) => { expenseDesc = (e.currentTarget as HTMLInputElement).value; showExpenseHint = true; }} />
+          <input value={expenseTotal} inputmode="decimal" placeholder="Total" disabled={archived} on:input={(e) => { expenseTotal = (e.currentTarget as HTMLInputElement).value; showExpenseHint = true; }} />
           <div class="currency-row">
-            <input class="currency" bind:value={expenseCurrency} aria-label="Expense currency" disabled={archived} on:change={() => (expenseCurrency = normalizeCurrency(expenseCurrency || group!.currency))} />
+            <select class="currency" bind:value={expenseCurrency} aria-label="Expense currency" disabled={archived} on:change={() => (expenseCurrency = normalizeCurrency(expenseCurrency || group!.currency))}>
+              {#each expenseCurrencyOptions as code}
+                <option value={code}>{code}</option>
+              {/each}
+            </select>
             {#if normalizeCurrency(expenseCurrency || group.currency) !== group.currency}
-              <input bind:value={exchangeRate} inputmode="decimal" placeholder={`1 ${normalizeCurrency(expenseCurrency)} to ${group.currency}`} aria-label="Exchange rate to group currency" disabled={archived} />
+              <input bind:value={exchangeRate} inputmode="decimal" placeholder={`1 ${normalizeCurrency(expenseCurrency)} to ${group.currency}`} aria-label="Exchange rate to group currency" disabled={archived} on:input={() => (showExpenseHint = true)} />
             {/if}
           </div>
           <div class="segmented payer-mode" aria-label="Payer mode">
@@ -1606,10 +1715,9 @@
             </div>
           {/if}
         </div>
-        {#if archived}<p class="hint">Archived trips are read-only.</p>{:else if !hasLocalClaim}<p class="hint">Viewing is enabled. Expense creation requires claiming one participant on this device.</p>{/if}
-        {#if !payerPreview.ok}<p class="hint">{payerPreview.message}</p>{/if}
-        {#if !amountPreview.ok}<p class="hint">{amountPreview.message}</p>{:else if !sharePreview.ok}<p class="hint">{sharePreview.message}</p>{:else if sharePreview.remainderPid}<p class="hint">Rounding remainder goes to {participantLabel(sharePreview.remainderPid)}.</p>{/if}
-        <button type="button" disabled={!canSaveExpense} on:click={addExpense}><Icon name="plus" size={17} /> Save expense</button>
+        {#if expenseBlockReason && (showExpenseHint || !hasLocalClaim || archived)}<p class="hint action-hint">{expenseBlockReason}</p>{/if}
+        {#if amountPreview.ok && sharePreview.ok && sharePreview.remainderPid}<p class="hint">Rounding remainder goes to {participantLabel(sharePreview.remainderPid)}.</p>{/if}
+        <button type="button" class:blocked={!canSaveExpense} disabled={!canSaveExpense} on:click={addExpense}><Icon name="plus" size={17} /> Save expense</button>
       </article>
 
       <article class="panel settlements">
@@ -1699,11 +1807,12 @@
       {#if expenses.length === 0}<p class="hint">No expenses yet.</p>{/if}
     </section>
 
-    <section class="panel import-panel" id="manual-import">
-      <h2><Icon name="upload" size={18} /> Import Recovery JSON</h2>
+    <details class="panel import-panel" id="manual-import">
+      <summary><Icon name="upload" size={18} /> Import recovery JSON</summary>
       <textarea bind:value={importText} placeholder="Paste a TripLedgerExport, TripLedgerDelta, DeviceIdentityBackup, or DeviceLinkRequest JSON file here"></textarea>
       <button type="button" disabled={!importText.trim()} on:click={importExport}>Import</button>
-    </section>
+    </details>
+    {/if}
     {#if claimCandidate}
       <div class="modal-backdrop" role="presentation">
         <div class="modal" role="dialog" aria-modal="true" aria-label="Claim participant">

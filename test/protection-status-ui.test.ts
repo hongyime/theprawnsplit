@@ -10,7 +10,8 @@ vi.mock("@/relay/sync", () => ({ syncOnce: vi.fn(async () => ({ published: 0, co
 if (!(globalThis.crypto as Crypto).subtle) Object.defineProperty(globalThis, "crypto", { value: webcrypto, configurable: true });
 if (!window.matchMedia) Object.defineProperty(window, "matchMedia", { value: () => ({ matches: false, media: "", addEventListener() {}, removeEventListener() {}, addListener() {}, removeListener() {}, onchange: null, dispatchEvent: () => false }) });
 
-const { ensureGroup, resetRepositoryForTests } = await import("@/db/repo");
+const { appendEvents, ensureGroup, resetRepositoryForTests } = await import("@/db/repo");
+const { defaultParticipant } = await import("@/lib/events");
 const { default: App } = await import("@/App.svelte");
 
 let instance: Record<string, unknown> | null = null;
@@ -21,12 +22,15 @@ afterEach(() => { if (instance) { try { unmount(instance as never); } catch {} i
 describe("protection status UI (rendered)", () => {
   it("shows browser-tab and storage-unknown labels in jsdom where those values apply", async () => {
     await resetRepositoryForTests(`protection-render-${Date.now()}`);
-    await ensureGroup();
+    const group = await ensureGroup();
+    const factory = { deviceId: group.deviceId, nextCounter: group.nextCounter };
+    await appendEvents(group.groupId, [defaultParticipant(factory, "Alice")]);
     renderApp();
     await screen.findByText("Your Trips", {}, { timeout: 15000 });
     const card = await waitFor(() => { const el = document.querySelector<HTMLButtonElement>(".trip-card"); if (!el) throw new Error("no card"); return el; }, { timeout: 15000 });
     fireEvent.click(card);
     await waitFor(() => { if (!document.querySelector(".app-shell")) throw new Error("no shell"); }, { timeout: 15000 });
+    fireEvent.click(await screen.findByText("Sync, backup, and recovery", {}, { timeout: 15000 }));
     await waitFor(() => { if (!document.querySelector(".protection-status")) throw new Error("no prot-status"); }, { timeout: 15000 });
 
     const prot = document.querySelector(".protection-status");

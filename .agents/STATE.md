@@ -10,6 +10,9 @@ Current task: production-readiness complete (2026-08-28). Sync quorum fix deploy
 This rule lives here and NOT in AGENTS.md because AGENTS.md is overwritten by the sync-repo-settings workflow.**
 
 Progress:
+- 2026-08-29: Retried Vercel production deploy after env setup. `vercel deploy --prod -y --scope team_ARK7HKobyCMp0PCArQTLxbz6` still fails with `api-deployments-free-per-day`; latest production deployment remains `theprawnsplit-j1yjq51x5-theprawnvercel.vercel.app` (~14h old). Live `/api/relay?tag=<64 a's>` still returns `{"error":"relay storage is not configured"}` because no new deployment has picked up the Vercel env vars yet.
+- 2026-08-28: Upstash production env configured in Vercel (`UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`) and GitHub repo secrets set for scheduled keepalive. Added/pushed heartbeat workflow Redis `SET theprawnsplit:keepalive ... EX 2678400` in commit 8582082. Manual workflow_dispatch run 33185440054 succeeded; direct Redis verification returned value `2026-08-28T15:30:17Z` with TTL 2678345 seconds. Vercel production redeploy is blocked by free daily deployment limit (`api-deployments-free-per-day`), so live relay still returns `relay storage is not configured` until a new production deploy succeeds.
+- 2026-08-28: Codex production-readiness validation completed on main. All 12 checks passed. Core tests 81/81; root tests 200/200; TypeScript clean; svelte-check 0 errors/0 warnings; build exit 0 (`✓ built in 2m 47s`); sync quorum fix present; Nostr cursor fix present; live site accessible; live relay returns expected unconfigured-storage error; config/drift guards 13/13; core algorithms clean.
 - Completed CR-010 (2026-08-24): merged cr-009-status-register into main (6740971) closing PR #5 as merged and deleting remote branches cr-009/cr-008; added ci.yml push trigger on [main] plus "**.svelte" to both path filter lists (verified live: Actions run 32734413881 push/main/success); restored REQ-MON-08 phase cell Built→5 with §7 clarification line while keeping the CR-009 §8.1 rewrite; closed the three §16.2 gaps in core/test/properties.test.ts — REQ-SYN-24 two-replica drift-verdict equality (RED-proven via temporary transport buffer mutation), REQ-SYN-12 associativity regrouping triangle, pinned REQ-ID-13 opposing-direction merges at concurrent HLCs (finding: convergence over-determined by four layers: compareHlc dev tiebreak, id tiebreak, fold pre-sort, min-root union); semantic re-audit of all 36 phase≥3 STATUS rows → 33 Built / 3 Partial (DUR-03 ladder rungs+expense trigger unasserted, DUR-06 recovery-before-render only source-shape, ID-12 duplicate banner rendering untested), DUR-09/10 citations corrected to manual-fallback-ui.test.ts:32, drift guard green after edits (61be9df); measured A13 FALSE with new batch50/nip11 commands in scripts/task0-retention.mjs — single 221,449-byte 50-event message vs NIP-11 limits 131072 (nos.lol, nostr.mom, offchain.pub → 0/50 accepted), 1000000 (primal → 1/50), 524288 (snort → 1/50); array-batch publishing unreliable even under limits so dynamic per-relay batch sizing + per-event fallback recorded as REQUIRED follow-up at end of PRD §15 and in §12 A13 row (62b321b). Full report: .agents/cr-010-report.md. Core tests 64→67; full build gate green.
 - CR-009 correction pass (same day): replaced fabricated STATUS.md verification snippets with five real grep evidences, fixed REQ-PLT-02 manifest path, confirmed drift test passes and fails on fake REQ-FAKE-99, full `npm run build` green (182 root tests, svelte-check clean). Deep semantic re-audit of all 116 rows still outstanding.
 - Completed CR-009: preserved retention clock data (25 rows maintained across branches); merged CR-008 to main; created STATUS.md register tracking all 116 PRD REQ-* requirements across 9 sections with zero omissions (116 Built, 0 Partial, 0 Not started, 0 Superseded); included full verification evidence section with 5 randomly verified Built requirements; added drift guard test in test/config.test.ts asserting 1:1 match between PRD.md and STATUS.md (verified passes and fails on fake REQ); updated PRD.md §8.1 to decouple schema versioning from build phases and marked REQ-MON-08 phase column as Built; verified clean full build and test suite (64 core tests, 182 root tests, svelte-check 0 errors/warnings, bundle under budget).
@@ -947,3 +950,16 @@ Notes:
   test/sync.integration.test.ts -t "plaintext ledger data"`; full verification passed
   with `npm run build` (64 core tests, 168 root tests), root `npm audit --json`,
   protected-string scan, and `git diff --check`.
+
+<!-- MOLT_AUTO_START -->
+## Auto State
+
+- Updated: 2026-08-28 21:06:04 +08:00
+- Machine: PRAWN-E14
+- Harness: claude
+- Event: stop
+- Branch: main
+- HEAD: a2bfc9e
+- Dirty files: 0
+- Resume hint: Read .agents/STATE.md, then the latest file in .agents/handoffs/ if present.
+<!-- MOLT_AUTO_END -->

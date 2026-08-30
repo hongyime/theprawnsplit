@@ -1799,38 +1799,38 @@
           </div>
         {/if}
       </article>
-    </section>
 
-    <section class="panel ledger">
-      <h2>Ledger</h2>
-      {#each expenses as expense}
-        {@const coverage = expenseCoverageLabel(expense.xid)}
-        <div class="ledger-row">
-          <div>
-            <strong>{expense.desc}</strong>
-            <span>{expense.date}</span>
-            <span class="sync-coverage" class:ok-coverage={coverage === "Everyone Has This"}>{coverage}</span>
-            <span class="payer-summary">{payerSummary(expense.financials.payers)}</span>
-            {#if expense.financials.rate}<span class="payer-summary">{rateSummary(expense.financials.rate)}</span>{/if}
-            {#if expense.financialHistory.length > 1}
-              <details class="expense-history">
-                <summary>{expense.financialHistory.length - 1} Correction{expense.financialHistory.length === 2 ? "" : "s"}</summary>
-                {#each expenseHistoryRows(expense) as row}
-                  <span class:active-history={row.active}>
-                    {row.label}: {formatMinor(row.financials.minor, group.currency)}{row.active ? " Active" : ""}
-                  </span>
-                {/each}
-              </details>
-            {/if}
+      <section class="panel ledger">
+        <h2>Ledger</h2>
+        {#each expenses as expense}
+          {@const coverage = expenseCoverageLabel(expense.xid)}
+          <div class="ledger-row">
+            <div>
+              <strong>{expense.desc}</strong>
+              <span>{expense.date}</span>
+              <span class="sync-coverage" class:ok-coverage={coverage === "Everyone Has This"}>{coverage}</span>
+              <span class="payer-summary">{payerSummary(expense.financials.payers)}</span>
+              {#if expense.financials.rate}<span class="payer-summary">{rateSummary(expense.financials.rate)}</span>{/if}
+              {#if expense.financialHistory.length > 1}
+                <details class="expense-history">
+                  <summary>{expense.financialHistory.length - 1} Correction{expense.financialHistory.length === 2 ? "" : "s"}</summary>
+                  {#each expenseHistoryRows(expense) as row}
+                    <span class:active-history={row.active}>
+                      {row.label}: {formatMinor(row.financials.minor, group.currency)}{row.active ? " Active" : ""}
+                    </span>
+                  {/each}
+                </details>
+              {/if}
+            </div>
+            <div>
+              <strong>{formatMinor(expense.financials.minor, group.currency)}</strong>
+              <button type="button" disabled={archived} on:click={() => editExpense(expense.xid)} title="Edit Expense"><Icon name="receipt-text" size={16} /></button>
+              <button type="button" disabled={archived} on:click={() => voidExpense(expense.xid)} title="Void Expense"><Icon name="trash" size={16} /></button>
+            </div>
           </div>
-          <div>
-            <strong>{formatMinor(expense.financials.minor, group.currency)}</strong>
-            <button type="button" disabled={archived} on:click={() => editExpense(expense.xid)} title="Edit Expense"><Icon name="receipt-text" size={16} /></button>
-            <button type="button" disabled={archived} on:click={() => voidExpense(expense.xid)} title="Void Expense"><Icon name="trash" size={16} /></button>
-          </div>
-        </div>
-      {/each}
-      {#if expenses.length === 0}<p class="hint">No Expenses Yet.</p>{/if}
+        {/each}
+        {#if expenses.length === 0}<p class="hint">No Expenses Yet.</p>{/if}
+      </section>
     </section>
 
     {/if}

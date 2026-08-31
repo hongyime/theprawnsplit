@@ -25,6 +25,7 @@ __pycache__/
 .vercel
 stats.html
 
+
 # AI / editor dot directories (managed via sourcerepo)
 .*
 !.github/

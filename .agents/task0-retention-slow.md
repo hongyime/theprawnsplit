@@ -37,3 +37,5 @@ Decision gates — agreed **before** seeing data (see CR-005 Task 3):
 | 2026-08-31 11:55 | 8.9d | wss://offchain.pub | 18/18 | 100% | 18/20 (90%) |  |
 | 2026-09-01 10:35 | 9.9d | wss://relay.damus.io | 10/10 | 100% | 10/20 (50%) |  |
 | 2026-09-01 10:35 | 9.9d | wss://offchain.pub | 18/18 | 100% | 18/20 (90%) |  |
+| 2026-09-02 10:00 | 10.9d | wss://relay.damus.io | 0/10 | 0% | 10/20 (50%) |  |
+| 2026-09-02 10:00 | 10.9d | wss://offchain.pub | 18/18 | 100% | 18/20 (90%) |  |

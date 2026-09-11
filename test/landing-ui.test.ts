@@ -39,8 +39,21 @@ describe("landing and root routing UI (rendered)", () => {
 
   it("lists stored groups sorted by newest first", async () => {
     await resetRepositoryForTests(`landing-sort-${Date.now()}`);
-    const g1 = await createGroup("First Trip", "USD");
-    const g2 = await createGroup("Second Trip", "EUR");
+    // Adjacent creations can share Date.now() on a fast runner. This test checks
+    // timestamp ordering; provide distinct timestamps instead of relying on time
+    // spent generating keys. Equal timestamps have no specified creation order.
+    const clock = vi.spyOn(Date, "now");
+    let g1: Awaited<ReturnType<typeof createGroup>>;
+    let g2: Awaited<ReturnType<typeof createGroup>>;
+    try {
+      clock.mockReturnValue(1_700_000_000_000);
+      g1 = await createGroup("First Trip", "USD");
+      clock.mockReturnValue(1_700_000_001_000);
+      g2 = await createGroup("Second Trip", "EUR");
+    } finally {
+      clock.mockRestore();
+    }
+    expect(g2.createdAt).toBeGreaterThan(g1.createdAt);
     const stored = await listGroups();
     expect(stored.length).toBe(2);
     expect(stored[0]?.groupId).toBe(g2.groupId);

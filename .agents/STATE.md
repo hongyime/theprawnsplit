@@ -1,42 +1,36 @@
 # Project State
 
-Active portfolio maintenance, 2026-09-11: CR-014 fixes new-device discovery,
-event/cursor durability and duplicate replay consuming admission budgets. The
-real HTTP adapter/API fixture reduces four known-device reads to one bounded
-group read. All 23 focused checks now pass, including legacy-cursor recovery.
-Four independent mutations failed at their intended assertions; the runner
-restored both runtime files. Full verification remains open.
-The stale local Git graph chain was preserved and a 15,512-byte replacement cache
-was independently verified; HEAD and working contents are unchanged by that repair.
-Preserve all real ledgers, relays and existing retention probes. Work is uncommitted
-on main; full suites, browser checks and production release remain open. The first
-full build passed core 81/81 and root 210/211: the encrypted 500-row pagination
-fixture exceeded its 5-second test deadline. Its deadline is now 30 seconds,
-preserving all assertions; the focused rerun passed. A separate
-main-push release workflow complements the shared PR-only CI without changing it.
-The next full build passed core 81/81 and app 211/211, then found five array-access
-type errors in the new fixture. Those accesses are now guarded; the standalone
-Svelte check passes with zero errors and zero warnings. A new complete protocol
-run is active, recorded as prawn-split-release-run.json.
+Active portfolio maintenance, 2026-09-11: CR-014 remains open while its final
+release gates are completed. Runtime commit `461e5455` is on main and deployed
+to Vercel production. It fixes new-device discovery, event/cursor durability and
+duplicate admission accounting. All 23 focused sync checks pass; four deliberate
+regression variants produced assertion failures and both runtime files were restored.
 
-The next local aggregate run is terminal: core 81/81 and app 209 tests passed,
-but the worker for the existing two-case common-expense UI suite failed to start.
-This is a runner error, not a passing aggregate build. A separate thread-pool
-probe is running; no test isolation or worker setting has been changed.
-All eleven isolated production-build browser checks now pass: setup, expense
-entry, confirmed publication before sharing, mobile recovery, discovery of a new
-mobile participant on desktop, reload through the trip picker, cursor use and
-uncaught-error checks. Relay traffic is synthetic and service workers are blocked.
-The mobile Shadow/provenance overlap is recorded separately in the backlog.
+Hosted release run `34559568694` passed the build (core 81/81, app 211/211,
+Svelte zero errors/warnings and Vite), then failed the separately required root
+test command at the existing trip-order fixture. That fixture assumed successive
+clock readings increase. The local correction supplies distinct timestamps,
+preserves the ordering assertions, and still fails against a reversed comparator.
+The corrected landing suite passes 3/3 using a local thread-pool invocation;
+the separate Svelte check passes with zero errors and warnings. No permanent worker setting changed.
+The earlier thread probe passed 10/10. The last aggregate local run still has a
+Windows worker-start error and must not be reported as a passing build.
 
-Resume CR-014: publish the reviewed implementation on main, then verify the
-hosted release workflow and Vercel production. The hosted workflow runs every
-PROTOCOL A2 command explicitly. Write the final report after collecting those
-results; update state/journal and the portfolio plan. CR-014 remains incomplete
-until those release gates and the committed report are finished. Preserve the
-local failed-run evidence, all real ledgers and the existing retention clock.
+Both public domains passed 11 browser checks each with isolated synthetic relays.
+All 12 HTTP/artifact checks now pass. The initial validation checker incorrectly
+expected plain text; it now verifies the endpoint's JSON error contract.
+Browser checks cover setup, expense entry, confirmed sharing, mobile recovery,
+new-device discovery and reload through the trip picker. No live relay writes or
+private ledgers were exercised; service workers were blocked in these checks.
+The mobile participant overlap and possible multi-trip selection issue are
+recorded separately in PROTOCOL.md. The latter is not behaviorally reproduced yet.
 
-Current task: production-readiness complete (2026-08-28). Sync quorum fix deployed: unconfigured relays excluded from ackQuorum calculation so Nostr-only mode works. PRD A1 verdict updated to PARTIAL. CI green on eb7b4be. Next: operate per PROTOCOL.md backlog (P0: retention clock running, gate 2026-09-21).
+Next: publish the fixture correction, verify the complete hosted A2 workflow and
+the resulting production deployment, then write the CR-014 report and close the
+release checklist. Keep all failed-run evidence, ledgers and the retention clock.
+The approved portfolio plan and PostPlan HTML remain active across all repositories.
+
+Historical checkpoint (2026-08-28): production-readiness complete. Sync quorum fix deployed: unconfigured relays excluded from ackQuorum calculation so Nostr-only mode works. PRD A1 verdict updated to PARTIAL. CI green on eb7b4be. Retention clock running, gate 2026-09-21.
 
 **IDLE RULE (permanent — see PROTOCOL.md Part 4):** When no `.agents/cr-NNN-prompt.md` exists and no backlog item is started, stop. Do not re-emit completion summaries. One sentence: "Nothing to do — no prompt file, no started backlog item." The continuation hook firing on a completed state is not work.
 

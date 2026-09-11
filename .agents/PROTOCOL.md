@@ -133,6 +133,12 @@ Do this before the 30-day gate (clock started 2026-08-22T12:59:41Z, gate ≈2026
 
 ### P1 — Test-suite trustworthiness
 
+- **Multi-trip selection and join recovery need behavioral verification.** Source
+  inspection during CR-014 found that `ensureGroup(seed)` returns the first stored
+  group before considering a supplied join seed. The shared refresh helper and
+  `runSync` also call `ensureGroup()` after work on a selected trip. Reproduce
+  joining a different trip and refreshing the second stored trip; preserve every
+  existing ledger and seed. This is a source finding, not yet a reproduced defect.
 - **Mutation-test beyond the comparator.** CR-011 mutation-tested `eventSortKey` and
   found 2 of 3 mutations undetectable. CR-014 additionally detects mutations of sync
   fetch planning, event/cursor persistence and duplicate admission at the caller.
@@ -151,8 +157,11 @@ Do this before the 30-day gate (clock started 2026-08-22T12:59:41Z, gate ≈2026
 
 - **CR-014 sync repair verification in progress:** bounded group reads, atomic
   received-event/cursor writes and duplicate admission accounting are implemented.
-  Focused fixtures and regression mutations pass their intended checks. Full
-  protocol, isolated browser and production release gates are still open.
+  Runtime commit `461e5455` is deployed. Focused fixtures, regression mutations,
+  the hosted build, isolated browser checks on both public domains and compiled
+  asset/validation checks pass. The repeated CI root-test command exposed an
+  existing timestamp-dependent ordering fixture. Its explicit-date correction,
+  the complete hosted protocol workflow and the final report remain open.
 - **CR-014 scope boundary:** optional legacy HTTP author filtering still applies
   after the Redis page limit; the app no longer uses it for normal recovery.
   HTTP relay and NIP-11 reads have no request deadline. Buffer removal, discard

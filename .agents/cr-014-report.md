@@ -353,3 +353,32 @@ layout, the broader semantic STATUS audit and every other portfolio requirement
 remain outside this completed runtime verification. The separate retention clock
 and scheduled probes are preserved. The existing IndexedDB/Redis/Nostr design was
 not migrated into Supabase, and no existing records were removed.
+
+## B4 correction — 2026-09-11 source recheck
+
+The B4 phrase "client-side cursor filtering" above is incorrect. Nostr passes the
+timestamp watermark to the relay as `since`. `selectNostrEntries` removes duplicate
+event IDs, sorts by creation time and ID, and emits timestamp cursors; it does not
+filter locally by the supplied `since` value. This is existing behavior and was
+unchanged by CR-014. This addendum preserves the original report and corrects the
+trace; the implementation and test conclusions do not rely on local time filtering.
+
+```text
+$ rg -n -e since -e seen.has -e sort -e querySync src/relay/nostr.ts
+14:export function selectNostrEntries(events: NostrEventLike[], opts: { since?: number | null }): RelayEntry[] {
+18:  // The relay applies `since` server-side; the boundary second may re-deliver
+22:    .filter((event) => (seen.has(event.id) ? false : (seen.add(event.id), true)))
+23:    .sort((a, b) => a.created_at - b.created_at || compareCodepoints(a.id, b.id))
+53:  opts: { author?: string; limit?: number; since?: number | null },
+60:    ...(opts.since ? { since: opts.since } : {}),
+94:    const since = opts.cursor ? Number(opts.cursor) : null;
+95:    const filter = nostrFetchFilter(tag, this.kind, { ...opts, since });
+96:    const events = await this.pool.querySync(this.relayUrls, filter);
+97:    return selectNostrEntries(events, { since });
+```
+
+## Not verified this pass — unchanged after correction
+
+The scope exclusions in the preceding section remain open. In particular, live
+Nostr retention/admission and the behavior of relays returning events outside
+their requested timestamp range were not verified by these isolated checks.

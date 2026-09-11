@@ -1,34 +1,24 @@
 # Project State
 
-Active portfolio maintenance, 2026-09-11: CR-014 remains open while its final
-release gates are completed. Runtime commit `461e5455` is on main and deployed
-to Vercel production. It fixes new-device discovery, event/cursor durability and
-duplicate admission accounting. All 23 focused sync checks pass; four deliberate
-regression variants produced assertion failures and both runtime files were restored.
+Active portfolio maintenance, 2026-09-11: CR-014 runtime verification is complete.
+Commit `a49e256d16440536a59150140817746b00b29ced` is deployed and all main workflows
+pass, including every PROTOCOL A2 command. The build and root command each pass
+core 81/81 and app 211/211; separate core tests pass 81/81 and Svelte reports zero
+errors/warnings. Both public aliases pass isolated recovery browser checks and
+all HTTP/compiled-asset checks. See `.agents/cr-014-report.md` for actual outputs,
+failure-before-fix evidence, mutation results and scope boundaries.
 
-Hosted release run `34559568694` passed the build (core 81/81, app 211/211,
-Svelte zero errors/warnings and Vite), then failed the separately required root
-test command at the existing trip-order fixture. That fixture assumed successive
-clock readings increase. The local correction supplies distinct timestamps,
-preserves the ordering assertions, and still fails against a reversed comparator.
-The corrected landing suite passes 3/3 using a local thread-pool invocation;
-the separate Svelte check passes with zero errors and warnings. No permanent worker setting changed.
-The earlier thread probe passed 10/10. The last aggregate local run still has a
-Windows worker-start error and must not be reported as a passing build.
+This documentation commit publishes the final report and shared backlog. The
+portfolio release metadata records the final push and notes-deployment check.
+The failed Windows aggregate runner remains an explicit local limitation; no
+test configuration was weakened. All existing ledgers, relay data, retention
+probes, schedules and the separate retention clock are preserved.
 
-Both public domains passed 11 browser checks each with isolated synthetic relays.
-All 12 HTTP/artifact checks now pass. The initial validation checker incorrectly
-expected plain text; it now verifies the endpoint's JSON error contract.
-Browser checks cover setup, expense entry, confirmed sharing, mobile recovery,
-new-device discovery and reload through the trip picker. No live relay writes or
-private ledgers were exercised; service workers were blocked in these checks.
-The mobile participant overlap and possible multi-trip selection issue are
-recorded separately in PROTOCOL.md. The latter is not behaviorally reproduced yet.
-
-Next: publish the fixture correction, verify the complete hosted A2 workflow and
-the resulting production deployment, then write the CR-014 report and close the
-release checklist. Keep all failed-run evidence, ledgers and the retention clock.
-The approved portfolio plan and PostPlan HTML remain active across all repositories.
+Next repository work: reproduce the queued multi-trip selection/join concern;
+repair the mobile participant overlap and investigate documentation-only Vercel
+builds. Broader semantic/mutation audits and retention gates remain open under
+PROTOCOL.md. The accepted portfolio rotation and free-tier protection continue
+across all repositories; CR-014 does not complete that wider goal.
 
 Historical checkpoint (2026-08-28): production-readiness complete. Sync quorum fix deployed: unconfigured relays excluded from ackQuorum calculation so Nostr-only mode works. PRD A1 verdict updated to PARTIAL. CI green on eb7b4be. Retention clock running, gate 2026-09-21.
 

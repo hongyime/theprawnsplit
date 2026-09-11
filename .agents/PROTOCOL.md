@@ -155,13 +155,12 @@ Do this before the 30-day gate (clock started 2026-08-22T12:59:41Z, gate ≈2026
 
 ### P2 — Known gaps with named owners
 
-- **CR-014 sync repair verification in progress:** bounded group reads, atomic
-  received-event/cursor writes and duplicate admission accounting are implemented.
-  Runtime commit `461e5455` is deployed. Focused fixtures, regression mutations,
-  the hosted build, isolated browser checks on both public domains and compiled
-  asset/validation checks pass. The repeated CI root-test command exposed an
-  existing timestamp-dependent ordering fixture. Its explicit-date correction,
-  the complete hosted protocol workflow and the final report remain open.
+- **CR-014 sync recovery repair verified:** bounded group reads, atomic
+  received-event/cursor writes and duplicate admission accounting are deployed
+  on `a49e256d`. All protocol commands and main workflows pass. Isolated browser
+  recovery and public artifact/validation checks pass on both aliases. The
+  explicit-timestamp fixture correction preserves its ordering assertions.
+  See `.agents/cr-014-report.md`; wider retention and scope gaps remain below.
 - **CR-014 scope boundary:** optional legacy HTTP author filtering still applies
   after the Redis page limit; the app no longer uses it for normal recovery.
   HTTP relay and NIP-11 reads have no request deadline. Buffer removal, discard

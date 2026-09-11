@@ -674,26 +674,34 @@ export async function updateTransportVectors(
   await database.put("meta", { ...meta, versionVector: mergedVersion, discardVector: mergedDiscard, lastSyncAt: Date.now() });
 }
 
-export async function upsertRemoteEvents(groupId: string, events: Event[]): Promise<number> {
+export async function upsertRemoteEvents(groupId: string, events: Event[], cursorUpdates: Record<string, string> = {}): Promise<number> {
   const database = await db();
   const tx = database.transaction(["events", "meta"], "readwrite");
   let added = 0;
-  for (const event of events) {
-    const key: [string, string] = [groupId, event.id];
-    if (!(await tx.objectStore("events").get(key))) {
-      await tx.objectStore("events").put({ groupId, eventId: event.id, eventJson: encodeEvent(event), syncState: "confirmed", publishedAt: Date.now() });
-      added += 1;
+  try {
+    for (const event of events) {
+      const key: [string, string] = [groupId, event.id];
+      if (!(await tx.objectStore("events").get(key))) {
+        await tx.objectStore("events").put({ groupId, eventId: event.id, eventJson: encodeEvent(event), syncState: "confirmed", publishedAt: Date.now() });
+        added += 1;
+      }
     }
-  }
-  const meta = await tx.objectStore("meta").get(groupId);
-  if (meta) {
-    const mergedVector = { ...meta.versionVector };
-    for (const [dev, counter] of Object.entries(vectorFromEvents(events))) {
-      mergedVector[dev] = Math.max(mergedVector[dev] ?? 0, counter);
+    const meta = await tx.objectStore("meta").get(groupId);
+    if (meta) {
+      const mergedVector = { ...meta.versionVector };
+      for (const [dev, counter] of Object.entries(vectorFromEvents(events))) {
+        mergedVector[dev] = Math.max(mergedVector[dev] ?? 0, counter);
+      }
+      await tx.objectStore("meta").put({ ...meta, versionVector: mergedVector,
+        cursors: { ...meta.cursors, ...cursorUpdates }, lastSyncAt: Date.now() });
     }
-    await tx.objectStore("meta").put({ ...meta, versionVector: mergedVector, lastSyncAt: Date.now() });
+    await tx.done;
+  } catch (error) {
+    // Also roll back a synchronous serialization failure between requests.
+    try { tx.abort(); } catch { /* The transaction may already be aborted. */ }
+    await tx.done.catch(() => {});
+    throw error;
   }
-  await tx.done;
   return added;
 }
 

@@ -7,7 +7,7 @@ is wrong. Never edit the PRD to match the code without a decision recorded in §
 Last audited: 2026-08-24 (CR-010 semantic re-audit against main @ 62b321b): every PRD row whose phase is ≥ 3 was re-checked for ASSERTION-LEVEL coverage — does the cited test assert the requirement's behaviour, not merely touch the same files? Count stated exactly: **36 rows carry a purely numeric phase ≥ 3** (12× phase 3, 16× phase 4, 8× phase 5); SEC-01 (`2 (mint) / 4 (verify)`) adds a 37th in-scope register row whose **phase-4 verify half received an assertion-level audit** too — see its Notes row. Result: 3 rows downgraded to `Partial` with one-line gaps in the Notes column. The CR-009 pass (same day) verified file existence only. CR-012 added the Evidence column and the grading standard it encodes: **a row may be Built when cited tests assert the requirement's semantics; the column records whether that assertion ran against a real render (rendered) or against source text / pure modules (source-shape).** CR-012 piloted 3 files (reconciliation-ui, settlement-ui, manual-fallback-ui); CR-013 converted 10 more, totalling 13 rendered files. Measured error rate: ~0.45 wrong source-text assertions per converted file. Grading standard (CR-013): source-shape is sufficient for structural/existence claims; rendered is required for behavioral rendering claims. Final Evidence distribution: **25 rendered / 91 source-shape** (116 total). See `.agents/cr-013-report.md`.
 
 | ID | Status | Implementation | Tests | Notes | Evidence |
-|---|---|---|---|---|
+|---|---|---|---|---|---|
 | REQ-ID-01 | Built | `src/App.svelte`, `src/main.ts` | `test/platform-boundaries.test.ts`  | | source-shape |
 | REQ-ID-02 | Built | `src/lib/ids.ts`, `src/db/repo.ts` | `test/device-identity.test.ts`, `test/device-id-privacy-ui.test.ts`  | | source-shape |
 | REQ-ID-03 | Built | `core/src/types.ts`, `core/src/identity.ts`, `core/src/fold.ts` | `core/test/identity.test.ts`, `test/participants.test.ts`  | | source-shape |
@@ -63,7 +63,7 @@ Last audited: 2026-08-24 (CR-010 semantic re-audit against main @ 62b321b): ever
 | REQ-SYN-06 | Built | `src/db/repo.ts`, `src/relay/sync.ts` | `test/sync.integration.test.ts`, `test/sync-state.test.ts`  | | source-shape |
 | REQ-SYN-07 | Built | `src/relay/sync.ts` | `test/sync.integration.test.ts`  | | source-shape |
 | REQ-SYN-08 | Built | `core/src/transport.ts`, `src/relay/sync.ts` | `core/test/transport.test.ts`, `test/sync.integration.test.ts`  | | source-shape |
-| REQ-SYN-09 | Built | `core/src/transport.ts`, `src/relay/sync.ts`, `src/relay/http.ts` | `core/test/transport.test.ts`, `test/sync.integration.test.ts`  | | source-shape |
+| REQ-SYN-09 | Built | `core/src/transport.ts`, `src/relay/sync.ts`, `src/relay/http.ts`, `src/db/repo.ts` | `core/test/transport.test.ts`, `test/sync.integration.test.ts`, `test/operated-sync-recovery.test.ts` | CR-014 exercises real HTTP/API and event/cursor transaction behavior; full row grading unchanged. | source-shape |
 | REQ-SYN-10 | Built | `src/lib/sync-labels.ts` | `test/sync-labels.test.ts`, `test/sync-coverage.test.ts`  | | source-shape |
 | REQ-SYN-11 | Built | `src/relay/diagnostics.ts`, `src/lib/relay-diagnostics.ts` | `test/relay-diagnostics.test.ts`, `test/relay-diagnostics-ui.test.ts`  | | source-shape |
 | REQ-SYN-12 | Built | `core/src/fold.ts` | `core/test/fold.test.ts`, `core/test/properties.test.ts`  | | source-shape |
@@ -75,7 +75,7 @@ Last audited: 2026-08-24 (CR-010 semantic re-audit against main @ 62b321b): ever
 | REQ-SYN-18 | Built | `core/src/identity.ts`, `src/relay/sync.ts` | `test/platform-boundaries.test.ts`  | | source-shape |
 | REQ-SYN-19 | Built | `core/src/transport.ts` | `core/test/transport.test.ts`, `core/test/properties.test.ts`  | | source-shape |
 | REQ-SYN-20 | Built | `core/src/fold.ts`, `core/src/transport.ts` | `core/test/properties.test.ts`, `core/test/transport.test.ts`  | | source-shape |
-| REQ-SYN-21 | Built | `src/relay/sync.ts`, `src/relay/http.ts`, `src/relay/nostr.ts` | `test/sync.integration.test.ts`  | | source-shape |
+| REQ-SYN-21 | Built | `src/relay/sync.ts`, `src/relay/http.ts`, `src/relay/nostr.ts` | `test/sync.integration.test.ts`, `test/operated-sync-recovery.test.ts` | CR-014 updates the known-author-only requirement explicitly; bounded topic reads include new devices. | source-shape |
 | REQ-SYN-22 | Built | `core/src/fold.ts`, `src/lib/freeze-policy.ts`, `src/App.svelte` | `core/test/properties.test.ts`, `test/freeze-policy.test.ts`, `test/protection-status-ui.test.ts`  | | rendered |
 | REQ-SYN-23 | Built | `src/relay/sync.ts`, `src/relay/http.ts`, `src/relay/nostr.ts` | `test/sync.integration.test.ts`, `test/relay-create.test.ts`  | | source-shape |
 | REQ-SYN-24 | Built | `core/src/hlc.ts`, `core/src/transport.ts` | `core/test/hlc.test.ts`, `core/test/transport.test.ts`, `core/test/properties.test.ts`  | | source-shape |

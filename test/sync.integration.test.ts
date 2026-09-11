@@ -115,7 +115,7 @@ describe("Phase 2 sync integration", { timeout: 30_000 }, () => {
     expect(await syncCounts(group.groupId)).toEqual({ local: 0, published: 0, confirmed: 2 });
   });
 
-  it("plans topic bootstrap for empty logs and author-cursor fetches for populated operated logs", () => {
+  it("plans bounded topic reads without treating old author cursors as group checkpoints", () => {
     const empty = {
       groupId: "g_empty",
       name: "Trip",
@@ -144,8 +144,7 @@ describe("Phase 2 sync integration", { timeout: 30_000 }, () => {
     };
 
     expect(relayFetchPlans(populated, "operated")).toEqual([
-      { cursorKey: "operated:author:d_a", opts: { author: "d_a", cursor: "operated:7", limit: 500 } },
-      { cursorKey: "operated:author:d_b", opts: { author: "d_b", limit: 500 } },
+      { cursorKey: "operated:topic", opts: { limit: 500 } },
     ]);
     expect(relayFetchPlans(populated, "nostr")).toEqual([{ cursorKey: "nostr:topic", opts: { cursor: "nostr:3", limit: 500 } }]);
   });
@@ -270,7 +269,7 @@ describe("Phase 2 sync integration", { timeout: 30_000 }, () => {
     expect(relays[0]!.fetches.at(-1)?.opts).toEqual({ limit: 500 });
   });
 
-  it("persists operated relay author cursors for populated incremental fetches", async () => {
+  it("persists operated relay topic cursors for populated incremental fetches", async () => {
     const operated = new MemoryRelay("operated");
     const spare = new MemoryRelay("spare");
     const relays = [operated, spare];
@@ -281,9 +280,9 @@ describe("Phase 2 sync integration", { timeout: 30_000 }, () => {
     await appendEvents(groupA.groupId, [alice]);
     await expect(syncOnce(groupA.groupId, relays)).resolves.toMatchObject({ confirmed: 2 });
     const afterFirstSync = await readGroup(groupA.groupId);
-    const cursorKey = `operated:author:${groupA.deviceId}`;
+    const cursorKey = "operated:topic";
     expect(afterFirstSync.meta.cursors[cursorKey]).toBe("operated:1");
-    expect(operated.fetches.at(-1)?.opts).toMatchObject({ author: groupA.deviceId, limit: 500 });
+    expect(operated.fetches.at(-1)?.opts).toEqual({ limit: 500 });
 
     const next = makeEvent({ deviceId: groupA.deviceId, nextCounter: afterFirstSync.nextCounter }, "ParticipantAdded", {
       pid: "p_cursor",
@@ -291,7 +290,7 @@ describe("Phase 2 sync integration", { timeout: 30_000 }, () => {
     });
     await appendEvents(groupA.groupId, [next]);
     await expect(syncOnce(groupA.groupId, relays)).resolves.toMatchObject({ confirmed: 1 });
-    expect(operated.fetches.at(-1)?.opts).toMatchObject({ author: groupA.deviceId, cursor: "operated:1", limit: 500 });
+    expect(operated.fetches.at(-1)?.opts).toEqual({ cursor: "operated:1", limit: 500 });
     expect((await readGroup(groupA.groupId)).meta.cursors[cursorKey]).toBe("operated:2");
   });
 
@@ -428,14 +427,14 @@ describe("Phase 2 sync integration", { timeout: 30_000 }, () => {
     expect(recovered.meta.cursors["operated:topic"]).toBe("operated:1");
 
     await expect(syncOnce(group.groupId, [relay])).resolves.toMatchObject({ received: 0 });
-    const afterAuthorCursor = await readGroup(group.groupId);
-    expect(afterAuthorCursor.meta.cursors["operated:author:future_device"]).toBe("operated:1");
+    const afterIncrementalRead = await readGroup(group.groupId);
+    expect(afterIncrementalRead.meta.cursors["operated:topic"]).toBe("operated:1");
 
     await expect(syncOnce(group.groupId, [relay])).resolves.toMatchObject({ received: 0 });
-    expect(relay.fetches.at(-1)?.opts).toMatchObject({ author: "future_device", cursor: "operated:1", limit: 500 });
+    expect(relay.fetches.at(-1)?.opts).toEqual({ cursor: "operated:1", limit: 500 });
   });
 
-  it("stops refetching surplus events after drop vectors and author cursors advance", async () => {
+  it("stops refetching surplus events after drop vectors and the topic cursor advance", async () => {
     const secret = createGroupSecret();
     const key = await groupKey(secret);
     const tag = await groupTag(secret);
@@ -469,12 +468,12 @@ describe("Phase 2 sync integration", { timeout: 30_000 }, () => {
     expect(afterTopicBootstrap.meta.discardVector.throwaway_device).toBe(51);
     expect(afterTopicBootstrap.meta.cursors["operated:topic"]).toBe("operated:1");
 
-    await expect(syncOnce(group.groupId, [relay])).resolves.toMatchObject({ received: 0, dropped: 51 });
-    const afterAuthorCursor = await readGroup(group.groupId);
-    expect(afterAuthorCursor.meta.discardVector.throwaway_device).toBe(51);
-    expect(afterAuthorCursor.meta.cursors["operated:author:throwaway_device"]).toBe("operated:1");
+    await expect(syncOnce(group.groupId, [relay])).resolves.toMatchObject({ received: 0, dropped: 0 });
+    const afterIncrementalRead = await readGroup(group.groupId);
+    expect(afterIncrementalRead.meta.discardVector.throwaway_device).toBe(51);
+    expect(afterIncrementalRead.meta.cursors["operated:topic"]).toBe("operated:1");
 
     await expect(syncOnce(group.groupId, [relay])).resolves.toMatchObject({ received: 0, dropped: 0 });
-    expect(relay.fetches.at(-1)?.opts).toMatchObject({ author: "throwaway_device", cursor: "operated:1", limit: 500 });
+    expect(relay.fetches.at(-1)?.opts).toEqual({ cursor: "operated:1", limit: 500 });
   });
 });

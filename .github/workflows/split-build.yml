@@ -1,0 +1,55 @@
+name: Prawn Split Release Check
+
+# Repository override: this project works directly on main. The shared PR-only
+# Build Check does not verify releases, and its filters omit Svelte components.
+on:
+  push:
+    branches: [main]
+    paths:
+      - "src/**"
+      - "api/**"
+      - "core/**"
+      - "test/**"
+      - "scripts/lint-money.mjs"
+      - "package.json"
+      - "package-lock.json"
+      - "index.html"
+      - "public/**"
+      - "*config*"
+      - "vercel.json"
+      - ".github/workflows/split-build.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: split-release-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            core/package-lock.json
+      - name: Install locked dependencies
+        run: |
+          npm ci
+          npm --prefix core ci
+      - name: Test, check and build
+        run: npm run build
+      # PROTOCOL.md A2 requires these separately, with their own suite totals.
+      - name: Confirm root test command
+        run: npm test
+      - name: Confirm core test command
+        run: npm --prefix core test
+      - name: Confirm Svelte diagnostics
+        run: npx svelte-check --tsconfig ./tsconfig.json

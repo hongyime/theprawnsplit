@@ -13,7 +13,6 @@ import {
   removeBufferedEvents,
   saveMeta,
   updateTransportVectors,
-  updateMeta,
   upsertRemoteEvents,
   vectorFromEvents,
   type GroupRecord,
@@ -35,13 +34,8 @@ interface RelayFetchPlan {
   opts: { author?: string; cursor?: string | null; limit?: number };
 }
 
-function knownDeviceIds(group: GroupRecord): string[] {
-  return [...new Set(group.events.map((event) => event.dev))].sort();
-}
-
-function fetchOpts(cursor: string | null | undefined, author?: string): RelayFetchPlan["opts"] {
+function fetchOpts(cursor: string | null | undefined): RelayFetchPlan["opts"] {
   return {
-    ...(author ? { author } : {}),
     ...(cursor ? { cursor } : {}),
     limit: FETCH_LIMIT,
   };
@@ -55,14 +49,12 @@ export function relayFetchPlans(group: GroupRecord, relayName: string): RelayFet
   if (group.events.length === 0) {
     return [{ cursorKey: `${relayName}:topic`, opts: { limit: FETCH_LIMIT } }];
   }
-  if (relayName === "nostr") {
-    const cursorKey = `${relayName}:topic`;
-    return [{ cursorKey, opts: fetchOpts(group.meta.cursors[cursorKey]) }];
-  }
-  return knownDeviceIds(group).map((author) => {
-    const cursorKey = `${relayName}:author:${author}`;
-    return { cursorKey, opts: fetchOpts(group.meta.cursors[cursorKey], author) };
-  });
+  // A known-author directory cannot discover a newly joined device. The operated
+  // relay's ordered group stream supports bounded incremental reads directly.
+  // Keep an existing topic cursor; never promote an author cursor to a topic
+  // cursor, because doing so could skip a different device's earlier events.
+  const cursorKey = `${relayName}:topic`;
+  return [{ cursorKey, opts: fetchOpts(group.meta.cursors[cursorKey]) }];
 }
 
 export function createRelays(group: GroupRecord): Relay[] {
@@ -229,16 +221,22 @@ export async function syncOnce(groupId: string, relayOverride?: Relay[], opts: S
       }
     }
   }
-  if (Object.keys(cursorUpdates).length > 0) {
-    await updateMeta(groupId, (meta) => ({ ...meta, cursors: { ...meta.cursors, ...cursorUpdates } }));
-  }
   result.snapshotsSeen = snapshots.length;
   const bestSnapshot = snapshots.sort((a, b) => b.seq - a.seq)[0];
   if (bestSnapshot && group.events.length === 0) {
     await updateTransportVectors(groupId, bestSnapshot.vv, group.meta.discardVector);
   }
   const dueBuffered = await dueBufferedEvents(groupId);
-  const transport = admitTransportEvents([...dueBuffered, ...remoteEvents], group.events, group.meta.discardVector, {
+  // Relay pages and a legacy-cursor replay can repeat already stored events.
+  // Count each new event once; duplicate delivery must not exhaust admission
+  // budgets and cause a later, genuinely new event to be discarded.
+  const seenIds = new Set(group.events.map((event) => event.id));
+  const incoming = [...dueBuffered, ...remoteEvents].filter((event) => {
+    if (seenIds.has(event.id)) return false;
+    seenIds.add(event.id);
+    return true;
+  });
+  const transport = admitTransportEvents(incoming, group.events, group.meta.discardVector, {
     now: Date.now(),
     supportedVersion: config.schemaVersion,
     maxFutureDriftMs: config.maxFutureDriftMs,
@@ -264,7 +262,9 @@ export async function syncOnce(groupId: string, relayOverride?: Relay[], opts: S
     await markEvents(groupId, confirmedIds, "confirmed");
     result.confirmed = confirmedIds.length;
   }
-  result.received = await upsertRemoteEvents(groupId, transport.admitted);
+  // Commit the read checkpoint in the same transaction as the received events.
+  // A failed local write must leave the relay page available for the next retry.
+  result.received = await upsertRemoteEvents(groupId, transport.admitted, cursorUpdates);
   const snapshotEvery = Math.max(1, config.snapshotEvery);
   const snapshotEvents = await confirmedEvents(groupId);
   const snapshotSeq = Math.floor(snapshotEvents.length / snapshotEvery) * snapshotEvery;

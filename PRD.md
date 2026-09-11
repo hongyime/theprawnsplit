@@ -292,7 +292,7 @@ The Phase column is scope planning (§15), not delivery status — STATUS.md own
 | REQ-SYN-06 | Events hold one of three states: `local`, `published`, `confirmed`. The outbox retains an event until `confirmed` | 2 |
 | REQ-SYN-07 | `confirmed` requires reading the event back from a subscription distinct from the write. Acknowledgement alone is insufficient | 2 |
 | REQ-SYN-08 | Every published event carries the sender's current version vector | 2 |
-| REQ-SYN-09 | Gaps are **detected** by version-vector diff. Gaps are **filled** by fetching per-author from a cursor, because relays cannot index application-level event IDs. Deduplication is by event `id` on ingest | 2 |
+| REQ-SYN-09 | Version vectors describe known progress. Operated-relay reads advance through the ordered group stream using a group cursor, including authors not yet known locally. Nostr uses its topic/time cursor. Deduplication by event `id` precedes admission accounting; received events and their read cursor commit together | 2 |
 | REQ-SYN-10 | "Everyone has this" is displayed only when every known device's latest version vector covers the event | 2 |
 | REQ-SYN-11 | Relay `OK` failure reasons MUST be parsed and acted on per §9.6 | 2 |
 | REQ-SYN-12 | Log merge is set union by event ID and MUST be commutative, associative, and idempotent | 2 |
@@ -304,7 +304,7 @@ The Phase column is scope planning (§15), not delivery status — STATUS.md own
 | REQ-SYN-18 | The Nostr envelope signature is transport-layer attribution only. It MUST NOT be interpreted as ledger authorisation (§10.3) | 2 |
 | REQ-SYN-19 | Ingestion is bounded PER AUTHOR by drop-filtering. Exceeding a budget quarantines that author's surplus events only; events from every other peer continue to process. Budgets: **unknown author** (never seen in a `ParticipantClaimed`/`ParticipantAdded`) ≤50 events; **known peer** ≤1,000 events per group. Halting global ingestion on cap breach is PROHIBITED — it is a remote kill-switch | 2 |
 | REQ-SYN-20 | **Caps govern admission, never folding.** The fold ALWAYS runs on the admitted subset and MUST NOT be blocked by log size. Refusing to fold on a large log is the same remote kill-switch as REQ-SYN-19's halt | 2 |
-| REQ-SYN-21 | Two fetch modes (§9.5). A device with an EMPTY local log MUST bootstrap via topic filter `{"#t": [groupTag]}` with NO author filter, because it holds no author directory. Author-filtered fetch is used only for incremental gap filling on a populated log | 2 |
+| REQ-SYN-21 | Two fetch modes (§9.5). An EMPTY local log MUST bootstrap through the group topic without a cursor or author filter. Populated logs use a bounded incremental topic read so newly joined devices remain discoverable. Existing author cursors are retained but never substituted for the topic cursor | 2 |
 | REQ-SYN-22 | Quarantined events (`v` unsupported) MUST advance the transport version vector, preventing infinite refetch loops, but MUST NOT advance semantic ledger state. While any quarantined event exists: balance display and settlement are frozen, the protection indicator goes amber, and an unmissable "a newer version is required" banner is shown. Expense entry and viewing remain available | 2 |
 | REQ-SYN-23 | The relay adapter MUST dual-write to the operated Vercel relay AND the Nostr pool. **The operated relay is primary (D-23); the Nostr pool is secondary redundancy.** An event is `confirmed` (REQ-SYN-06) when read back from **either** backend. Bootstrap recovery (§9.5 Mode A) MUST query the operated relay first | 2 |
 | REQ-SYN-24 | Clock drift is gated at **transport admission**, not inside the fold. Events with `hlc.wall > local_time + 120,000 ms` are held in a bounded buffer (cap 500, counted against REQ-SYN-19 budgets) and admitted when local time catches up. Events MUST NOT be mutated — clamping `hlc.wall` against local time is PROHIBITED (it diverges). Causal-frontier drift bounds are PROHIBITED (they flag normal idle time). Admitted events fold via standard HLC receive: `wall = max(local, remote)` (§9.12) | 2 |
@@ -563,8 +563,8 @@ interface Relay {
   publish(tag: string, authorKey: KeyPair, blob: Uint8Array): Promise<AckResult>;
  
   // Fetch all batches for a group, optionally narrowed to one author.
-  // Gap FILLING is by author + cursor, not by application-level event ID —
-  // relays cannot index arbitrary app strings (§9.5).
+  // Incremental recovery uses the group cursor, including unknown authors.
+  // Relays cannot index arbitrary application-level event IDs (§9.5).
   fetch(tag: string, opts: {
     author?: string;       // device pubkey
     cursor?: string | null;
@@ -819,18 +819,26 @@ path REQ-DUR-06 depends on.
 #### Mode B — Incremental fetch (populated local log)
  
 ```
-detect(local: VV, remote: VV) -> DeviceId[]
-  return [ dev for dev in remote where local[dev] < remote[dev] ]
- 
-fill(tag, staleDevices, cursors):
-  for dev in staleDevices:
-     relay.fetch(tag, { author: pubkeyOf(dev), cursor: cursors[dev] })
-     // over-fetches; dedupe by event.id on ingest
+fill(tag, relay, cursors):
+  key = relay.name + ":topic"
+  page = relay.fetch(tag, { cursor: cursors[key], limit: 500 })
+  // No author filter: the next page can contain a previously unknown device.
+  // Dedupe against stored IDs and within the page before admission accounting.
+  // Persist admitted events and the page cursor in one local transaction.
 ```
  
-Over-fetching is acceptable: a whole trip is tens of kilobytes and deduplication by
-event `id` is free. Version vectors retain their two valuable roles — knowing *that* a
-gap exists, and computing the "everyone has this" guarantee (REQ-SYN-10).
+CR-014 corrects the previous known-author-only read plan: it could never discover a
+new device through the operated relay, and its HTTP API filters authors after the
+bounded stream read. The ordered group stream gives one read per sync independent
+of the known-device count. The optional author-filtered API remains for compatibility;
+it is not the normal discovery/recovery path.
+
+An existing topic cursor is reused. If only old per-author cursors exist, replay
+from the group stream's start in bounded pages; never take their maximum as a
+group checkpoint. Duplicate replay must not use admission budgets for fresh events.
+Version vectors still describe progress and inform delivery coverage (REQ-SYN-10).
+Cursor formats remain specific to each relay kind. Nostr retention and time-window
+pagination limits are separate from the operated relay's ordered stream.
  
 **A device MUST select Mode A whenever its local log is empty, regardless of whether it
 holds a stale author directory.** See REQ-SYN-21.
@@ -1168,6 +1176,7 @@ from `groupSecret`, while preserving the relay's inability to decrypt ledger con
 | **D-22** | Two export artifacts: shareable ledger, private identity backup | One export containing everything | REQ-SYN-13 uses exports as a *sharing* channel. Bundling `claimSk` would hand impersonation power to anyone the ledger is shared with. |
 | **D-14** | `Financials` is an atomic LWW unit | Per-field LWW; operational transform | Per-field merge across mutually-constrained financial fields can produce `minor` and `payers` from different edits, violating REQ-MON-02 and halting the fold under REQ-MON-15. |
 | **D-23** | Operated Vercel relay is **primary**; Nostr pool is secondary redundancy | Co-equal dual-write (D-12); Nostr-primary | Measurement 2026-08-22: 2 of 5 volunteer relays could not reliably accept traffic from an ephemeral key. offchain.pub gates on web of trust — a criterion TripSplit's disposable keys can never satisfy (§9.10). relay.damus.io failed silently with no OK text, leaving REQ-SYN-11 nothing to act on. The operated relay has no opinion about a pubkey's social standing. |
+| **D-24** | Bounded group-cursor reads for populated ledgers; received events and their cursor commit together; duplicate IDs are removed before admission accounting | Known-author-only reads; checkpoint before local storage | CR-014, 2026-09-11: executable HTTP/API fixtures reproduce missed new devices, four requests for four known devices, skipped retries after failed storage, and duplicate replay dropping fresh records. The group stream discovers unknown authors with one bounded read. Retain old author cursors without promoting them to a group checkpoint; a legacy replay can cost extra reads once. Existing relay data, encryption, admission caps and retention remain unchanged. |
 
 ---
 
@@ -1522,7 +1531,7 @@ All changes originate from external review. Fourteen findings; twelve accepted, 
 | Multi-payer schema omission | `ExpenseAdded.paidBy: string` → `payers: {pid, minor}[]`. Balance derivation refactored (§8.3). Schema ships Phase 1, UI Phase 5, to avoid a log migration. REQ-MON-11. |
 | `allocate()` non-determinism | Rewritten to BigInt integer arithmetic; ordering by integer remainder. Float division, `Math.floor` on quotients, and fractional comparison prohibited. §9.2, REQ-MON-14. |
 | Multi-character tags unindexed | Group addressing standardised on `["t", groupTag]`, single-letter and lowercase hex. §9.10, REQ-SYN-17. Would have failed silently at runtime. |
-| `fetchByIds` unimplementable | `Relay` interface redesigned. Gaps *detected* by version vector, *filled* by author + cursor. §8.4, §9.5, REQ-SYN-09. |
+| `fetchByIds` unimplementable | `Relay` interface redesigned. Version vectors describe progress; bounded group-cursor reads recover events across authors. §8.4, §9.5, REQ-SYN-09. |
 | NIP-01 envelope under-specified | Full envelope mapping added, with explicit statement that the Schnorr signature is transport attribution, not ledger authority. §9.10, REQ-SYN-18. |
 | Claim hijacking | REQ-SET-09: contested claims lose confirmation authority. §10.3.1. Residual risk documented. |
 | DoS by injection | REQ-SYN-19/20 ingestion and fold caps. §10.6. |

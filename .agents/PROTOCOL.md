@@ -134,7 +134,9 @@ Do this before the 30-day gate (clock started 2026-08-22T12:59:41Z, gate ≈2026
 ### P1 — Test-suite trustworthiness
 
 - **Mutation-test beyond the comparator.** CR-011 mutation-tested `eventSortKey` and
-  found 2 of 3 mutations undetectable. No other module has been mutation-tested. Apply
+  found 2 of 3 mutations undetectable. CR-014 additionally detects mutations of sync
+  fetch planning, event/cursor persistence and duplicate admission at the caller.
+  The following pure modules still need their own mutation audit. Apply
   B2 to `fold.ts`, `money.ts`, `settle.ts`, `identity.ts`, `transport.ts` — one CR each
   if needed. Expect more decorative tests.
 - **Map §16.2.1 adversarial suite properly.** Eight attacks are listed in the PRD. Five
@@ -146,6 +148,20 @@ Do this before the 30-day gate (clock started 2026-08-22T12:59:41Z, gate ≈2026
   evidence. This is the single largest untrusted area in STATUS.md.
 
 ### P2 — Known gaps with named owners
+
+- **CR-014 sync repair verification in progress:** bounded group reads, atomic
+  received-event/cursor writes and duplicate admission accounting are implemented.
+  Focused fixtures and regression mutations pass their intended checks. Full
+  protocol, isolated browser and production release gates are still open.
+- **CR-014 scope boundary:** optional legacy HTTP author filtering still applies
+  after the Redis page limit; the app no longer uses it for normal recovery.
+  HTTP relay and NIP-11 reads have no request deadline. Buffer removal, discard
+  vectors and publication confirmations remain separate from the event/cursor
+  transaction; failure recovery across those operations needs a separate audit.
+- **Mobile participant row:** the isolated 390px browser recovery check shows
+  the Shadow badge overlapping the participant provenance text beside Claim/Hide.
+  The page has no horizontal overflow, but this internal row layout needs repair
+  during the portfolio UI pass. CR-014 changes sync behavior, not this layout.
 
 - **REQ-DUR-03** (Partial): ladder rungs 1 and 4 and the `expenseCount >= 3` trigger
   are unasserted; only session rungs 2–3 and the dismissal cap are tested.
@@ -170,6 +186,11 @@ Do this before the 30-day gate (clock started 2026-08-22T12:59:41Z, gate ≈2026
   confirm against the §15 phase plan whether that is accurate or optimistic.
 - Operated Vercel relay production env vars (Upstash) — server-side, never verified in
   production.
+- **Avoid builds for retention-note-only changes.** CR-014 matched eleven recent
+  production deployments to commits changing only the three retention Markdown
+  reports. Design and verify a conservative build-ignore rule without changing
+  the retention job, its data, or source-triggered deployments. No setting has
+  been changed in this sync repair.
 
 ---
 

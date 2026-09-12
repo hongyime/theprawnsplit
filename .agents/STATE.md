@@ -1,12 +1,18 @@
 # Project State
 
-Active portfolio maintenance, 2026-09-12: CR-015 implements trip-identity isolation,
-validated/serialized joins, response-body deadlines and participant layout fixes.
-The final build passes core 81/81, app 233/233 and Svelte 0 errors/0 warnings;
-all separate commands and final browser checks also pass. The direct-main
-source push, hosted CI and production checks are next. Nine deliberate regressions were detected and reverted. The report and
-prompt are `.agents/cr-015-report.md` and `.agents/cr-015-prompt.md`. Existing
-retention commits and records remain intact; wider portfolio/storage work is open.
+Active portfolio maintenance, 2026-09-12: CR-015 runtime verification is complete.
+Commit `e936989fac1c72b77f99f63bbd472eda05899ad5` is READY in production and all
+five main workflows pass. Local and hosted protocol commands pass: core 81/81,
+app 233/233, Svelte zero errors/warnings. Both public aliases match the checked
+build and pass isolated two-trip/recovery/device-link workflows. Production
+participant layout passes at 320/390/1440 pixels with usable controls.
+
+This documentation commit publishes the final CR-015 report and backlog. The
+portfolio release metadata records its final push/deployment check. Trip joins,
+async identity isolation and request-body deadlines are repaired; same-trip
+concurrency, whole-cycle budgets, wider Prawn styling, database migration and
+other portfolio work remain open. No real ledger, retention probe, schedule or
+provider data changed. See `.agents/cr-015-report.md` for evidence and limits.
 
 Active portfolio maintenance, 2026-09-11: CR-014 runtime verification is complete.
 Commit `a49e256d16440536a59150140817746b00b29ced` is deployed and all main workflows

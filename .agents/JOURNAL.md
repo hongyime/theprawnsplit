@@ -216,3 +216,9 @@ or provider-data workflow is dispatched for testing.
   wrapping to avoid splitting button labels; the join decoder now preserves local
   storage error messages. Final build passes; separate commands, source release
   and production evidence remain pending. No provider data or schedules changed.
+
+- 2026-09-12: CR-015 production proof: e936989 is READY; all five main workflows
+  and every required command pass. Both aliases match the built files and pass
+  isolated two-trip/recovery/device-link workflows. Production participant layout
+  passes at all measured widths. Publish final report/backlog as agent Markdown;
+  retain the separate retention gate and wider portfolio/storage requirements.

@@ -133,12 +133,12 @@ Do this before the 30-day gate (clock started 2026-08-22T12:59:41Z, gate ≈2026
 
 ### P1 — Test-suite trustworthiness
 
-- **CR-015 multi-trip repair locally verified; production pending.** Seed matching
+- **CR-015 multi-trip repair verified in production.** Seed matching
   and concurrent joins, selected-trip refresh, stale navigation and delayed claims
   now have failing-before-fix behavioral evidence. A fixed-identity Trip component
-  preserves async work on its original ledger. All local protocol commands and
-  isolated browser checks pass. See `.agents/cr-015-report.md`; release verification
-  must finish before this item is closed.
+  preserves async work on its original ledger. All local and hosted protocol commands and
+  both production-alias browser checks pass. See `.agents/cr-015-report.md`; runtime `e936989` is READY;
+  this selection/identity defect is closed.
 - **Mutation-test beyond the comparator.** CR-011 mutation-tested `eventSortKey` and
   found 2 of 3 mutations undetectable. CR-014 additionally detects mutations of sync
   fetch planning, event/cursor persistence and duplicate admission at the caller.
@@ -166,7 +166,7 @@ Do this before the 30-day gate (clock started 2026-08-22T12:59:41Z, gate ≈2026
   CR-015 adds HTTP/NIP-11 request deadlines through body reads. Buffer removal, discard
   vectors and publication confirmations remain separate from the event/cursor
   transaction; failure recovery across those operations needs a separate audit.
-- **CR-015 mobile participant layout locally verified; production pending.**
+- **CR-015 mobile participant layout verified in production.**
   Long names/provenance and action controls fit the isolated 320/390/1440px
   browser checks. Hide, Restore and Claim remain usable.
 - **Whole sync-cycle budget remains open.** The new deadline bounds each HTTP

@@ -1,7 +1,8 @@
 # CR-015 — Trip selection, request deadlines and participant layout
 
-All final local commands and browser checks pass. Source push, hosted CI and
-production checks remain pending. The wider portfolio and Supabase migration are incomplete.
+Runtime release verified: `e936989fac1c72b77f99f63bbd472eda05899ad5` is READY in
+production and all main workflows pass. This final report update publishes the
+verification below. The wider portfolio and Supabase migration remain incomplete.
 
 ## Behavior
 
@@ -147,13 +148,54 @@ an overly broad wrapping rule that split short button labels. Browser checks of
 the final source are `prawn-split-layout-cr015-v2-local.json` (320/390/1440,
 no overlaps or page overflow, controls usable) and the trip check above
 (14 checks, no page errors). All three final layout screenshots were reviewed.
-Production remains pending.
+Production verification is recorded in Loop C.
 
-## Loop C — release pending
+## Loop C — production verification
 
-Push directly to main under this repository's explicit workflow. Record hosted
-CI, Vercel production commit/aliases, browser checks and clean synchronized main
-before marking this CR complete. No feature branch or PR is used.
+Source commit `e936989fac1c72b77f99f63bbd472eda05899ad5` is pushed to main.
+Vercel deployment `dpl_GSwm3EqrswrL36L8LK3J4dE5CxaE` is READY and serves
+`theprawnsplit.hong-yi.me` and `theprawnsplit.vercel.app`.
+
+| Main workflow | Conclusion |
+|---|---|
+| [TruffleHog Secret Scan](https://github.com/hongyime/theprawnsplit/actions/runs/34700244208) | success |
+| [LFS Guard](https://github.com/hongyime/theprawnsplit/actions/runs/34700244303) | success |
+| [Semgrep](https://github.com/hongyime/theprawnsplit/actions/runs/34700244184) | success |
+| [CodeQL Analysis](https://github.com/hongyime/theprawnsplit/actions/runs/34700244187) | success |
+| [Prawn Split Release Check](https://github.com/hongyime/theprawnsplit/actions/runs/34700244326) | success |
+
+Actual hosted release output:
+
+```text
+Test Files  8 passed (8)
+Tests  81 passed (81)
+Test Files  67 passed (67)
+Tests  233 passed (233)
+svelte-check found 0 errors and 0 warnings
+✓ built in 1.88s
+Test Files  8 passed (8)
+Tests  81 passed (81)
+Test Files  67 passed (67)
+Tests  233 passed (233)
+Test Files  8 passed (8)
+Tests  81 passed (81)
+svelte-check found 0 errors and 0 warnings
+```
+
+Public files: 14 HTTP/byte comparisons pass across both domains.
+Browser workflow checks: primary 14, secondary 14.
+All browser contexts report zero uncaught errors. The production layout check
+passes at 320/390/1440 pixels, including Hide, Restore and Claim. All relay traffic
+is intercepted; no production ledger is created. The runtime-error tool reports
+none in its default selected range (the interval is not returned).
+
+Evidence: `split-cr015-release.json`, `split-cr015-source-ci.json`,
+`split-cr015-source-production.json`, `split-cr015-public-source.json`,
+`prawn-split-trips-cr015-prod-primary.json`,
+`prawn-split-trips-cr015-prod-secondary.json`, `prawn-split-layout-cr015-prod.json`.
+The final notes commit and its deployment/clean-main check are recorded in the
+portfolio release metadata after this report is pushed. Only agent Markdown
+changes in that publication; application bytes remain the tested source.
 
 ## Deviations
 

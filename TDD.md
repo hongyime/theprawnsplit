@@ -46,7 +46,8 @@ ThePrawnSplit /
 │
 ├── src/                        # PHASE 1+ — the PWA
 │   ├── main.ts
-│   ├── App.svelte
+│   ├── App.svelte        # trip navigation
+│   ├── Trip.svelte       # one selected trip per component lifetime
 │   ├── db/
 │   │   ├── schema.ts           # IndexedDB stores
 │   │   └── repo.ts             # read/write, imports core/fold

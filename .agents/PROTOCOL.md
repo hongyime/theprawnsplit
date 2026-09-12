@@ -133,12 +133,12 @@ Do this before the 30-day gate (clock started 2026-08-22T12:59:41Z, gate ≈2026
 
 ### P1 — Test-suite trustworthiness
 
-- **Multi-trip selection and join recovery need behavioral verification.** Source
-  inspection during CR-014 found that `ensureGroup(seed)` returns the first stored
-  group before considering a supplied join seed. The shared refresh helper and
-  `runSync` also call `ensureGroup()` after work on a selected trip. Reproduce
-  joining a different trip and refreshing the second stored trip; preserve every
-  existing ledger and seed. This is a source finding, not yet a reproduced defect.
+- **CR-015 multi-trip repair locally verified; production pending.** Seed matching
+  and concurrent joins, selected-trip refresh, stale navigation and delayed claims
+  now have failing-before-fix behavioral evidence. A fixed-identity Trip component
+  preserves async work on its original ledger. All local protocol commands and
+  isolated browser checks pass. See `.agents/cr-015-report.md`; release verification
+  must finish before this item is closed.
 - **Mutation-test beyond the comparator.** CR-011 mutation-tested `eventSortKey` and
   found 2 of 3 mutations undetectable. CR-014 additionally detects mutations of sync
   fetch planning, event/cursor persistence and duplicate admission at the caller.
@@ -163,13 +163,16 @@ Do this before the 30-day gate (clock started 2026-08-22T12:59:41Z, gate ≈2026
   See `.agents/cr-014-report.md`; wider retention and scope gaps remain below.
 - **CR-014 scope boundary:** optional legacy HTTP author filtering still applies
   after the Redis page limit; the app no longer uses it for normal recovery.
-  HTTP relay and NIP-11 reads have no request deadline. Buffer removal, discard
+  CR-015 adds HTTP/NIP-11 request deadlines through body reads. Buffer removal, discard
   vectors and publication confirmations remain separate from the event/cursor
   transaction; failure recovery across those operations needs a separate audit.
-- **Mobile participant row:** the isolated 390px browser recovery check shows
-  the Shadow badge overlapping the participant provenance text beside Claim/Hide.
-  The page has no horizontal overflow, but this internal row layout needs repair
-  during the portfolio UI pass. CR-014 changes sync behavior, not this layout.
+- **CR-015 mobile participant layout locally verified; production pending.**
+  Long names/provenance and action controls fit the isolated 320/390/1440px
+  browser checks. Hide, Restore and Claim remain usable.
+- **Whole sync-cycle budget remains open.** The new deadline bounds each HTTP
+  request, not sequential per-event fallback or the entire sync. Review large
+  outboxes, WebSocket connection reuse/cleanup and concurrent same-trip sync
+  without changing relay quorum or silently discarding pending records.
 
 - **REQ-DUR-03** (Partial): ladder rungs 1 and 4 and the `expenseCount >= 3` trigger
   are unasserted; only session rungs 2–3 and the dismissal cap are tested.

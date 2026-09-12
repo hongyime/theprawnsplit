@@ -110,6 +110,7 @@ textarea {
 }
 
 .toast {
+  overflow-wrap: anywhere;
   position: sticky;
   top: 10px;
   z-index: 6;
@@ -686,12 +687,19 @@ button.secondary {
   align-items: center;
   gap: 0.45rem;
   min-width: 0;
+  flex: 1 1 12rem;
+}
+
+.people-list li {
+  flex-wrap: wrap;
+  align-items: center;
 }
 
 .people-list label span {
   display: grid;
   gap: 0.15rem;
   min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .people-list label small {
@@ -716,10 +724,14 @@ button.secondary {
   align-items: center;
   justify-content: flex-end;
   gap: 0.45rem;
-  min-width: 9rem;
+  min-width: 0;
+  max-width: 100%;
+  flex-wrap: wrap;
+  margin-left: auto;
 }
 
 .person-actions button {
+  flex-shrink: 0;
   min-height: 1.85rem;
   padding: 0.2rem 0.45rem;
   font-size: 0.84rem;
@@ -727,6 +739,15 @@ button.secondary {
 
 .people-list input {
   width: auto;
+  flex-shrink: 0;
+}
+
+.balance-row {
+  overflow-wrap: anywhere;
+}
+
+.balance-row strong {
+  flex-shrink: 0;
 }
 
 .positive strong {
@@ -821,6 +842,10 @@ button.copied {
   grid-template-columns: minmax(0, 1fr) minmax(5.5rem, 8rem);
   gap: 0.5rem;
   align-items: center;
+}
+
+.split-table label span {
+  overflow-wrap: anywhere;
 }
 
 .subgroup-tools {
@@ -1036,7 +1061,7 @@ button.copied {
   }
 
   .grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
     grid-template-areas:
       "people"
       "balances"

@@ -26,7 +26,7 @@ describe("PWA install boundary", () => {
     const html = readProjectFile("index.html");
     const mainSource = readProjectFile("src/main.ts");
     const serviceWorker = readProjectFile("public/sw.js");
-    const appSource = readProjectFile("src/App.svelte");
+    const appSource = readProjectFile("src/Trip.svelte");
     const manifest = JSON.parse(readProjectFile("public/manifest.webmanifest")) as WebManifest;
 
     expect(html).toContain('<link rel="manifest" href="/manifest.webmanifest" />');

@@ -6,6 +6,8 @@
 // for the process lifetime: limits change on relay-operator timescales, not
 // per-sync timescales.
 
+import { withRequestDeadline } from "./request-deadline";
+
 const limitCache = new Map<string, number | null>();
 
 export function clearNip11CacheForTests(): void {
@@ -25,13 +27,15 @@ export async function fetchMaxMessageLength(
 
 async function requestMaxMessageLength(relayUrl: string, fetchImpl: typeof fetch): Promise<number | null> {
   try {
-    const httpUrl = relayUrl.replace(/^wss:\/\//, "https://").replace(/^ws:\/\//, "http://");
-    const response = await fetchImpl(httpUrl, { headers: { Accept: "application/nostr+json" } });
-    if (!response.ok) return null;
-    const document = (await response.json()) as { limitation?: { max_message_length?: unknown } };
-    const raw = document.limitation?.max_message_length;
-    if (typeof raw !== "number" || !Number.isFinite(raw) || raw <= 0) return null;
-    return raw;
+    return await withRequestDeadline(async (signal) => {
+      const httpUrl = relayUrl.replace(/^wss:\/\//, "https://").replace(/^ws:\/\//, "http://");
+      const response = await fetchImpl(httpUrl, { signal, headers: { Accept: "application/nostr+json" } });
+      if (!response.ok) return null;
+      const document = (await response.json()) as { limitation?: { max_message_length?: unknown } };
+      const raw = document.limitation?.max_message_length;
+      if (typeof raw !== "number" || !Number.isFinite(raw) || raw <= 0) return null;
+      return raw;
+    });
   } catch {
     return null;
   }

@@ -25,7 +25,7 @@ import { describe, expect, it } from "vitest";
 
 describe("identity backup UI", () => {
   it("warns about impersonation and keeps identity backup out of share-sheet paths", () => {
-    const source = readFileSync(join(process.cwd(), "src", "App.svelte"), "utf8");
+    const source = readFileSync(join(process.cwd(), "src", "Trip.svelte"), "utf8");
     const prompt = source.match(/\{#if showIdentityBackupPrompt && hasLocalClaim\}([\s\S]*?)\{#if activeExportPrompt\}/)?.[1] ?? "";
     const syncStrip = source.match(/<section class="sync-strip">([\s\S]*?)\{#if relaySettingsOpen\}/)?.[1] ?? "";
     const shareDelta = source.match(/async function shareDelta\(\): Promise<void> \{([\s\S]*?)\n  \}/)?.[1] ?? "";

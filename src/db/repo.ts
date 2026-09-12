@@ -306,12 +306,20 @@ export async function createGroup(name?: string, currency?: string): Promise<Gro
 }
 
 export async function ensureGroup(seed?: JoinSeed): Promise<GroupRecord> {
-  const database = await db();
-  const groups = await database.getAll("groups");
-  if (groups[0]) return readGroup(groups[0].groupId);
-
+  if (seed !== undefined && (!seed || typeof seed !== "object" ||
+      typeof seed.secretB64 !== "string" || typeof seed.tagHex !== "string" ||
+      !/^[a-f0-9]{64}$/.test(seed.tagHex) ||
+      (seed.name !== undefined && typeof seed.name !== "string") ||
+      (seed.currency !== undefined && typeof seed.currency !== "string"))) {
+    throw new Error("Join Link Is Malformed.");
+  }
   const deviceId = newId("d");
   const secret = seed ? secretFromBase64(seed.secretB64) : createGroupSecret();
+  if (secret.length !== 32) throw new Error("Join Secret Is Invalid.");
+  // Finish cryptography before opening the IDB transaction: awaiting unrelated
+  // work inside it can close the transaction before the lookup and write finish.
+  const tagHex = await groupTag(secret);
+  if (seed && seed.tagHex !== tagHex) throw new Error("Join Secret Does Not Match This Trip.");
   const group: StoredGroup = {
     groupId: newId("g"),
     name: seed?.name?.trim() || "Trip",
@@ -320,7 +328,7 @@ export async function ensureGroup(seed?: JoinSeed): Promise<GroupRecord> {
     nextCounter: seed ? 1 : 2,
     createdAt: Date.now(),
     secretB64: secretToBase64(secret),
-    tagHex: seed?.tagHex || (await groupTag(secret)),
+    tagHex,
   };
   const meta: StoredMeta = {
     groupId: group.groupId,
@@ -330,7 +338,19 @@ export async function ensureGroup(seed?: JoinSeed): Promise<GroupRecord> {
     nostrSk: createNostrSecretHex(),
     durability: emptyDurabilityPromptState(),
   };
+  const database = await db();
+  // Serialize lookup and creation across tabs/concurrent joins. Do not merge or
+  // delete any pre-existing ledgers, even if older versions created duplicates.
   const tx = database.transaction(["groups", "events", "meta"], "readwrite");
+  const groups = await tx.objectStore("groups").getAll();
+  const existing = seed ? groups.find((candidate) => candidate.tagHex === tagHex) : groups[0];
+  if (existing) {
+    await tx.done;
+    if (seed && secretToBase64(secretFromBase64(existing.secretB64)) !== group.secretB64) {
+      throw new Error("Stored Trip Secret Does Not Match The Join Link.");
+    }
+    return readGroup(existing.groupId);
+  }
   await tx.objectStore("groups").put(group);
   const created: Event[] = seed
     ? []

@@ -201,3 +201,18 @@
 - 2026-09-11: CR-014 runtime 461e5455 reached production. Both domains pass isolated recovery browser checks and the compiled-asset/JSON-validation checks. Hosted build passed, but repeated root tests exposed an existing timestamp-dependent trip-order fixture. It now uses explicit distinct times; the corrected landing suite and Svelte check pass, and reversing the comparator still fails. Preserve failed evidence and rerun the full main release workflow before closing CR-014. Multi-trip selection and mobile overlap are separately queued.
 - 2026-09-11: CR-014 final evidence: a49e256d passes all main workflows and every protocol command; both public aliases match the reviewed build and pass isolated recovery checks. Added the immutable report and updated the backlog. Preserve local runner failures and explicit unverified scope; finish the notes push/deployment record in the portfolio ledger.
 - 2026-09-11: Appended a CR-014 report correction after rechecking Nostr: the relay applies the timestamp filter; the client deduplicates/sorts event IDs and emits timestamp cursors. Original report bytes and all application files are preserved.
+# 2026-09-12 CR-015 started
+
+Accepted portfolio rotation now addresses the recorded multi-trip and mobile
+findings plus related request deadlines. Preserve all ledgers and retention
+history; record failing behavioral evidence before implementation. No live relay
+or provider-data workflow is dispatched for testing.
+
+- 2026-09-12: CR-015 implementation: replace shared mutable trip routing with an
+  App router and fixed-identity Trip component; serialize validated seed joins,
+  retain selected IDs after sync/device linking, and bound HTTP/NIP-11 bodies.
+  Repository, rendered UI and real sync-caller fixtures reproduce the failures.
+  Nine deliberate regressions are detected. Final visual review narrowed text
+  wrapping to avoid splitting button labels; the join decoder now preserves local
+  storage error messages. Final build passes; separate commands, source release
+  and production evidence remain pending. No provider data or schedules changed.

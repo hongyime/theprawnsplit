@@ -16,6 +16,7 @@ import {
   type GroupRecord,
 } from "@/db/repo";
 import { latestArchiveEvent } from "@/lib/lifecycle";
+import { groupTag } from "@/crypto/group";
 
 function groupWithIdentity(): GroupRecord {
   return {
@@ -84,6 +85,8 @@ describe("export artifact split", () => {
 
   it("keeps TripLedgerDelta shareable and applies it to a matching joined trip", async () => {
     const source = groupWithIdentity();
+    // The imported trip must have the actual tag of the synthetic join secret.
+    source.tagHex = await groupTag(new Uint8Array(32));
     const delta = createDelta(source, source.events);
     const json = stringifyExport(delta);
 
@@ -154,6 +157,7 @@ describe("export artifact split", () => {
 
   it("restores identity backup onto a matching recovered trip by tag", async () => {
     const source = groupWithIdentity();
+    source.tagHex = await groupTag(new Uint8Array(32));
     const ledger = createExport(source);
     const backup = createIdentityBackup(source);
 

@@ -1,5 +1,13 @@
 # Project State
 
+Active portfolio maintenance, 2026-09-12: CR-015 implements trip-identity isolation,
+validated/serialized joins, response-body deadlines and participant layout fixes.
+The final build passes core 81/81, app 233/233 and Svelte 0 errors/0 warnings;
+all separate commands and final browser checks also pass. The direct-main
+source push, hosted CI and production checks are next. Nine deliberate regressions were detected and reverted. The report and
+prompt are `.agents/cr-015-report.md` and `.agents/cr-015-prompt.md`. Existing
+retention commits and records remain intact; wider portfolio/storage work is open.
+
 Active portfolio maintenance, 2026-09-11: CR-014 runtime verification is complete.
 Commit `a49e256d16440536a59150140817746b00b29ced` is deployed and all main workflows
 pass, including every PROTOCOL A2 command. The build and root command each pass

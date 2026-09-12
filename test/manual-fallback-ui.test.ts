@@ -66,6 +66,7 @@ describe("eviction recovery panel (rendered)", () => {
     expect(importLinks.some((node) => node.closest("button"))).toBe(true);
 
     // The blocked-recovery copy is present while sync cannot recover.
-    expect(screen.getByText(/Waiting For Recovered Trip Data|Import Is The Fastest Way Back/)).toBeTruthy();
+    expect(screen.getByText("Waiting For Recovered Trip Data.", { exact: true })).toBeTruthy();
+    expect(await screen.findByText("No Raw Events Were Recovered Yet. Import Is The Fastest Way Back Onto This Trip.", { exact: true })).toBeTruthy();
   });
 }, 60_000);

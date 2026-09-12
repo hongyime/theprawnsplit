@@ -7,7 +7,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 function appSource(): string {
-  return readFileSync(join(process.cwd(), "src", "App.svelte"), "utf8");
+  return readFileSync(join(process.cwd(), "src", "Trip.svelte"), "utf8");
 }
 
 function between(source: string, start: string, end: string): string {

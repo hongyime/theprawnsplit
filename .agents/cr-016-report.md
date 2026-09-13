@@ -1,6 +1,6 @@
 # CR-016 — Bounded sync cycles and exact confirmation
 
-Local verification complete; source CI, production verification and Loop C closeout are pending.
+Local and source-release verification complete. The documentation closeout commit and clean main verification are recorded separately after this report is committed.
 
 ## Behavior
 
@@ -148,3 +148,15 @@ Real relay retention and long-term recovery, the separate retention gate, live
 provider capacity, monthly billing/egress fit, Supabase migration, wider Prawn
 styling and the remaining portfolio requirements. All browser relay traffic and
 gateway fixtures are synthetic; no real ledger or provider write was used for tests.
+
+## Production verification
+
+Source `108d6429e2cc5c14bceb8a0f23dd612d2ebbe181` is READY as `dpl_9bJzyPhFMMLUzEPQzwhH1qQZPzD4`. The production browser passes 18 checks with synthetic relay interception and zero real test writes. Both public aliases pass 14 asset checks, byte-matched to the locally verified build. All 5 source-commit workflows pass:
+
+- [LFS Guard](https://github.com/hongyime/theprawnsplit/actions/runs/34749763298): success
+- [TruffleHog Secret Scan](https://github.com/hongyime/theprawnsplit/actions/runs/34749763344): success
+- [Semgrep](https://github.com/hongyime/theprawnsplit/actions/runs/34749763288): success
+- [CodeQL Analysis](https://github.com/hongyime/theprawnsplit/actions/runs/34749763409): success
+- [Prawn Split Release Check](https://github.com/hongyime/theprawnsplit/actions/runs/34749763407): success
+
+The repository was clean after the source push. A separate documentation commit records this evidence; its final SHA and clean-main result are retained in the portfolio release closeout. Hosted build commands repeat the local protocol checks. Service-worker upgrade behavior, live provider limits and retention remain outside this pass. Evidence: `split-cr016-release.json`, `split-cr016-public-source.json` and `prawn-split-cycle-cr016-production.json`.

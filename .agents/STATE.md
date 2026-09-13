@@ -1,6 +1,6 @@
 # Project State
 
-Active portfolio maintenance, 2026-09-13: CR-016 local verification is complete: core 81, app 251, all required commands and 18 browser checks pass. Source CI, production verification and final closeout remain pending. See .agents/cr-016-report.md. Existing records and wider portfolio requirements are preserved.
+Active portfolio maintenance, 2026-09-13: CR-016 source 108d6429e2cc5c14bceb8a0f23dd612d2ebbe181 is READY in production; all 5 main workflows, 18 production browser checks and 14 public asset checks pass. Core 81, app 251; no real test writes. This documentation commit records release evidence. Final clean-main/publication verification is retained in the portfolio closeout. See .agents/cr-016-report.md. Wider retention, metadata transaction, storage migration and monthly quota requirements remain open.
 
 Active portfolio maintenance, 2026-09-12: CR-015 runtime verification is complete.
 Commit `e936989fac1c72b77f99f63bbd472eda05899ad5` is READY in production and all

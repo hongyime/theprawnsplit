@@ -169,10 +169,16 @@ Do this before the 30-day gate (clock started 2026-08-22T12:59:41Z, gate ≈2026
 - **CR-015 mobile participant layout verified in production.**
   Long names/provenance and action controls fit the isolated 320/390/1440px
   browser checks. Hide, Restore and Claim remain usable.
-- **Whole sync-cycle budget — CR-016 started.** The new deadline bounds each HTTP
-  request, not sequential per-event fallback or the entire sync. Review large
-  outboxes, WebSocket connection reuse/cleanup and concurrent same-trip sync
-  without changing relay quorum or silently discarding pending records.
+- **CR-016 sync network work and same-trip ownership verified in production.**
+  Shared cancellation limits network work to 60 seconds; fallback rotates at most
+  10 pending events per cycle. Same-trip Web Locks, owned-pool cleanup, exact-event
+  confirmation and atomic sync metadata updates have failing-first evidence.
+  Pending records and normal polling cadence are preserved.
+- **Remaining sync transaction and browser boundaries.** Review ensureMeta,
+  updateTransportVectors, saveMeta and markSnapshotPublished full-record writes,
+  plus buffer/vector/checkpoint transaction boundaries. Stalled local database
+  commits are outside the network deadline. Already-open old app versions and
+  browsers without Web Locks need separate coordination/upgrade assessment.
 
 - **REQ-DUR-03** (Partial): ladder rungs 1 and 4 and the `expenseCount >= 3` trigger
   are unasserted; only session rungs 2–3 and the dismissal cap are tested.

@@ -17,15 +17,17 @@ export function clearNip11CacheForTests(): void {
 export async function fetchMaxMessageLength(
   relayUrl: string,
   fetchImpl: typeof fetch = fetch,
+  signal?: AbortSignal,
 ): Promise<number | null> {
   const cached = limitCache.get(relayUrl);
   if (cached !== undefined) return cached;
-  const value = await requestMaxMessageLength(relayUrl, fetchImpl);
+  const value = await requestMaxMessageLength(relayUrl, fetchImpl, signal);
+  if (signal?.aborted) throw signal.reason;
   limitCache.set(relayUrl, value);
   return value;
 }
 
-async function requestMaxMessageLength(relayUrl: string, fetchImpl: typeof fetch): Promise<number | null> {
+async function requestMaxMessageLength(relayUrl: string, fetchImpl: typeof fetch, parent?: AbortSignal): Promise<number | null> {
   try {
     return await withRequestDeadline(async (signal) => {
       const httpUrl = relayUrl.replace(/^wss:\/\//, "https://").replace(/^ws:\/\//, "http://");
@@ -35,7 +37,7 @@ async function requestMaxMessageLength(relayUrl: string, fetchImpl: typeof fetch
       const raw = document.limitation?.max_message_length;
       if (typeof raw !== "number" || !Number.isFinite(raw) || raw <= 0) return null;
       return raw;
-    });
+    }, parent);
   } catch {
     return null;
   }

@@ -2,7 +2,8 @@ import { compareCodepoints } from "@theprawnsplit/core";
 import { finalizeEvent, generateSecretKey, getPublicKey, SimplePool } from "nostr-tools";
 import { bytesToHex, hexToBytes } from "@/crypto/bytes";
 import { config } from "@/config";
-import type { AckResult, Relay, RelayEntry } from "./types";
+import type { AckResult, Relay, RelayEntry, RelayRequestOptions } from "./types";
+import { withRequestDeadline } from "./request-deadline";
 
 export interface NostrEventLike {
   id: string;
@@ -77,23 +78,36 @@ export class NostrRelay implements Relay {
     return bytesToHex(this.sk);
   }
 
-  async publish(tag: string, _author: string, blob: string): Promise<AckResult> {
+  close(): void { this.pool.destroy(); }
+
+  private request<T>(operation: () => Promise<T>, request?: RelayRequestOptions): Promise<T> {
+    return withRequestDeadline(async (signal) => {
+      const abort = () => this.pool.destroy();
+      signal.addEventListener("abort", abort, { once: true });
+      try { return await operation(); }
+      finally { signal.removeEventListener("abort", abort); }
+    }, request?.signal);
+  }
+
+  async publish(tag: string, _author: string, blob: string, _writeProof?: string, request?: RelayRequestOptions): Promise<AckResult> {
     try {
-      const event = finalizeEvent(nostrEventTemplate(tag, blob, this.kind), this.sk);
-      const pubs = this.pool.publish(this.relayUrls, event);
-      const settled = await Promise.allSettled(pubs);
-      const ok = settled.filter((result) => result.status === "fulfilled").length;
-      return ok > 0 ? { ok: true, cursor: event.id } : { ok: false, reason: "no nostr relay accepted publish" };
+      return await this.request(async () => {
+        const event = finalizeEvent(nostrEventTemplate(tag, blob, this.kind), this.sk);
+        const pubs = this.pool.publish(this.relayUrls, event);
+        const settled = await Promise.allSettled(pubs);
+        const ok = settled.filter((result) => result.status === "fulfilled").length;
+        return ok > 0 ? { ok: true, cursor: event.id } : { ok: false, reason: "no nostr relay accepted publish" };
+      }, request);
     } catch (error) {
       return { ok: false, reason: error instanceof Error ? error.message : String(error) };
     }
   }
 
-  async fetch(tag: string, opts: { author?: string; cursor?: string | null; limit?: number }): Promise<RelayEntry[]> {
+  async fetch(tag: string, opts: { author?: string; cursor?: string | null; limit?: number }, request?: RelayRequestOptions): Promise<RelayEntry[]> {
     // The stored cursor on this relay kind is a created_at watermark (see RelayEntry).
     const since = opts.cursor ? Number(opts.cursor) : null;
     const filter = nostrFetchFilter(tag, this.kind, { ...opts, since });
-    const events = await this.pool.querySync(this.relayUrls, filter);
+    const events = await this.request(() => this.pool.querySync(this.relayUrls, filter), request);
     return selectNostrEntries(events, { since });
   }
 }

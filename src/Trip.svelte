@@ -930,6 +930,10 @@
       const { syncOnce } = await import("@/relay/sync");
       if (disposed) return;
       const result = await syncOnce(tripId);
+      if (result.inProgress) {
+        if (!disposed) syncStatus = "Sync is already running for this trip";
+        return;
+      }
       if (disposed) return;
       recoveryAttempted = true;
       lastSyncResult = result;

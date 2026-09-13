@@ -48,6 +48,7 @@ export interface StoredMeta {
   lastSnapshotSeq?: number;
   lastSyncAt?: number;
   lastSyncError?: string;
+  syncFallbackNextId?: string;
   unsyncedSince?: number;
   relaySettings?: RelaySettings;
   subgroups?: SubgroupPreset[];
@@ -237,10 +238,12 @@ async function ensureMeta(group: StoredGroup, events: Event[]): Promise<StoredMe
 
 export async function updateMeta(groupId: string, update: (meta: StoredMeta) => StoredMeta): Promise<StoredMeta> {
   const database = await db();
-  const existing = await database.get("meta", groupId);
+  const tx = database.transaction("meta", "readwrite");
+  const existing = await tx.store.get(groupId);
   if (!existing) throw new Error("Group metadata not found");
   const next = update({ ...existing, durability: normalizeDurabilityPromptState(existing.durability) });
-  await database.put("meta", next);
+  await tx.store.put(next);
+  await tx.done;
   return next;
 }
 

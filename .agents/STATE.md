@@ -1,5 +1,7 @@
 # Project State
 
+Active portfolio maintenance, 2026-09-13: CR-016 local verification is complete: core 81, app 251, all required commands and 18 browser checks pass. Source CI, production verification and final closeout remain pending. See .agents/cr-016-report.md. Existing records and wider portfolio requirements are preserved.
+
 Active portfolio maintenance, 2026-09-12: CR-015 runtime verification is complete.
 Commit `e936989fac1c72b77f99f63bbd472eda05899ad5` is READY in production and all
 five main workflows pass. Local and hosted protocol commands pass: core 81/81,

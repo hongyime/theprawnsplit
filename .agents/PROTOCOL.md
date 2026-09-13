@@ -169,7 +169,7 @@ Do this before the 30-day gate (clock started 2026-08-22T12:59:41Z, gate ≈2026
 - **CR-015 mobile participant layout verified in production.**
   Long names/provenance and action controls fit the isolated 320/390/1440px
   browser checks. Hide, Restore and Claim remain usable.
-- **Whole sync-cycle budget remains open.** The new deadline bounds each HTTP
+- **Whole sync-cycle budget — CR-016 started.** The new deadline bounds each HTTP
   request, not sequential per-event fallback or the entire sync. Review large
   outboxes, WebSocket connection reuse/cleanup and concurrent same-trip sync
   without changing relay quorum or silently discarding pending records.

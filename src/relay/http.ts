@@ -1,5 +1,5 @@
 import { config } from "@/config";
-import type { AckResult, Relay, RelayEntry } from "./types";
+import type { AckResult, Relay, RelayEntry, RelayRequestOptions } from "./types";
 import { withRequestDeadline } from "./request-deadline";
 
 export class HttpRelay implements Relay {
@@ -7,7 +7,7 @@ export class HttpRelay implements Relay {
 
   constructor(readonly endpoint = config.relayEndpoint) {}
 
-  async publish(tag: string, author: string, blob: string, writeProof: string): Promise<AckResult> {
+  async publish(tag: string, author: string, blob: string, writeProof: string, request?: RelayRequestOptions): Promise<AckResult> {
     return withRequestDeadline(async (signal) => {
       const response = await fetch(this.endpoint, {
         signal,
@@ -18,10 +18,10 @@ export class HttpRelay implements Relay {
       if (!response.ok) return { ok: false, reason: await response.text() };
       const body = (await response.json()) as { cursor?: string };
       return body.cursor ? { ok: true, cursor: body.cursor } : { ok: true };
-    });
+    }, request?.signal);
   }
 
-  async fetch(tag: string, opts: { author?: string; cursor?: string | null; limit?: number }): Promise<RelayEntry[]> {
+  async fetch(tag: string, opts: { author?: string; cursor?: string | null; limit?: number }, request?: RelayRequestOptions): Promise<RelayEntry[]> {
     const url = new URL(this.endpoint, window.location.origin);
     url.searchParams.set("tag", tag);
     if (opts.cursor) url.searchParams.set("cursor", opts.cursor);
@@ -32,6 +32,6 @@ export class HttpRelay implements Relay {
       if (!response.ok) throw new Error(await response.text());
       const body = (await response.json()) as { entries?: RelayEntry[] };
       return body.entries ?? [];
-    });
+    }, request?.signal);
   }
 }

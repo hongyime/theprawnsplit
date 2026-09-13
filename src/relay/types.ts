@@ -33,13 +33,18 @@ export interface RelayDiagnostic {
   retryAfterMs?: number;
 }
 
+export interface RelayRequestOptions { signal?: AbortSignal }
+
 export interface Relay {
   name: string;
-  publish(tag: string, author: string, blob: string, writeProof: string): Promise<AckResult>;
-  fetch(tag: string, opts: { author?: string; cursor?: string | null; limit?: number }): Promise<RelayEntry[]>;
+  publish(tag: string, author: string, blob: string, writeProof: string, request?: RelayRequestOptions): Promise<AckResult>;
+  fetch(tag: string, opts: { author?: string; cursor?: string | null; limit?: number }, request?: RelayRequestOptions): Promise<RelayEntry[]>;
+  close?(): void;
 }
 
 export interface SyncResult {
+  /** Another tab owns this trip's cycle; no recovery attempt was made here. */
+  inProgress?: boolean;
   published: number;
   confirmed: number;
   received: number;

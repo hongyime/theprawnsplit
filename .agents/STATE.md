@@ -1,5 +1,13 @@
 # Project State
 
+Portfolio usage audit, 2026-09-14: the manual `storage-usage.yml` workflow reads
+only Upstash `DBSIZE` and `INFO memory` with existing repository secrets. Its
+unit tests exercise numeric allowlisting, secret-safe errors, GET-only requests,
+response limits and redirect refusal. Inventory output belongs in the workflow
+summary; capacity remains unproven until actual measurements and a Supabase
+destination are established. This maintenance task changes no app, relay or
+retention behavior. The existing CR-016 and broader migration boundaries remain.
+
 Active portfolio maintenance, 2026-09-13: CR-016 source 108d6429e2cc5c14bceb8a0f23dd612d2ebbe181 is READY in production; all 5 main workflows, 18 production browser checks and 14 public asset checks pass. Core 81, app 251; no real test writes. This documentation commit records release evidence. Final clean-main/publication verification is retained in the portfolio closeout. See .agents/cr-016-report.md. Wider retention, metadata transaction, storage migration and monthly quota requirements remain open.
 
 Active portfolio maintenance, 2026-09-12: CR-015 runtime verification is complete.

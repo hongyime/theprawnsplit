@@ -23,6 +23,18 @@ Svelte 5 · TypeScript · Vite 6 · IndexedDB (`idb`) · Vercel · Upstash Redis
 money allocation, settlement, HLC ordering, merge resolution, and the fold. It is
 verified by property tests before any app code runs.
 
+## Storage usage audit
+
+Run **Upstash storage usage** from GitHub Actions on `main` for aggregate Redis
+key count and memory bytes. It uses the existing repository secrets and only
+issues `DBSIZE` and `INFO memory`, after its tests pass. Inventory is manual;
+there is no schedule, key enumeration, trip-record read, or storage mutation.
+The JSON summary records units and safe failure codes. A failed command exits
+nonzero while retaining any successful aggregate result. Redis memory includes
+overhead and is not a PostgreSQL import-size estimate or a monthly usage figure.
+
+Local validation: `python -m unittest discover -s test/maintenance -p test_upstash_usage.py -v`.
+
 ## Setup
 
 ```bash

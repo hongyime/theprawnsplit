@@ -226,3 +226,5 @@ or provider-data workflow is dispatched for testing.
 - 2026-09-13: CR-016 local proof complete. Core 81 and app 251 pass, with zero Svelte errors/warnings and 18 browser checks. Bounded and coalesced sync, exact confirmation, snapshot acknowledgement and cleanup repairs retain pending events. Mutation survivors and scope limits are recorded. Production and final closeout remain pending.
 
 2026-09-13 — CR-016 source 108d6429e2cc5c14bceb8a0f23dd612d2ebbe181 released as dpl_9bJzyPhFMMLUzEPQzwhH1qQZPzD4; 5 main workflows, 18 production browser checks and 14 public asset checks pass. All relay browser traffic remains synthetic. Release report and remaining transaction/PWA/provider/retention boundaries recorded; final documentation commit and portfolio publication evidence follow in the external closeout.
+
+2026-09-14 — Add a manually dispatched, aggregate-only Upstash usage audit with existing Actions secrets. Keep reports free of endpoint names, tokens, provider error bodies, Redis keys and trip records. Preserve the operated relay, encrypted history, local keys, Nostr behavior and separate retention clock while migration decisions remain open.

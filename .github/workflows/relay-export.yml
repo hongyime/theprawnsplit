@@ -1,0 +1,56 @@
+name: Encrypted relay export
+
+on:
+  workflow_dispatch:
+    inputs:
+      recipient_public_key_b64:
+        description: Base64 of the reviewed RSA public PEM (3072 bits or stronger); private key stays on the receiving machine
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: prawnsplit-private-relay-export
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: '24'
+      - run: node --test test/maintenance/relay-migration.test.mjs
+
+  export:
+    if: github.ref == 'refs/heads/main'
+    needs: validate
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: '24'
+      - name: Export bounded read-only source into recipient-encrypted artifact
+        run: node scripts/relay-migration.mjs export "$RUNNER_TEMP/prawnsplit-relay.enc.json"
+        env:
+          UPSTASH_REDIS_REST_URL: ${{ secrets.UPSTASH_REDIS_REST_URL }}
+          UPSTASH_REDIS_REST_TOKEN: ${{ secrets.UPSTASH_REDIS_REST_TOKEN }}
+          PRAWNSPLIT_EXPORT_PUBLIC_KEY_B64: ${{ inputs.recipient_public_key_b64 }}
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: prawnsplit-relay-encrypted-${{ github.run_id }}
+          path: ${{ runner.temp }}/prawnsplit-relay.enc.json
+          if-no-files-found: error
+          retention-days: 1
+          compression-level: 0

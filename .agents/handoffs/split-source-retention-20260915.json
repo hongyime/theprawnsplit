@@ -1,0 +1,81 @@
+{
+  "cr": "CR-017",
+  "active_migration_changed": false,
+  "implementation": [
+    "Bounded encrypted source fragments through existing capacity-guarded relay",
+    "Atomic IndexedDB fragment receipts and source checkpoint",
+    "Exact ciphertext retry after lost acknowledgements"
+  ],
+  "status": "local_protocol_and_browser_passed_publication_pending",
+  "branch": "main",
+  "remaining": [
+    "Focused behavioral and adversarial mutation validation",
+    "All four repository protocol commands",
+    "Validated source release and production verification",
+    "Source freeze, final delta, complete retained-data parity and current quota before actual migration"
+  ],
+  "findings": [
+    "Nostr recovery discarded exact signed JSON",
+    "Snapshot source checkpoints advanced without original-byte retention",
+    "New queue must commit before any archival publication"
+  ],
+  "date": "2026-09-15",
+  "production_backend": "Upstash",
+  "new_tests": 14,
+  "mutations_detected": 7,
+  "validation": [
+    {
+      "name": "build",
+      "command": "npm run build",
+      "exit_code": 0,
+      "suites": [
+        "81 passed (81)",
+        "326 passed (326)"
+      ],
+      "export_tests": [
+        "11"
+      ],
+      "diagnostics": [
+        "svelte-check found 0 errors and 0 warnings"
+      ],
+      "log": "split-source-protocol-build-20260915.log"
+    },
+    {
+      "name": "root-test",
+      "command": "npm test",
+      "exit_code": 0,
+      "suites": [
+        "81 passed (81)",
+        "326 passed (326)"
+      ],
+      "export_tests": [
+        "11"
+      ],
+      "diagnostics": [],
+      "log": "split-source-protocol-root-test-20260915.log"
+    },
+    {
+      "name": "core-test",
+      "command": "npm --prefix core test",
+      "exit_code": 0,
+      "suites": [
+        "81 passed (81)"
+      ],
+      "export_tests": [],
+      "diagnostics": [],
+      "log": "split-source-protocol-core-test-20260915.log"
+    },
+    {
+      "name": "svelte",
+      "command": "npm exec -- svelte-check --tsconfig ./tsconfig.json",
+      "exit_code": 0,
+      "suites": [],
+      "export_tests": [],
+      "diagnostics": [
+        "svelte-check found 0 errors and 0 warnings"
+      ],
+      "log": "split-source-protocol-svelte-20260915.log"
+    }
+  ],
+  "browser_checks": 18
+}

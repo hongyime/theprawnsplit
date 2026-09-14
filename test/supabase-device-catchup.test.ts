@@ -1,9 +1,10 @@
 import "fake-indexeddb/auto";
 import { readFileSync } from "node:fs";
 import { PGlite } from "@electric-sql/pglite";
+import { finalizeEvent, generateSecretKey } from "nostr-tools";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import * as local from "@/db/repo";
-import { encryptEvents } from "@/crypto/envelope";
+import { decryptEnvelope, encryptEnvelope, encryptEvents } from "@/crypto/envelope";
 import { relayWriteProof } from "@/crypto/group";
 import { defaultParticipant } from "@/lib/events";
 import { HttpRelay } from "@/relay/http";
@@ -13,6 +14,7 @@ import { syncMigrated, eventFingerprint } from "@/relay/migrated-sync";
 import { RecoveryRepository } from "@/relay/recovery-db";
 import { coordinatedSync, syncNetworkBudget } from "@/relay/sync-cycle";
 import { syncOnce } from "@/relay/sync";
+import { restoreNostrSource } from "@/relay/source-archive";
 import handler from "../api/relay";
 
 let sql: PGlite;
@@ -83,7 +85,156 @@ async function publishRaw(events: local.GroupRecord["events"]) {
   return operated.publish(group.tagHex, "old-device", await encryptEvents(key, events), await relayWriteProof(secret, group.tagHex));
 }
 
+async function snapshotSource(extra = "", content?: string) {
+  const { key } = await local.getGroupCrypto(group);
+  const blob = content ?? await encryptEnvelope(key, { type: "snapshot", seq: 0, vv: {}, state: {}, createdAt: 1 });
+  const event = finalizeEvent({ kind: 1512, created_at: 1, tags: [["t", group.tagHex]], content: blob }, generateSecretKey());
+  const raw = JSON.stringify(event).slice(0, -1) + ', "extra":' + JSON.stringify(extra) + '}';
+  const url = "wss://snapshot.fixture.invalid";
+  const entry = { cursor: "1", author: event.pubkey, blob, sourceEventJson: raw };
+  return { raw, url, entry, source: { relayUrls: [url], recoveryPage: vi.fn().mockResolvedValue([entry]) } };
+}
+async function storedArchives() {
+  const { key } = await local.getGroupCrypto(group);
+  const rows = (await sql.query<{ blob: string }>("select blob from prawnsplit.relay_entries order by cursor_ms,cursor_seq")).rows;
+  const envelopes = await Promise.all(rows.map((row) => decryptEnvelope(key, row.blob)));
+  return envelopes.flatMap((envelope) => envelope.type === "events" && envelope.sourceArchive ? [envelope.sourceArchive] : []);
+}
+const currentState = async () => (await discoverMigration(group.groupId, operated, {}, repository)).state!;
+
 describe("real IndexedDB → HTTP API → adapter → PostgreSQL recovery", () => {
+  it("retains a signed snapshot byte for byte in encrypted SQL rows before advancing its source checkpoint", async () => {
+    await cycle(); await cycle(); await cycle();
+    const { key } = await local.getGroupCrypto(group);
+    const blob = await encryptEnvelope(key, { type: "snapshot", seq: 0, vv: {}, state: {}, createdAt: 1 });
+    const event = finalizeEvent({ kind: 1512, created_at: 1, tags: [["t", group.tagHex]], content: blob }, generateSecretKey());
+    const raw = JSON.stringify(event).slice(0, -1) + ', "extra":9007199254740993}';
+    const url = "wss://snapshot.fixture.invalid";
+    const source = { relayUrls: [url], recoveryPage: vi.fn().mockResolvedValue([{ cursor: "1", author: event.pubkey, blob, sourceEventJson: raw }]) };
+    expect((await cycle(source)).errors).toEqual([]);
+    const rows = (await sql.query<{ blob: string }>("select blob from prawnsplit.relay_entries order by cursor_ms,cursor_seq")).rows;
+    const envelopes = await Promise.all(rows.map((row) => decryptEnvelope(key, row.blob)));
+    const archives = envelopes.flatMap((envelope) => envelope.type === "events" && "sourceArchive" in envelope ? [envelope.sourceArchive as { data: string }] : []);
+    expect(archives).toHaveLength(1);
+    expect(Buffer.from(archives[0]!.data, "base64").toString("utf8")).toBe(raw);
+    const state = (await discoverMigration(group.groupId, operated, {}, repository)).state!;
+    expect(state.nostr[url]?.lastSweep).toBeTypeOf("number");
+  });
+
+  it("does not send original history if its durable queue cannot be committed", async () => {
+    await cycle(); await cycle(); await cycle(); posted = [];
+    const { source, url } = await snapshotSource();
+    const originalSave = repository.save.bind(repository);
+    vi.spyOn(repository, "save").mockImplementation(async (state) => {
+      if (state.sourcePending) throw new DOMException("Synthetic full device", "QuotaExceededError");
+      await originalSave(state);
+    });
+    expect((await cycle(source)).errors.length).toBeGreaterThan(0);
+    expect(posted).toEqual([]);
+    expect((await currentState()).nostr[url]).toBeUndefined();
+    expect((await currentState()).sourcePending).toBeUndefined();
+  });
+
+  it("reopens a multipart source queue after a lost ACK and advances only after every SQL receipt", async () => {
+    await cycle(); await cycle(); await cycle(); posted = [];
+    const { source, url, raw } = await snapshotSource("🦐".repeat(20_000));
+    loseAck = true;
+    expect((await cycle(source)).errors.join(" ")).toContain("Older history remains");
+    const pending = (await currentState()).sourcePending!;
+    expect(pending.packets.length).toBeGreaterThan(1);
+    expect(pending.packets[0]!.blob).toBe(posted[0]);
+    expect((await currentState()).nostr[url]).toBeUndefined();
+    await repository.close(); repository = new RecoveryRepository(dbName + "-recovery");
+    for (let index = 0; index < pending.packets.length; index += 1) {
+      expect((await cycle(source)).errors).toEqual([]);
+      if (index + 1 < pending.packets.length) expect((await currentState()).nostr[url]).toBeUndefined();
+    }
+    expect(posted[1]).toBe(posted[0]);
+    expect(source.recoveryPage).toHaveBeenCalledTimes(1);
+    expect((await currentState()).sourcePending).toBeUndefined();
+    expect((await currentState()).nostr[url]?.lastSweep).toBeTypeOf("number");
+    const archives = await storedArchives();
+    expect(archives).toHaveLength(pending.packets.length);
+    expect(await restoreNostrSource(archives, group.tagHex, 1512)).toBe(raw);
+  });
+
+  it("atomically retains its source queue and checkpoint when the final local receipt transaction aborts", async () => {
+    await cycle(); await cycle(); await cycle(); posted = [];
+    const { source, url } = await snapshotSource();
+    const originalPut = IDBObjectStore.prototype.put;
+    let abortOnce = true;
+    const put = vi.spyOn(IDBObjectStore.prototype, "put").mockImplementation(function (this: IDBObjectStore, value, key) {
+      const request = originalPut.call(this, value, key);
+      if (abortOnce && posted.length === 1 && this.name === "states" && !value.sourcePending) {
+        abortOnce = false; this.transaction.abort();
+      }
+      return request;
+    });
+    expect((await cycle(source)).errors.length).toBeGreaterThan(0);
+    put.mockRestore();
+    const state = await currentState();
+    expect(state.sourcePending?.packets[0]!.blob).toBe(posted[0]);
+    expect(state.nostr[url]).toBeUndefined();
+    expect(await repository.sourceCovered(state.scope, state.sourcePending!.packets[0]!.receipt)).toBe(false);
+    expect((await cycle(source)).errors).toEqual([]);
+    expect(posted[1]).toBe(posted[0]);
+    expect(await storedArchives()).toHaveLength(1);
+    expect((await currentState()).nostr[url]?.lastSweep).toBeTypeOf("number");
+  });
+
+  it("keeps source bytes pending when the SQL capacity guard refuses them and allows later local edits", async () => {
+    await cycle(); await cycle(); await cycle(); posted = [];
+    const { source, url, raw } = await snapshotSource("🦐".repeat(20_000));
+    await sql.exec("update prawnsplit.relay_control set max_payload_bytes=payload_bytes");
+    expect((await cycle(source)).errors.length).toBeGreaterThan(0);
+    expect(await storedArchives()).toHaveLength(0);
+    expect((await currentState()).nostr[url]).toBeUndefined();
+    const retained = (await currentState()).sourcePending!.packets[0]!.blob;
+    await sql.exec("update prawnsplit.relay_control set max_payload_bytes=10000000");
+    const fresh = defaultParticipant({ deviceId: "fresh-device", nextCounter: 1 }, "Fresh Edit");
+    await local.appendEvents(group.groupId, [fresh]);
+    expect((await cycle(source)).errors).toEqual([]);
+    expect(posted.at(-1)).toBe(retained);
+    expect((await local.syncCounts(group.groupId)).local).toBe(0);
+    while ((await currentState()).sourcePending) await cycle(source);
+    expect(await restoreNostrSource(await storedArchives(), group.tagHex, 1512)).toBe(raw);
+    expect(source.recoveryPage).toHaveBeenCalledTimes(1);
+  });
+
+  it("learns archived fragment receipts on a returning device before reading Nostr again", async () => {
+    await cycle(); await cycle(); await cycle();
+    const { source, raw, url } = await snapshotSource();
+    await cycle(source);
+    await repository.close(); repository = new RecoveryRepository(dbName + "-returning-source");
+    source.recoveryPage.mockClear(); posted = [];
+    await cycle(source);
+    expect(source.recoveryPage).not.toHaveBeenCalled();
+    await cycle(source);
+    expect(source.recoveryPage).toHaveBeenCalledTimes(1);
+    expect(posted).toEqual([]);
+    expect(await restoreNostrSource(await storedArchives(), group.tagHex, 1512)).toBe(raw);
+    expect((await currentState()).nostr[url]?.lastSweep).toBeTypeOf("number");
+  });
+
+  it("retains signed but unreadable original ciphertext without promoting its source checkpoint", async () => {
+    await cycle(); await cycle(); await cycle(); posted = [];
+    const { source, raw, url } = await snapshotSource("unknown format", "unreadable encrypted payload");
+    expect((await cycle(source)).errors.join(" ")).toContain("Unreadable recovered history");
+    expect(await restoreNostrSource(await storedArchives(), group.tagHex, 1512)).toBe(raw);
+    expect((await currentState()).nostr[url]).toBeUndefined();
+    await cycle(source);
+    expect(posted).toHaveLength(1);
+    expect((await currentState()).nostr[url]).toBeUndefined();
+  });
+
+  it("rejects incomplete source provenance without advancing or writing archival bytes", async () => {
+    await cycle(); await cycle(); await cycle(); posted = [];
+    const { source, entry, url } = await snapshotSource();
+    source.recoveryPage.mockResolvedValue([{ ...entry, sourceEventJson: undefined }]);
+    expect((await cycle(source)).errors.join(" ")).toContain("checkpoint is retained");
+    expect(posted).toEqual([]);
+    expect((await currentState()).nostr[url]).toBeUndefined();
+  });
   it("pauses migrated syncing without cross-tab lock support and keeps local keys/history", async () => {
     vi.stubGlobal("navigator", {});
     const before = await local.readGroup(group.groupId);
@@ -190,15 +341,20 @@ describe("real IndexedDB → HTTP API → adapter → PostgreSQL recovery", () =
   it("recovers duplicated late Nostr events through the actual default sync branch without publishing to Nostr", async () => {
     const remote = defaultParticipant({ deviceId: "nostr-late-device", nextCounter: 1 }, "Nostr Late Arrival");
     const { key } = await local.getGroupCrypto(group);
-    const entry = { cursor: "1", author: "nostr-author", blob: await encryptEvents(key, [remote, remote]) };
-    vi.spyOn(NostrRelay.prototype, "recoveryPage").mockResolvedValue([entry, entry]);
+    const blob = await encryptEvents(key, [remote, remote]);
+    const signed = finalizeEvent({ kind: 1512, created_at: 1, tags: [["t", group.tagHex]], content: blob }, generateSecretKey());
+    const entry = { cursor: "1", author: signed.pubkey, blob, sourceEventJson: JSON.stringify(signed) };
+    const recovery = vi.spyOn(NostrRelay.prototype, "recoveryPage").mockResolvedValue([entry, entry]);
     const publish = vi.spyOn(NostrRelay.prototype, "publish").mockRejectedValue(new Error("Nostr publication must be unreachable"));
     const first = await syncOnce(group.groupId);
     expect(first.errors).toEqual([]);
     await syncOnce(group.groupId); await syncOnce(group.groupId);
     expect(publish).not.toHaveBeenCalled();
     expect((await local.readGroup(group.groupId)).events.filter((event) => event.id === remote.id)).toHaveLength(1);
-    expect(await countRows()).toBe(1);
+    const archives = await storedArchives();
+    expect(new Set(archives.map((item) => item.sourceUrl))).toEqual(new Set(recovery.mock.calls.map(([url]) => url)));
+    expect(archives).toHaveLength(new Set(recovery.mock.calls.map(([url]) => url)).size);
+    expect(await countRows()).toBe(1 + archives.length);
   });
 
   it("keeps custom settings and local history while blocking external writes after migration", async () => {

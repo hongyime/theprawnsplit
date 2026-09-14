@@ -8,6 +8,7 @@ import { confirmedEvents, dueBufferedEvents, encodeEvent, getGroupCrypto, markEv
   upsertRemoteEvents, vectorFromEvents, type GroupRecord } from "@/db/repo";
 import type { HttpRelay } from "./http";
 import { recoverNostrPage, type NostrRecoverySource } from "./nostr-recovery";
+import { prepareSourcePackets, readSourceFragment } from "./source-archive";
 import { recoveryRepository, type RecoveryRepository, type RecoveryState, type RecoveryPacket } from "./recovery-db";
 import { emptySyncResult, ownsCrossTabSync, syncNetworkBudget } from "./sync-cycle";
 import type { RelayEntry } from "./types";
@@ -74,12 +75,18 @@ export async function syncMigrated(groupId: string, operated: Pick<HttpRelay, "f
     group = await readGroup(groupId);
     const known = new Map(group.events.map((event) => [event.id, event]));
     const decoded = new Map<string, Event>();
+    const sourceReceipts: string[] = [];
     let safeCheckpoint = true;
     for (const entry of entries) {
       try {
         const envelope = await decryptEnvelope(key, entry.blob);
         if (envelope.type === "snapshot") { result.snapshotsSeen += 1; continue; }
         if (!Array.isArray(envelope.events)) throw new Error("invalid envelope");
+        if (envelope.sourceArchive !== undefined) {
+          if (envelope.events.length) throw new Error("invalid source envelope");
+          const { receipt } = await readSourceFragment(envelope.sourceArchive);
+          if (operatedRead) sourceReceipts.push(receipt);
+        }
         for (const event of envelope.events) {
           if (!event || typeof event.id !== "string") throw new Error("invalid event");
           const existing = decoded.get(event.id) ?? known.get(event.id);
@@ -122,7 +129,7 @@ export async function syncMigrated(groupId: string, operated: Pick<HttpRelay, "f
           receipts.push({ id: event.id, fingerprint: await eventFingerprint(event) });
         }
       }
-      await repository.acknowledge(state, receipts);
+      await repository.acknowledge(state, receipts, sourceReceipts);
       const pending = new Set((await pendingOutboundEventRows(groupId)).map((row) => row.event.id));
       const ids = receipts.filter((event) => pending.has(event.id)).map((event) => event.id);
       await markEvents(groupId, ids, "confirmed");
@@ -151,7 +158,9 @@ export async function syncMigrated(groupId: string, operated: Pick<HttpRelay, "f
       }
     } catch { result.errors.push("Operated history read will retry; local history and checkpoint retained"); }
 
-    if (nostr?.relayUrls.length && !deadline.signal.aborted) {
+    // Finish reading existing archive receipts before copying a source again.
+    // A durable unfinished page blocks another source read, not new local edits.
+    if (!state.sourcePending && state.initialReadDone && nostr?.relayUrls.length && !deadline.signal.aborted) {
       const url = nostr.relayUrls[state.nextNostr % nostr.relayUrls.length]!;
       // Rotate even when a source is offline/saturated, so one relay cannot
       // starve recovery from another. Never promote its failed checkpoint.
@@ -159,7 +168,15 @@ export async function syncMigrated(groupId: string, operated: Pick<HttpRelay, "f
       await repository.save(state);
       try {
         const page = await deadline.run((signal) => recoverNostrPage(nostr, url, group.tagHex, state.nostr[url], { signal }));
-        if (await ingest(page.entries, false)) {
+        const packets = await prepareSourcePackets(key, url, page.entries, group.tagHex, config.nostrKind,
+          (receipt) => repository.sourceCovered(state.scope, receipt));
+        const safeCheckpoint = await ingest(page.entries, false);
+        if (packets.length) {
+          const next = { ...state, sourcePending: { sourceUrl: url, next: page.next, advanceCheckpoint: safeCheckpoint,
+            author: group.deviceId, packets } };
+          await repository.save(next);
+          state = next;
+        } else if (safeCheckpoint) {
           state = { ...state, nostr: { ...state.nostr, [url]: page.next } };
           await repository.save(state);
         }
@@ -204,6 +221,25 @@ export async function syncMigrated(groupId: string, operated: Pick<HttpRelay, "f
         }
       }
       if (state.pending) { await repository.save(state); await sendPending(); }
+    }
+    // One archive write per cycle, after ordinary ledger writes. Persisted
+    // ciphertext survives a lost response and is idempotent in the operated DB.
+    if (state.sourcePending && !deadline.signal.aborted) {
+      try {
+        const pending = state.sourcePending, packet = pending.packets[0]!;
+        const ack = await deadline.run((signal) => operated.publish(group.tagHex, pending.author, packet.blob, proof, { signal }));
+        if (!ack.ok || !ack.cursor || !validCursor(ack.cursor)) throw new Error("Missing source receipt");
+        const next = { ...state };
+        if (pending.packets.length > 1) next.sourcePending = { ...pending, packets: pending.packets.slice(1) };
+        else {
+          delete next.sourcePending;
+          if (pending.advanceCheckpoint) next.nostr = { ...next.nostr, [pending.sourceUrl]: pending.next };
+        }
+        // The fragment receipt, remaining packets and final source checkpoint
+        // share one transaction. A failed local commit replays identical bytes.
+        await repository.acknowledge(next, [], [packet.receipt]);
+        state = next;
+      } catch { result.errors.push("Older history remains on this device until it is safely saved"); }
     }
   } catch {
     result.errors.push("Recovery was interrupted; encrypted local changes will retry");

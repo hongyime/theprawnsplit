@@ -341,3 +341,95 @@ The new production deployment and browser behavior are still pending. Full
 Supabase activation remains gated on raw signed Nostr/snapshot retention, a
 verified source freeze, final encrypted delta/parity and current quota headroom.
 The broader CR-017 migration remains incomplete.
+
+## Original signed source retention — 2026-09-15
+
+CR-017 remains in progress. This source prepares exact signed Nostr history and
+snapshot retention for the explicitly migrated generation. Production still
+uses Upstash; no source writer reset, data migration, schema, flags or hosted
+resources were changed in this phase.
+
+### Observed defect and repair
+
+The recovery transport returned content/author/time only. Its original signed
+JSON was discarded, and the migrated sync path advanced a Nostr checkpoint even
+when a snapshot's source bytes had never been saved. New tests first failed with
+`sourceEventJson` absent and `expected [] to have a length of 1 but got +0` from
+the actual IndexedDB → HTTP handler → Supabase adapter → PostgreSQL path.
+An initial dependency-cache mismatch prevented that SQL test from loading;
+after selecting the matching installed lockfile cache, its behavioral RED was
+recorded separately. Later type checking found four errors; those were fixed
+without relaxing any test or diagnostic.
+
+`eventObjectJson` retains the exact EVENT object text, including large unknown
+numbers and escape spelling. Distinct extension fields sharing a signed event
+ID remain distinct originals. `prepareSourcePackets` validates signed provenance
+and splits exact UTF-8 into encrypted `events: []` envelopes. Each fragment is
+bounded and uses the ordinary proof-authorized, capacity-guarded relay append.
+`restoreNostrSource` rejects partial/mixed/corrupt fragments and reconstructs the
+original bytes. Existing readers see empty event batches.
+
+The page queue must commit locally before publication. A failing-first test
+caught an initial attempt to publish after that save failed; the state is now
+promoted only after the save succeeds. At most one archival packet is sent per
+cycle, after normal ledger writes. Its exact ciphertext is retried after a lost
+response. Fragment receipt, remaining queue and final source checkpoint share
+one IndexedDB transaction. A returning device reads existing operated receipts
+before revisiting Nostr. Unreadable signed content is retained without advancing
+its source checkpoint. The existing SQL capacity guard can refuse an upload
+while its original ciphertext remains queued.
+
+### Loop A — measured validation
+
+The protocol commands and their outputs were parsed from the actual command
+logs by the validation runner; counts were not inferred from source rows:
+
+```text
+npm run build: 81 passed (81); 326 passed (326); encrypted export 11; svelte-check found 0 errors and 0 warnings
+npm test: 81 passed (81); 326 passed (326); encrypted export 11
+npm --prefix core test: 81 passed (81)
+npm exec -- svelte-check --tsconfig ./tsconfig.json: svelte-check found 0 errors and 0 warnings
+local disposable-browser checks: 18; page errors: 0; real relay connections: 0
+new test cases computed against base 9617019: 14; all observed failing under mutation
+mutations detected: 7/7
+```
+
+Fresh `rg -n` verified `eventObjectJson` in
+`src/relay/nostr-recovery-transport.ts`, `readSourceFragment`,
+`restoreNostrSource` and `prepareSourcePackets` in `src/relay/source-archive.ts`,
+and their queue/receipt integration in `src/relay/migrated-sync.ts` and
+`src/relay/recovery-db.ts`. Behavioral assertions live in
+`test/nostr-recovery-transport.test.ts`, `test/source-archive.test.ts` and
+`test/supabase-device-catchup.test.ts`. No Markdown table was added or changed in
+this phase. STATE is condensed to current work; its prior text remains in Git
+at `96170196acf4abdb2da250d63b4a51d75623302a` and the local audit archive.
+
+### Loop B — adversarial review and scope
+
+This is one metadata-loss path crossing transport and recovery checkpoint
+boundaries, plus the initial new-queue persistence defect caught before release.
+The two envelope types (event batches and snapshots) are both traced. The
+existing event-only legacy `selectNostrEntries` path is outside this migration
+change; no legacy backend behavior is silently relabeled as archived.
+
+Every new test was matched by name against actual failed mutation results.
+Detected mutations omitted archival preparation, reserialized source JSON,
+skipped restoration checks, advanced the checkpoint before receipt, ignored
+fragment hashes, omitted source receipts and skipped durable queue storage.
+No mutation survived. Tests retain their original deadlines and assertions;
+the earlier Nostr mock now supplies real signed provenance and separately
+asserts one ledger upload plus the required source archive records.
+
+The end-to-end tests use the real relay SQL in isolated PostgreSQL (PGlite),
+including rejection by its capacity guard. They are not evidence of hosted
+quota headroom. Exact retained originals add bytes and rows, including copies
+for distinct source locations. Bounded requests do not prove indefinite Free
+capacity. Nostr's saturated timestamp-page limitation remains explicit.
+
+### Not verified this pass
+
+Main CI and the new production deployment have not yet been observed. The
+source inventory has not been archived live by this change. Final old-writer
+freeze, encrypted delta/parity, service isolation, shared migration space,
+monthly egress and growth headroom remain prerequisites for Supabase cutover.
+The wider CR-017/Loop C and portfolio goal remain incomplete.

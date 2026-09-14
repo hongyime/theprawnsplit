@@ -32,10 +32,20 @@ describe("Nostr recovery wire completion", () => {
     const { request } = await start();
     const event = finalizeEvent({ kind: 1512, created_at: 50, tags: [["t", tag]], content: "encrypted" }, generateSecretKey());
     socket.frame("EVENT", event); socket.frame("EVENT", event); socket.frame("EOSE");
-    expect(await request).toEqual([{ cursor: "50", author: event.pubkey, blob: "encrypted" }]);
+    expect(await request).toEqual([{ cursor: "50", author: event.pubkey, blob: "encrypted", sourceEventJson: JSON.stringify(event) }]);
     expect(socket.sent.at(-1)?.[0]).toBe("CLOSE");
     expect(socket.closed).toBe(true);
     expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it("retains exact signed JSON, including distinct unknown fields and numeric spellings", async () => {
+    const { request } = await start();
+    const event = finalizeEvent({ kind: 1512, created_at: 50, tags: [["t", tag]], content: "encrypted" }, generateSecretKey());
+    const first = JSON.stringify(event).slice(0, -1) + ', "extra" : {"integer":9007199254740993,"escaped":"\\u867e", "nested":[",]",{}]}}';
+    const second = first.replace("9007199254740993", "9007199254740995");
+    for (const raw of [first, second, first]) socket.onmessage?.({ data: `["EVENT",${JSON.stringify(socket.sent[0]?.[1])},${raw}]` });
+    socket.frame("EOSE");
+    expect((await request).map((entry) => entry.sourceEventJson)).toEqual([first, second]);
   });
 
   it("rejects a socket close or timeout instead of treating it as empty completed history", async () => {

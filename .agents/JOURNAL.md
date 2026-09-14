@@ -240,3 +240,5 @@ or provider-data workflow is dispatched for testing.
 2026-09-14: Stage the reviewed CR-017 runtime on main with Git deployments disabled for existing Linux validation; local v6 had 81 core/310 app passes and two UI timeouts. No backend/receipt/retention change.
 
 2026-09-14: All four Linux protocol commands and five main workflows passed for c9633c7. Applied the reviewed receipt safeguard with unchanged retained counts and disabled writes/imports. Restore prior Vercel configuration for legacy bridge production verification; full Supabase cutover remains open.
+
+2026-09-15: CR-017 exact signed source retention passed all four local protocol commands, 18 isolated browser checks and seven mutation checks. Preserve a durable encrypted page queue before any upload; only acknowledged fragments may advance its checkpoint. Direct-main publication follows repository rules; Upstash remains live and full Supabase cutover remains gated.

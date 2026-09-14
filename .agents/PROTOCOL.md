@@ -158,9 +158,11 @@ Do this before the 30-day gate (clock started 2026-08-22T12:59:41Z, gate ≈2026
 - **CR-017 encrypted relay staging is verified; cutover remains open.** The operated
   snapshot and complete encrypted source archive are private in Supabase, with
   imports/writes disabled. The reviewed conservative capacity correction is applied.
-  The event-recovery bridge and receipt upgrade are prepared for checked legacy
-  publication. Full backend activation still requires private raw signed Nostr
-  history/snapshot retention, source-freeze access and verified final encrypted
+  The event-recovery bridge and receipt upgrade are released. Exact signed
+  Nostr/snapshot retention source now passes all local protocol and mutation
+  checks; main CI and production verification remain pending. No raw Nostr
+  inventory was archived live in this phase. Full backend activation still
+  requires private retained-source parity, source-freeze access and final encrypted
   deltas, service-only isolation and shared-project capacity. Returning offline
   devices keep their keys/history and catch up later; universal reconnection is
   not a release gate. See `.agents/cr-017-report.md`.

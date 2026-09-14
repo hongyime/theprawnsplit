@@ -1,4 +1,5 @@
 import { openDB, type DBSchema } from "idb";
+import type { SourcePacket } from "./source-archive";
 
 export interface RecoveryPacket { blob: string; author: string; events: { id: string; fingerprint: string }[]; snapshotSeq?: number }
 export interface NostrCheckpoint {
@@ -15,6 +16,7 @@ export interface RecoveryState {
   cursor?: string;
   initialReadDone?: boolean;
   pending?: RecoveryPacket;
+  sourcePending?: { sourceUrl: string; next: NostrCheckpoint; advanceCheckpoint: boolean; author: string; packets: SourcePacket[] };
   nostr: Record<string, NostrCheckpoint>;
   nextNostr: number;
 }
@@ -52,12 +54,16 @@ export class RecoveryRepository {
   async covered(scope: string, id: string, fingerprint: string): Promise<boolean> {
     return (await (await this.database).get("receipts", [scope, id]))?.fingerprint === fingerprint;
   }
+  async sourceCovered(scope: string, receipt: string): Promise<boolean> {
+    return this.covered(scope + "|source-archive-v1", receipt, receipt);
+  }
   /** Receipt + retry-packet removal are one commit. A crash replays the same blob. */
-  async acknowledge(state: RecoveryState, events: RecoveryPacket["events"]): Promise<void> {
+  async acknowledge(state: RecoveryState, events: RecoveryPacket["events"], sourceReceipts: string[] = []): Promise<void> {
     const tx = (await this.database).transaction(["states", "receipts"], "readwrite");
     try {
       await tx.objectStore("states").put(state);
       for (const event of events) await tx.objectStore("receipts").put({ scope: state.scope, ...event });
+      for (const receipt of sourceReceipts) await tx.objectStore("receipts").put({ scope: state.scope + "|source-archive-v1", id: receipt, fingerprint: receipt });
       await tx.done;
     } catch (error) {
       try { tx.abort(); } catch { /* Already aborted. */ }

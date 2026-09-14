@@ -1,10 +1,13 @@
 import type { CanonicalValue, Event } from "@theprawnsplit/core";
 import { bigintReplacer, bigintReviver } from "@/lib/money";
 import { base64ToBytes, bytesToBase64, utf8, utf8d } from "./bytes";
+import type { NostrSourceFragment } from "@/relay/source-archive";
 
 export interface EventEnvelope {
   type: "events";
   events: Event[];
+  /** Empty event batches carry encrypted source bytes without ledger effects. */
+  sourceArchive?: NostrSourceFragment;
 }
 
 export interface SnapshotEnvelope {

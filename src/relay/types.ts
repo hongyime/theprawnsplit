@@ -1,6 +1,8 @@
 export interface RelayEntry {
   blob: string;
   author: string;
+  /** Exact signed EVENT object from a verified Nostr recovery frame. */
+  sourceEventJson?: string;
   /**
    * Cursor is relay-kind-specific and MUST NOT be compared across kinds (CR-012):
    * - HttpRelay (operated relay): opaque server-side token, interpreted only by the server.

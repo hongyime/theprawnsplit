@@ -17,6 +17,7 @@ it("releases the Nostr pool created for a complete sync cycle", async () => {
   vi.stubGlobal("fetch", vi.fn(async (input: string | URL, init?: RequestInit) => {
     const url = new URL(input, "https://fixture.invalid");
     expect(url.origin).toBe("https://fixture.invalid"); expect(url.pathname).toBe("/api/relay");
+    if (url.searchParams.has("capabilities")) return Response.json({ protocol: 1, mode: "legacy", generation: null });
     if (init?.method === "POST") {
       const body = JSON.parse(String(init.body)); stored = { blob: body.blob, author: body.author, cursor: "fixture-1" };
       return new Response(JSON.stringify({ cursor: stored.cursor }));
@@ -39,6 +40,7 @@ it.each([{ urls: [] }, { urls: ["wss://configured.fixture.invalid"] }])("looks u
   const lookups: string[] = [];
   vi.stubGlobal("fetch", vi.fn(async (input: string | URL) => {
     const url = new URL(input, "https://fixture.invalid");
+    if (url.searchParams.has("capabilities")) return Response.json({ protocol: 1, mode: "legacy", generation: null });
     if (url.pathname === "/api/relay") return new Response(JSON.stringify({ cursor: "fixture-1", entries: [] }));
     lookups.push(url.href);
     return new Response(JSON.stringify({ limitation: { max_message_length: 131072 } }));

@@ -47,6 +47,27 @@ describe("operated relay API", () => {
     await expect(body(response)).resolves.toEqual({ error: "invalid tag" });
   });
 
+  it.each(["{secret-source-payload", "null", "[]", '"string-body"'])("rejects non-object or malformed JSON with a safe 400: %s", async (payload) => {
+    const response = await handler(new Request("https://relay.test/api/relay", { method: "POST", body: payload }));
+    expect(response.status).toBe(400);
+    expect(await body(response)).toEqual({ error: "invalid request body" });
+  });
+
+  it("enforces the blob limit in UTF-8 bytes before touching storage", async () => {
+    const response = await handler(new Request("https://relay.test/api/relay", { method: "POST",
+      body: JSON.stringify({ tag, author: "device-a", blob: "\u00e9".repeat(65537), writeProof: proof }) }));
+    expect(response.status).toBe(400);
+    expect(await body(response)).toEqual({ error: "invalid blob" });
+  });
+
+  it("redacts invalid provider endpoint details from storage failures", async () => {
+    process.env.UPSTASH_REDIS_REST_URL = "invalid-provider-endpoint-sensitive";
+    process.env.UPSTASH_REDIS_REST_TOKEN = "fixture-sensitive-token";
+    const response = await handler(new Request(`https://relay.test/api/relay?tag=${tag}`));
+    expect(response.status).toBe(503);
+    expect(await body(response)).toEqual({ error: "relay storage unavailable" });
+  });
+
   it("reports missing storage configuration for otherwise valid writes", async () => {
     delete process.env.UPSTASH_REDIS_REST_URL;
     delete process.env.UPSTASH_REDIS_REST_TOKEN;

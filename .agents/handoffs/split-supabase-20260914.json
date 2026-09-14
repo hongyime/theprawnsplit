@@ -1,0 +1,322 @@
+{
+  "task": "CR-017 encrypted relay migration preparation",
+  "baseline": "d705e828f8ebe72465782368ab4d5e114c135b0c",
+  "phase": "Reviewed runtime staged for Linux validation with Git-triggered Vercel deployments disabled",
+  "destination": "Existing Free PrawnStatus Singapore project; capacity and isolation review pending",
+  "preserve": [
+    "Ciphertext strings",
+    "Author IDs",
+    "Redis stream IDs",
+    "Proof commitments",
+    "Device keys and offline records",
+    "Current Nostr behavior"
+  ],
+  "next": [
+    "Review suitable isolated validation route for frozen candidate; rerun full four-command protocol",
+    "Only after green checks, apply exact approved guarded receipt SQL and publish bridge in legacy/upstash mode",
+    "Preserve raw signed Nostr messages and snapshots privately or obtain explicit narrower retention decision",
+    "Establish source freeze using reviewed management/owner access, revoke old writes while preserving isolated export/rollback access, verify primary/replica consistency",
+    "Reconcile final encrypted operated-source delta and capacity before backend activation; offline browsers catch up on return"
+  ],
+  "not_authorized_yet": [
+    "Production app cutover",
+    "Enable app writes/imports",
+    "Further exports without review",
+    "Source/archive deletion",
+    "New Supabase project",
+    "Paid resources"
+  ],
+  "export_commit": "30884435e458436c4e3b3e09942600f0e90a7f9b",
+  "export_run": "https://github.com/hongyime/theprawnsplit/actions/runs/34807373560",
+  "export_summary": {
+    "topics": 8,
+    "stream_records": 14,
+    "commitments": 8,
+    "blob_bytes": 7969,
+    "snapshot_json_bytes": 11149,
+    "optimistic_stable": true,
+    "atomic_snapshot": false,
+    "cutover_ready": false
+  },
+  "tests": {
+    "postgres_checks": 7,
+    "targeted_before_cleanup_tests": 37,
+    "original_draft_mutations_detected": 5,
+    "original_draft_mutations_total": 6,
+    "deadline_cleanup_gap_followup": "detected after adding success/failure early-return coverage; original survivor retained"
+  },
+  "staging": {
+    "records": 14,
+    "topics": 8,
+    "commitments": 8,
+    "namespace_bytes": 122880,
+    "payload_bytes": 8393,
+    "archive_objects": 2,
+    "archive_bytes": 16187,
+    "imports_enabled": false,
+    "writes_enabled": false,
+    "status_reader_preserved": true
+  },
+  "capacity_followup": {
+    "candidate_integrated_in_unpublished_source": true,
+    "permanent_regression": "original failed; candidate SQL suite 17 passed",
+    "helper_live_application": "Applied and preservation asserted; both flags disabled",
+    "strict_shared_database_capacity_guarantee": false,
+    "helper_source_md5": "5e7cfb363d4a2d4cd8a15a9549db821a",
+    "permanent_sql_tests": 17,
+    "guarded_transaction_tests": 4,
+    "final_full_runtime_release_checks": "Required before runtime publication; prior full suite predates this SQL-only follow-up"
+  },
+  "original_repository": "Clean on released export commit; unpublished source stays isolated",
+  "catchup_validation": {
+    "final_protocol_passed": false,
+    "latest": {
+      "at": "2026-09-14T06:38:04.974051+00:00",
+      "checkout": "isolated local validation checkout",
+      "commands": [
+        {
+          "command": "npm.cmd run build",
+          "exit": 1,
+          "log": "split-catchup-final-v5-build-20260914.log",
+          "summary": [
+            "Test Files  8 passed (8)",
+            "Tests  81 passed (81)",
+            "Test Files  2 failed | 76 passed (78)",
+            "Tests  1 failed | 301 passed | 10 skipped (312)"
+          ]
+        }
+      ],
+      "local_execution": {
+        "VITEST_MAX_WORKERS": "1",
+        "reason": "v4 forks worker start timed out; approximately 1 GiB physical memory free; no test assertions skipped or changed",
+        "hosted_default_validation": "pending publication"
+      }
+    },
+    "v3_behavior_output": [
+      "Test Files  8 passed (8)",
+      "Tests  81 passed (81)",
+      "Test Files  78 passed (78)",
+      "Tests  312 passed (312)",
+      "\u2139 tests 11",
+      "\u2139 pass 11",
+      "\u2139 fail 0",
+      "svelte-check found 2 errors and 0 warnings in 1 file"
+    ],
+    "v4": {
+      "at": "2026-09-14T06:24:57.648604+00:00",
+      "checkout": "isolated local validation checkout",
+      "commands": [
+        {
+          "command": "npm.cmd run build",
+          "exit": 1,
+          "log": "split-catchup-final-v4-build-20260914.log",
+          "summary": [
+            "Test Files  8 passed (8)",
+            "Tests  81 passed (81)",
+            "Test Files  77 passed (77)",
+            "Tests  309 passed (309)"
+          ]
+        }
+      ]
+    },
+    "deadline_relaxed": false,
+    "user_processes_stopped": false
+  },
+  "catchup_live_changes": false,
+  "catchup_hosted_validation_route": {
+    "at": "2026-09-14T06:52:39.545949+00:00",
+    "remote_main": "30884435e458436c4e3b3e09942600f0e90a7f9b",
+    "existing_hosted_workflows": [
+      {
+        "id": 339000273,
+        "name": "Auto-merge Bot PRs",
+        "path": ".github/workflows/auto-merge-bots.yml",
+        "state": "disabled_manually"
+      },
+      {
+        "id": 339000274,
+        "name": "Bandit",
+        "path": ".github/workflows/bandit.yml",
+        "state": "active"
+      },
+      {
+        "id": 339000275,
+        "name": "Build Check",
+        "path": ".github/workflows/ci.yml",
+        "state": "active"
+      },
+      {
+        "id": 339000276,
+        "name": "CodeQL Analysis",
+        "path": ".github/workflows/codeql.yml",
+        "state": "active"
+      },
+      {
+        "id": 339000277,
+        "name": "Dependabot Auto-Merge",
+        "path": ".github/workflows/dependabot-auto-merge.yml",
+        "state": "disabled_manually"
+      },
+      {
+        "id": 339000278,
+        "name": "Dependency Review",
+        "path": ".github/workflows/dependency-review.yml",
+        "state": "active"
+      },
+      {
+        "id": 339000279,
+        "name": "Greet New Contributors",
+        "path": ".github/workflows/greetings.yml",
+        "state": "active"
+      },
+      {
+        "id": 339000280,
+        "name": "Heartbeat",
+        "path": ".github/workflows/heartbeat.yml",
+        "state": "active"
+      },
+      {
+        "id": 339000281,
+        "name": "Pull Request Labeler",
+        "path": ".github/workflows/labeler.yml",
+        "state": "active"
+      },
+      {
+        "id": 339000283,
+        "name": "LFS Guard",
+        "path": ".github/workflows/lfs-guard.yml",
+        "state": "active"
+      },
+      {
+        "id": 357534382,
+        "name": "Encrypted relay export",
+        "path": ".github/workflows/relay-export.yml",
+        "state": "active"
+      },
+      {
+        "id": 339000284,
+        "name": "OSSF Scorecard",
+        "path": ".github/workflows/scorecard.yml",
+        "state": "active"
+      },
+      {
+        "id": 339000286,
+        "name": "Semgrep",
+        "path": ".github/workflows/semgrep.yml",
+        "state": "active"
+      },
+      {
+        "id": 355466706,
+        "name": "Prawn Split Release Check",
+        "path": ".github/workflows/split-build.yml",
+        "state": "active"
+      },
+      {
+        "id": 357491185,
+        "name": "Upstash storage usage",
+        "path": ".github/workflows/storage-usage.yml",
+        "state": "active"
+      },
+      {
+        "id": 339000287,
+        "name": "Summarize new issues",
+        "path": ".github/workflows/summary.yml",
+        "state": "active"
+      },
+      {
+        "id": 340033361,
+        "name": "Task 0 \u2014 relay retention probe",
+        "path": ".github/workflows/task0-retention.yml",
+        "state": "active"
+      },
+      {
+        "id": 339000288,
+        "name": "TruffleHog Secret Scan",
+        "path": ".github/workflows/trufflehog.yml",
+        "state": "active"
+      },
+      {
+        "id": 339000324,
+        "name": "Dependabot Updates",
+        "path": "dynamic/dependabot/dependabot-updates",
+        "state": "active"
+      }
+    ],
+    "manual_workflows_at_main": [
+      {
+        "path": ".github/workflows/auto-merge-bots.yml",
+        "sha256": "d7fcb9f3aee9db1e9dc72819653644365bc3e456572559a628c8eaab27bc424f",
+        "has_inputs": false,
+        "input_names": []
+      },
+      {
+        "path": ".github/workflows/bandit.yml",
+        "sha256": "abfe811964915c241a0e720d6910feab521c2623a137576368d00f7d58af62c8",
+        "has_inputs": false,
+        "input_names": []
+      },
+      {
+        "path": ".github/workflows/heartbeat.yml",
+        "sha256": "5d69caab1103390ec8acd7d3efcfab98f85dc8567f2a0ae244310a035eb6578a",
+        "has_inputs": false,
+        "input_names": []
+      },
+      {
+        "path": ".github/workflows/relay-export.yml",
+        "sha256": "2db08c6b9eeb25ebb5e7c4a6f15696bfad674dcfe16473c654a82fd590320dd4",
+        "has_inputs": true,
+        "input_names": [
+          "recipient_public_key_b64"
+        ]
+      },
+      {
+        "path": ".github/workflows/scorecard.yml",
+        "sha256": "9be03c8063f351e6d419c227acbd24f29153422395d60354295501f01116af66",
+        "has_inputs": false,
+        "input_names": []
+      },
+      {
+        "path": ".github/workflows/semgrep.yml",
+        "sha256": "b8b5223cd1a095335ec513800450e0c896deb84f33790e7a378225b3d939fa79",
+        "has_inputs": false,
+        "input_names": []
+      },
+      {
+        "path": ".github/workflows/split-build.yml",
+        "sha256": "8a3bec0f4501eb5a9368bba2ac793bfc0cfa146e629d1c64badbb3a69477baef",
+        "has_inputs": false,
+        "input_names": []
+      },
+      {
+        "path": ".github/workflows/storage-usage.yml",
+        "sha256": "9212827c5fc21e65e0c22b6830a7faaa7d8d2e9b3cd4c77f829fda51dd673e38",
+        "has_inputs": false,
+        "input_names": []
+      },
+      {
+        "path": ".github/workflows/task0-retention.yml",
+        "sha256": "3d20148296034e32e418b96d50d5c35f34e37515d0a8b94a2d512f085c89f676",
+        "has_inputs": false,
+        "input_names": []
+      }
+    ],
+    "download_artifact_workflows_at_main": [],
+    "existing_exact_candidate_artifact_validation_available": false,
+    "reason": "Prawn Split Release Check checks out its dispatched ref and has no artifact/hash/source inputs. Other manual workflows accept no candidate source; the only dispatch input is the encrypted exporter recipient public key. Build Check is PR-triggered. Current main is export-only and cannot validate the unpublished candidate.",
+    "next_validation_route": "A separately reviewed artifact-only validation facility or other isolated adequate host is required; no workflow change, dispatch, upload or infrastructure added in this inspection.",
+    "l390_used": false,
+    "mutations": false
+  },
+  "linux_validation_stage": {
+    "production_release_pending": true,
+    "git_deployment_enabled": false,
+    "local_v6": {
+      "core_passed": 81,
+      "app_passed": 310,
+      "app_failed": 2,
+      "unhandled_errors": 1
+    },
+    "production_app_cutover": false,
+    "receipt_upgrade_applied": false
+  }
+}

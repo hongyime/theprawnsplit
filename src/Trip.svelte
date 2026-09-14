@@ -966,7 +966,7 @@
     }
     if (lastSyncResult.received > 0) return "Raw Events Were Recovered. Balances Will Render From The Event Log.";
     if (lastSyncResult.snapshotsSeen > 0) {
-      return "A Relay Snapshot Was Found And Used Only For Transport Bootstrap. Raw Event History Is Still Reconciling.";
+      return "A Relay Snapshot Was Found. Raw Event History Is Still Reconciling.";
     }
     if (lastSyncResult.errors.length > 0) return `Relay Recovery Failed: ${lastSyncResult.errors[0]}`;
     return recoveryMode === "evicted"

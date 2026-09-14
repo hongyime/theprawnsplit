@@ -1,5 +1,35 @@
 # Project State
 
+Active CR-017 Linux validation stage, 2026-09-14: the reviewed recovery
+candidate is being staged on main with `git.deploymentEnabled: false`. Existing
+production remains on the export-only release and Upstash. No receipt SQL upgrade,
+backend activation, data export or write-switch change is part of this stage.
+Local v6 passed 81 core and 310 app tests; two multi-trip UI scenarios hit the
+local harness timeout, followed by a teardown rejection. The full four-command
+protocol remains incomplete until the existing Linux release workflow passes.
+Restore the exact previous Vercel configuration only after hosted validation and
+source review pass; then verify the actual production commit and behavior.
+Raw Nostr preservation, final Upstash freeze/delta and quota gates still apply.
+
+
+Active CR-017, 2026-09-14: production remains export-only main `30884435e458436c4e3b3e09942600f0e90a7f9b`.
+The measured snapshot/archive is privately staged in Supabase with imports and
+app writes disabled. The previously reviewed capacity helper is applied.
+
+The isolated event-recovery bridge and receipt upgrade are implemented and
+reviewed, but publication is blocked on final validation: v3 behavioral suites
+passed before fixture-only typing corrections; v4/v5 then hit local Windows
+worker/startup/test-duration resource failures. The current source and all logs
+are preserved. No deadline was relaxed, hosted check bypassed or user process
+stopped. The conditional live receipt upgrade has not run.
+
+Next: use a separately reviewed suitable validation route, then the reviewed
+guarded receipt upgrade and legacy/Upstash bridge release. Full Supabase backend
+activation additionally needs raw signed Nostr/snapshot retention, source-freeze
+access, final encrypted delta/parity and capacity checks. Returning offline
+devices retain keys/history and catch up later; universal reconnection is not a
+release gate. CR-017 remains in progress.
+
 Portfolio usage audit, 2026-09-14: the manual `storage-usage.yml` workflow reads
 only Upstash `DBSIZE` and `INFO memory` with existing repository secrets. Its
 unit tests exercise numeric allowlisting, secret-safe errors, GET-only requests,

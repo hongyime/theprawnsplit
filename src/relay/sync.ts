@@ -28,6 +28,8 @@ import { fetchMaxMessageLength } from "./nip11";
 import type { Relay, SyncResult } from "./types";
 
 import { coordinatedSync, emptySyncResult, syncNetworkBudget, SYNC_FALLBACK_LIMIT } from "./sync-cycle";
+import { discoverMigration, isDefaultOperatedRelay } from "./migration-mode";
+import { syncMigrated } from "./migrated-sync";
 
 const FETCH_LIMIT = 500;
 
@@ -103,6 +105,25 @@ async function runSyncCycle(groupId: string, relayOverride: Relay[] | undefined,
   try {
     if (!relayOverride) await updateMeta(groupId, (meta) => ({ ...meta, nostrSk: group.meta.nostrSk,
       ...(group.meta.relaySettings ? { relaySettings: group.meta.relaySettings } : {}) }));
+    if (!relayOverride) {
+      const operated = relays.find((relay): relay is HttpRelay => relay instanceof HttpRelay && isDefaultOperatedRelay(relay));
+      try {
+        // Check the app's own cutover authority even for groups using custom
+        // relay settings. Preserve those settings, but do not silently continue
+        // external publication after the app has migrated.
+        const migration = await deadline.run((signal) => discoverMigration(groupId, operated ?? new HttpRelay(), { signal }));
+        if (migration.mode.mode === "paused") throw new Error("Sync is temporarily paused for migration; local changes are safe");
+        if (migration.state) {
+          if (!operated) throw new Error("Choose the default operated relay in Sync settings to move this trip; local history is preserved");
+          return await syncMigrated(groupId, operated, relays.find((relay): relay is NostrRelay => relay instanceof NostrRelay), migration.state, deadline);
+        }
+      } catch (reason) {
+        const result = emptySyncResult();
+        result.errors.push(reason instanceof Error ? reason.message : "Unable to verify relay migration status; local changes will retry");
+        await updateMeta(groupId, (meta) => ({ ...meta, lastSyncAt: Date.now(), lastSyncError: result.errors[0]! }));
+        return result;
+      }
+    }
     const { secret, key } = await getGroupCrypto(group);
     const writeProof = await relayWriteProof(secret, group.tagHex);
     const outbound = await pendingOutboundEventRows(groupId);

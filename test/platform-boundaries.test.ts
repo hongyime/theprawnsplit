@@ -44,8 +44,11 @@ describe("platform boundaries", () => {
     const source = readSources();
 
     expect(source).not.toMatch(
-      /\b(?:signIn|signOut|signUp|login|logout|OAuth|oauth|auth0|firebase|supabase|clerk|nextAuth|magicLink|passwordReset)\b/,
+      /\b(?:signIn|signOut|signUp|login|logout|OAuth|oauth|auth0|firebase|clerk|nextAuth|magicLink|passwordReset)\b/,
     );
+    // The accepted encrypted-storage generation may be named in the client;
+    // account APIs and the provider SDK remain outside this client boundary.
+    expect(source).not.toMatch(/@supabase\/supabase-js|\bsupabase\.auth\b/);
     expect(source).not.toMatch(/\b(?:email|phoneNumber|phone number|sms|otp|one-time password)\b/i);
   });
 
@@ -77,7 +80,8 @@ describe("platform boundaries", () => {
   });
 
   it("keeps direct network APIs inside relay adapters", () => {
-    const adapterPaths = new Set([join(sourceRoot, "relay", "http.ts"), join(sourceRoot, "relay", "nostr.ts")]);
+    const adapterPaths = new Set([join(sourceRoot, "relay", "http.ts"), join(sourceRoot, "relay", "nostr.ts"),
+      join(sourceRoot, "relay", "nostr-recovery-transport.ts")]);
     const offenders = sourceEntries()
       .filter((entry) => !adapterPaths.has(entry.path))
       .filter((entry) => /\b(?:window|globalThis)\.fetch\s*\(|\bawait\s+fetch\s*\(|\bnew\s+(?:WebSocket|EventSource)\s*\(|\bSimplePool\b|\bpool\.(?:publish|querySync)\b/.test(entry.source))
@@ -138,6 +142,7 @@ describe("platform boundaries", () => {
 
     expect(clientSource).not.toMatch(/\bUPSTASH_REDIS_REST_(?:URL|TOKEN)\b/);
     expect(clientSource).not.toMatch(/\bVITE_[A-Z0-9_]*UPSTASH\b/);
+    expect(clientSource).not.toMatch(/\b(?:PRAWNSPLIT_SUPABASE_SECRET_KEY|SUPABASE_ACCESS_TOKEN)\b|\bVITE_[A-Z0-9_]*SUPABASE\b/);
     expect(relaySource).toContain("process.env.UPSTASH_REDIS_REST_URL");
     expect(relaySource).toContain("process.env.UPSTASH_REDIS_REST_TOKEN");
     expect(relaySource).not.toContain("import.meta.env");

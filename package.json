@@ -9,7 +9,8 @@
     "check": "svelte-check --tsconfig ./tsconfig.json",
     "lint:money": "node scripts/lint-money.mjs",
     "test": "npm run test:core && npm run test:sync",
-    "test:sync": "vitest run --config vitest.config.ts --dir .",
+    "test:sync": "vitest run --config vitest.config.ts --dir . && npm run test:relay-migration",
+    "test:relay-migration": "node --test test/maintenance/relay-migration.test.mjs",
     "test:core": "npm --prefix core test",
     "gen:icons": "node scripts/gen-icons.mjs",
     "task0:publish": "node scripts/task0-retention.mjs publish",
@@ -31,6 +32,7 @@
     "svelte": "^5.16.0"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "0.5.8",
     "@sveltejs/vite-plugin-svelte": "^5.1.1",
     "@testing-library/dom": "^10.4.1",
     "@testing-library/svelte": "^5.4.2",

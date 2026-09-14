@@ -20,7 +20,7 @@ it("keeps timed-out writes local and the read checkpoint intact, then confirms a
     const url = new URL(input, "https://fixture.invalid");
     expect(url.origin).toBe("https://fixture.invalid");
     requests.push({ method: init?.method ?? "GET", signal: init?.signal as AbortSignal, cursor: url.searchParams.get("cursor") });
-    if (stalled) return { ok: true, json: () => new Promise(() => {}) };
+    if (stalled) return new Response(new ReadableStream({ pull: () => new Promise(() => {}) }));
     if (init?.method === "POST") {
       const body = JSON.parse(String(init.body));
       stored = { cursor: "1000-8", blob: body.blob, author: body.author };

@@ -155,6 +155,16 @@ Do this before the 30-day gate (clock started 2026-08-22T12:59:41Z, gate ≈2026
 
 ### P2 — Known gaps with named owners
 
+- **CR-017 encrypted relay staging is verified; cutover remains open.** The operated
+  snapshot and complete encrypted source archive are private in Supabase, with
+  imports/writes disabled. The reviewed conservative capacity correction is applied.
+  The event-recovery bridge and receipt upgrade are prepared for checked legacy
+  publication. Full backend activation still requires private raw signed Nostr
+  history/snapshot retention, source-freeze access and verified final encrypted
+  deltas, service-only isolation and shared-project capacity. Returning offline
+  devices keep their keys/history and catch up later; universal reconnection is
+  not a release gate. See `.agents/cr-017-report.md`.
+
 - **CR-014 sync recovery repair verified:** bounded group reads, atomic
   received-event/cursor writes and duplicate admission accounting are deployed
   on `a49e256d`. All protocol commands and main workflows pass. Isolated browser

@@ -8,9 +8,12 @@ on:
     paths:
       - "src/**"
       - "api/**"
+      - "server/**"
+      - "supabase/schemas/**"
       - "core/**"
       - "test/**"
       - "scripts/lint-money.mjs"
+      - "scripts/relay-migration.mjs"
       - "package.json"
       - "package-lock.json"
       - "index.html"

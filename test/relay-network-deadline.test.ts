@@ -17,9 +17,9 @@ describe("relay request deadlines cover headers and bodies", () => {
         const forever = () => new Promise<never>(() => {}); // deliberately ignores abort
         const transport = vi.fn((_url: unknown, init?: RequestInit) => {
           signal = init?.signal ?? undefined;
-          return phase === "headers" ? forever() : Promise.resolve({
-            ok: phase !== "error-body", json: forever, text: forever,
-          } as unknown as Response);
+          return phase === "headers" ? forever() : Promise.resolve(new Response(new ReadableStream({
+            pull: forever,
+          }), { status: phase === "error-body" ? 503 : 200 }));
         });
         vi.stubGlobal("fetch", transport);
         const relay = new HttpRelay("/api/relay");

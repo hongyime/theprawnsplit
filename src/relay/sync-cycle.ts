@@ -3,6 +3,9 @@ import type { SyncResult } from "./types";
 export const SYNC_NETWORK_BUDGET_MS = 60_000;
 export const SYNC_FALLBACK_LIMIT = 10;
 const inFlight = new Map<string, Promise<SyncResult>>();
+const crossTabOwners = new Set<string>();
+
+export const ownsCrossTabSync = (groupId: string): boolean => crossTabOwners.has(groupId);
 
 export function emptySyncResult(): SyncResult {
   return { published: 0, confirmed: 0, received: 0, buffered: 0, dropped: 0,
@@ -17,7 +20,11 @@ export function coordinatedSync(groupId: string, run: () => Promise<SyncResult>)
   const pending = Promise.resolve().then(async () => {
     if (typeof navigator !== "undefined" && navigator.locks) {
       return await navigator.locks.request(`prawn-sync:${groupId}`, { ifAvailable: true },
-        async (lock): Promise<SyncResult> => lock ? run() : { ...emptySyncResult(), inProgress: true });
+        async (lock): Promise<SyncResult> => {
+          if (!lock) return { ...emptySyncResult(), inProgress: true };
+          crossTabOwners.add(groupId);
+          try { return await run(); } finally { crossTabOwners.delete(groupId); }
+        });
     }
     return run();
   }).finally(() => { inFlight.delete(groupId); });

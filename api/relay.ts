@@ -1,4 +1,5 @@
 import { Redis } from "@upstash/redis";
+import { SupabaseRelayStore, validRedisCursor } from "../server/supabase-relay";
 
 export const config = { runtime: "edge" };
 
@@ -20,6 +21,13 @@ function redis(): Redis {
     throw new Error("relay storage is not configured");
   }
   return Redis.fromEnv();
+}
+
+function supabase(): SupabaseRelayStore | null {
+  const backend = process.env.PRAWNSPLIT_RELAY_BACKEND ?? "upstash";
+  if (backend === "upstash") return null;
+  if (backend !== "supabase") throw new Error("invalid relay storage configuration");
+  return new SupabaseRelayStore(process.env.PRAWNSPLIT_SUPABASE_URL, process.env.PRAWNSPLIT_SUPABASE_SECRET_KEY);
 }
 
 const json = (body: unknown, status = 200): Response =>
@@ -68,14 +76,36 @@ export default async function handler(req: Request): Promise<Response> {
   try {
     const url = new URL(req.url);
 
+    // Deployment configuration is the cutover authority. Never infer a completed
+    // migration merely from credentials being present. No database read is needed.
+    const phase = process.env.PRAWNSPLIT_RELAY_MIGRATION ?? "legacy";
+    const backend = process.env.PRAWNSPLIT_RELAY_BACKEND ?? "upstash";
+    if (!["legacy", "paused", "supabase-v1"].includes(phase)) return bad("invalid relay storage configuration", 503);
+    if (!["upstash", "supabase"].includes(backend) || (phase === "legacy" && backend !== "upstash") ||
+        (phase === "supabase-v1" && backend !== "supabase")) return bad("invalid relay storage configuration", 503);
+    if (req.method === "GET" && url.searchParams.get("capabilities") === "1") {
+      const response = json({ protocol: 1, mode: phase, generation: phase === "supabase-v1" ? "supabase-v1" : null });
+      response.headers.set("cache-control", "no-store");
+      return response;
+    }
+
     if (req.method === "POST") {
-      const body = (await req.json()) as { tag?: string; blob?: string; author?: string; writeProof?: string };
+      if (phase === "paused") return bad("relay migration temporarily pauses writes; retry later", 503);
+      let parsed: unknown;
+      try { parsed = await req.json(); } catch { return bad("invalid request body"); }
+      if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) return bad("invalid request body");
+      const body = parsed as { tag?: string; blob?: string; author?: string; writeProof?: string };
       const tag = body.tag ?? "";
       if (!TAG_RE.test(tag)) return bad("invalid tag");
-      if (typeof body.blob !== "string" || body.blob.length === 0 || body.blob.length > MAX_BLOB) return bad("invalid blob");
+      if (typeof body.blob !== "string" || body.blob.length === 0 || new TextEncoder().encode(body.blob).byteLength > MAX_BLOB) return bad("invalid blob");
       if (typeof body.author !== "string" || body.author.length === 0 || body.author.length > 128) return bad("invalid author");
       if (typeof body.writeProof !== "string" || !isValidWriteProof(body.writeProof)) return bad("invalid proof");
 
+      const destination = supabase();
+      if (destination) {
+        const cursor = await destination.append(tag, await writeProofCommitment(body.writeProof), body.blob, body.author);
+        return cursor === null ? bad("invalid proof", 403) : json({ cursor });
+      }
       const store = redis();
       if (!(await verifyRelayWriteProof(store, tag, body.writeProof))) return bad("invalid proof", 403);
 
@@ -92,6 +122,11 @@ export default async function handler(req: Request): Promise<Response> {
 
       const cursor = url.searchParams.get("cursor");
       const author = url.searchParams.get("author");
+      const destination = supabase();
+      if (destination) {
+        if (cursor && !validRedisCursor(cursor)) return bad("invalid cursor");
+        return json({ entries: await destination.read(tag, cursor, parseLimit(url.searchParams.get("limit")), author) });
+      }
       const rows = await redis().xrange<{ blob?: string; author?: string }>(
         streamKey(tag),
         cursor ? `(${cursor}` : "-",
@@ -109,6 +144,10 @@ export default async function handler(req: Request): Promise<Response> {
 
     return bad("method not allowed", 405);
   } catch (error) {
-    return bad(error instanceof Error ? error.message : String(error), 503);
+    // Only fixed local configuration messages are safe to expose. Provider errors
+    // can contain endpoint names, credentials or database details.
+    const message = error instanceof Error ? error.message : "";
+    const safe = message === "relay storage is not configured" || message === "invalid relay storage configuration";
+    return bad(safe ? message : "relay storage unavailable", 503);
   }
 }

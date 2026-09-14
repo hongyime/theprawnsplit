@@ -4,6 +4,7 @@ import { bytesToHex, hexToBytes } from "@/crypto/bytes";
 import { config } from "@/config";
 import type { AckResult, Relay, RelayEntry, RelayRequestOptions } from "./types";
 import { withRequestDeadline } from "./request-deadline";
+import { fetchNostrRecoveryPage } from "./nostr-recovery-transport";
 
 export interface NostrEventLike {
   id: string;
@@ -109,5 +110,11 @@ export class NostrRelay implements Relay {
     const filter = nostrFetchFilter(tag, this.kind, { ...opts, since });
     const events = await this.request(() => this.pool.querySync(this.relayUrls, filter), request);
     return selectNostrEntries(events, { since });
+  }
+
+  async recoveryPage(url: string, tag: string, filter: { since: number; until: number; limit: number }, request?: RelayRequestOptions): Promise<RelayEntry[]> {
+    if (!this.relayUrls.includes(url)) throw new Error("Unknown recovery relay");
+    const query = { ...nostrFetchFilter(tag, this.kind, filter), since: filter.since, until: filter.until };
+    return fetchNostrRecoveryPage(url, query, request);
   }
 }

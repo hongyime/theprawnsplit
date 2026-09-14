@@ -238,3 +238,5 @@ or provider-data workflow is dispatched for testing.
 2026-09-14 — CR-017 recovery bridge implementation reviewed; final validation constrained by local Windows resource failures after fixture typing correction. V3 behavioral suites passed; v4 missed a worker and v5 reported setup/test-duration failures. Exact logs and candidate preserved, no deadlines relaxed or live changes. Guarded receipt upgrade and legacy bridge publication await a suitable reviewed validation route; full retained-history/source-freeze/capacity gates remain.
 
 2026-09-14: Stage the reviewed CR-017 runtime on main with Git deployments disabled for existing Linux validation; local v6 had 81 core/310 app passes and two UI timeouts. No backend/receipt/retention change.
+
+2026-09-14: All four Linux protocol commands and five main workflows passed for c9633c7. Applied the reviewed receipt safeguard with unchanged retained counts and disabled writes/imports. Restore prior Vercel configuration for legacy bridge production verification; full Supabase cutover remains open.

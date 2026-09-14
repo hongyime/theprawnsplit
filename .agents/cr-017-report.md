@@ -306,3 +306,38 @@ This publishes a validation candidate, not a verified production release.
 Only after all four hosted commands pass may the original Vercel configuration
 be restored for production validation. The receipt SQL upgrade, backend switch,
 raw Nostr preservation and source-freeze gates remain separate.
+
+## Hosted validation and receipt upgrade — 2026-09-14
+
+The unchanged runtime on `c9633c7192c34022d643a5d4ce8e9108d9865bae`
+passed [Linux release validation](https://github.com/hongyime/theprawnsplit/actions/runs/34826452163).
+All five main workflows passed. Computed from the hosted log:
+
+```text
+npm run build: core 81/81; app 312/312; encrypted export 11/11; Svelte 0 errors/0 warnings; Vite passed
+npm test: core 81/81; app 312/312; encrypted export 11/11
+npm --prefix core test: 81/81
+npx svelte-check --tsconfig ./tsconfig.json: 0 errors/0 warnings
+```
+
+The two Windows timeout scenarios passed on Linux with unchanged assertions and
+test limits. The original failed local results remain part of this audit trail.
+This resolves the runtime validation blocker; it does not prove full migration.
+
+The previously reviewed transactional receipt upgrade was applied with its
+exact SQL hash, preflight and read-back guards. Three bounded management requests
+used 8,547 request-body bytes and 725 response-body bytes. The protected record
+counts remain 14 entries, eight topics/commitments and 8,393 payload bytes.
+The namespace now occupies 139,264 bytes; the application database measures
+18,312,339 bytes. Import/write switches remain disabled, row security remains
+enabled, and public roles remain denied. No source data or archive was rewritten.
+
+This follow-up restores the exact pre-validation Vercel configuration so the
+tested bridge can be deployed in legacy/Upstash mode.
+
+### Not verified this pass
+
+The new production deployment and browser behavior are still pending. Full
+Supabase activation remains gated on raw signed Nostr/snapshot retention, a
+verified source freeze, final encrypted delta/parity and current quota headroom.
+The broader CR-017 migration remains incomplete.

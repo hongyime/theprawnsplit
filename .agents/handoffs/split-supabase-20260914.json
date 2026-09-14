@@ -1,7 +1,7 @@
 {
   "task": "CR-017 encrypted relay migration preparation",
   "baseline": "d705e828f8ebe72465782368ab4d5e114c135b0c",
-  "phase": "Reviewed runtime staged for Linux validation with Git-triggered Vercel deployments disabled",
+  "phase": "Hosted validation passed; receipt safeguard applied; legacy bridge production verification pending",
   "destination": "Existing Free PrawnStatus Singapore project; capacity and isolation review pending",
   "preserve": [
     "Ciphertext strings",
@@ -318,5 +318,21 @@
     },
     "production_app_cutover": false,
     "receipt_upgrade_applied": false
+  },
+  "bridge_release": {
+    "source_sha": "c9633c7192c34022d643a5d4ce8e9108d9865bae",
+    "hosted_run": "https://github.com/hongyime/theprawnsplit/actions/runs/34826452163",
+    "all_main_workflows_passed": true,
+    "full_protocol_passed": true,
+    "counts": {
+      "core": 81,
+      "app": 312,
+      "encrypted_export": 11
+    },
+    "receipt_upgrade_applied": true,
+    "write_import_flags_enabled": false,
+    "production_backend": "upstash",
+    "production_release_verified": false,
+    "backend_cutover": false
   }
 }

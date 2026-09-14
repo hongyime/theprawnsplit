@@ -1,5 +1,17 @@
 # Project State
 
+Active CR-017 bridge release, 2026-09-14: source `c9633c7` passed all five
+main workflows. The Linux release workflow passed all four protocol commands:
+81 core tests, 312 app tests, 11 encrypted-export tests, and zero Svelte diagnostics.
+The reviewed receipt upgrade is now applied in the private Supabase namespace;
+all 14 staged records and 8 proof commitments remain, with imports/writes disabled.
+This commit restores the prior Vercel configuration for the tested legacy bridge.
+Actual production deployment and browser behavior still require verification.
+Upstash remains the production backend; no source freeze or backend activation
+has happened. Raw Nostr retention, final delta/parity and quota gates remain open.
+
+Historical validation checkpoint:
+
 Active CR-017 Linux validation stage, 2026-09-14: the reviewed recovery
 candidate is being staged on main with `git.deploymentEnabled: false`. Existing
 production remains on the export-only release and Upstash. No receipt SQL upgrade,

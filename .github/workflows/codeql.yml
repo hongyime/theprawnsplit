@@ -64,7 +64,7 @@ jobs:
       languages: ${{ steps.langs.outputs.languages }}
       any: ${{ steps.langs.outputs.any }}
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@v7.0.1
       - name: Detect languages
         id: langs
         shell: bash
@@ -103,7 +103,7 @@ jobs:
       matrix:
         language: ${{ fromJson(needs.detect.outputs.languages) }}
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@v7.0.1
 
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v4

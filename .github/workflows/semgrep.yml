@@ -61,7 +61,7 @@ jobs:
     # Skip on Dependabot bot-authored branches to avoid noise
     if: (github.actor != 'dependabot[bot]')
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@v7.0.1
 
       - name: Run Semgrep (community rulesets)
         run: |

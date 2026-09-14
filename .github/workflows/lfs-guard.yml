@@ -43,7 +43,7 @@ jobs:
 
       - name: Checkout
         if: steps.opt-out.outputs.opt_out != 'true'
-        uses: actions/checkout@v7
+        uses: actions/checkout@v7.0.1
         with:
           # The guard reads only the current index, including a PR merge checkout.
           fetch-depth: 1

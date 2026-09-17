@@ -30,3 +30,20 @@ Free plans only; never delete records or upgrade to force a fit.
 
 Detailed source-release history: `.agents/handoffs/split-source-retention-20260915.json`.
 The existing owner HTML contains the current operator result and remaining gates.
+
+## Prawn UI — maintenance/prawn-ui-20260916 (2026-09-18)
+
+PR #11 open against main: https://github.com/hongyime/theprawnsplit/pull/11
+Commit ed332a0 on branch maintenance/prawn-ui-20260916.
+
+Delivered: Space Grotesk self-hosted font (public/fonts/SpaceGrotesk.woff2),
+CSS variables (--neo-bg/fg/border/shadow/accent with dark-mode overrides),
+NeoCard.svelte and NeoButton.svelte (Svelte 5 runes components), NeoCard applied
+to App.svelte landing-content and Trip.svelte setup-form, NeoButton applied to
+Start-A-New-Trip, Create-My-Spot and Save-Expense primary actions.
+Test stubs (legacy slot-based) added for jsdom environment; vitest.config.ts
+alias array ensures stubs are used in tests only.
+@electric-sql/pglite installed locally (was in devDeps, missing from node_modules),
+resolving pre-existing svelte-check TypeScript errors in supabase test files.
+svelte-check: 0 errors. vite build: 247 modules clean.
+Both new components pass all isolated UI tests. CR-017 data/relay gates unchanged.

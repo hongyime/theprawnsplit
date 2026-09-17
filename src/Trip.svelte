@@ -1,6 +1,8 @@
 <script lang="ts">
   import { onDestroy } from "svelte";
   import Icon from "@/lib/Icon.svelte";
+  import NeoCard from "@/lib/NeoCard.svelte";
+  import NeoButton from "@/lib/NeoButton.svelte";
   import { allocate, eventSortKey, fold, greedySettlement, type Event, type Financials, type VerificationContext, type State } from "@theprawnsplit/core";
   import {
     appendEvents,
@@ -1257,7 +1259,7 @@
           <h2>Set Up The Split Before Adding Bills.</h2>
           <p>Add Yourself First. This Device Will Claim That Person So Expense Saving Unlocks Immediately.</p>
         </div>
-        <div class="setup-form">
+        <NeoCard class="setup-form">
           <label>
             <span>Trip Name</span>
             <input value={group.name} disabled={!groupProfileEditable} on:change={(e) => renameGroup((e.currentTarget as HTMLInputElement).value)} />
@@ -1275,8 +1277,8 @@
             <input bind:value={setupName} placeholder="e.g. John Smith" />
           </label>
           {#if setupNameMatch}<p class="hint duplicate-hint">{matchText(setupNameMatch)} Use That Person Instead.</p>{/if}
-          <button type="button" class="setup-primary" disabled={!setupName.trim() || Boolean(setupNameMatch)} on:click={completeSetup}>Create My Spot</button>
-        </div>
+          <NeoButton class="setup-primary" disabled={!setupName.trim() || Boolean(setupNameMatch)} onclick={completeSetup}>Create My Spot</NeoButton>
+        </NeoCard>
       </section>
     {/if}
     {#if archived}<p class="warning">This Trip Is Archived. The Ledger Remains Readable And Exportable. Relay Retention Is Outside This App's Control; Archiving Does Not Delete Relay Data.</p>{/if}
@@ -1668,7 +1670,7 @@
         </div>
         {#if expenseBlockReason && (showExpenseHint || !hasLocalClaim || archived)}<p class="hint action-hint">{expenseBlockReason}</p>{/if}
         {#if amountPreview.ok && sharePreview.ok && sharePreview.remainderPid}<p class="hint">Rounding Remainder Goes To {participantLabel(sharePreview.remainderPid)}.</p>{/if}
-        <button type="button" class:blocked={!canSaveExpense} disabled={!canSaveExpense} on:click={addExpense}><Icon name="plus" size={17} /> Save Expense</button>
+        <NeoButton class={!canSaveExpense ? 'blocked' : ''} disabled={!canSaveExpense} onclick={addExpense}><Icon name="plus" size={17} /> Save Expense</NeoButton>
       </article>
 
       <article class="panel settlements">

@@ -1,6 +1,8 @@
 <script lang="ts">
   import { onDestroy } from "svelte";
   import Trip from "@/Trip.svelte";
+  import NeoCard from "@/lib/NeoCard.svelte";
+  import NeoButton from "@/lib/NeoButton.svelte";
   import { createGroup, ensureGroup, listGroups, readGroup, type GroupRecord, type StoredGroup } from "@/db/repo";
   import { decodeJoinSeed } from "@/lib/join-link";
 
@@ -53,16 +55,16 @@
   <main class="center">Loading Local Ledger...</main>
 {:else if !selection && storedGroups.length === 0}
   <main class="landing-screen">
-    <div class="landing-content">
+    <NeoCard class="landing-content">
       <img src="/favicon.svg" alt="The Prawn Split" class="landing-logo" width="64" height="64" />
       <h1>The Prawn Split</h1>
       <p class="tagline">
         Split Trip Costs With Friends.<br />
         No Accounts. No Ads. Works Offline.
       </p>
-      <button type="button" class="landing-btn" on:click={startNewTrip}>Start A New Trip</button>
+      <NeoButton class="landing-btn" onclick={startNewTrip}>Start A New Trip</NeoButton>
       <p class="hint-note">Got A Link From A Friend? Just Open It.</p>
-    </div>
+    </NeoCard>
   </main>
 {:else if !selection && storedGroups.length > 0}
   <main class="landing-screen group-list-screen">
@@ -73,7 +75,7 @@
       </div>
       <div class="trips-header">
         <h2>Your Trips</h2>
-        <button type="button" on:click={startNewTrip}>+ Start A New Trip</button>
+        <NeoButton onclick={startNewTrip}>+ Start A New Trip</NeoButton>
       </div>
       <div class="trips-list" role="list">
         {#each storedGroups as g}

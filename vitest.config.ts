@@ -9,11 +9,13 @@ export default defineConfig({
   plugins: [svelte()],
   resolve: {
     conditions: ["browser"],
-    alias: {
-      "@": resolve(root, "src"),
-      "@theprawnsplit/core": resolve(root, "core/src/index.ts"),
-      "@lucide/svelte": resolve(root, "test/stubs/lucide-icons.ts"),
-    },
+    alias: [
+      { find: "@/lib/NeoCard.svelte", replacement: resolve(root, "test/stubs/NeoCard.svelte") },
+      { find: "@/lib/NeoButton.svelte", replacement: resolve(root, "test/stubs/NeoButton.svelte") },
+      { find: "@", replacement: resolve(root, "src") },
+      { find: "@theprawnsplit/core", replacement: resolve(root, "core/src/index.ts") },
+      { find: "@lucide/svelte", replacement: resolve(root, "test/stubs/lucide-icons.ts") },
+    ],
   },
   test: {
     environment: "node",

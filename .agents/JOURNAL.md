@@ -242,3 +242,5 @@ or provider-data workflow is dispatched for testing.
 2026-09-14: All four Linux protocol commands and five main workflows passed for c9633c7. Applied the reviewed receipt safeguard with unchanged retained counts and disabled writes/imports. Restore prior Vercel configuration for legacy bridge production verification; full Supabase cutover remains open.
 
 2026-09-15: CR-017 exact signed source retention passed all four local protocol commands, 18 isolated browser checks and seven mutation checks. Preserve a durable encrypted page queue before any upload; only acknowledged fragments may advance its checkpoint. Direct-main publication follows repository rules; Upstash remains live and full Supabase cutover remains gated.
+
+2026-09-15: Preserve a fresh encrypted Upstash export and all 24 verified Nostr wire replies from bounded known-group reads in existing private Supabase Storage. Full readback and 14-record/eight-commitment parity pass; both app flags remain disabled. Empty responses do not prove full history; source freeze, final delta and current monthly capacity remain open. Operator notes remain local for the next direct-main source release.

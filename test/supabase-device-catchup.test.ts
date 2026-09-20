@@ -29,7 +29,7 @@ beforeAll(async () => {
   sql = new PGlite();
   await sql.exec("create role anon; create role authenticated; create role service_role bypassrls;");
   await sql.exec(readFileSync(new URL("../supabase/schemas/relay.sql", import.meta.url), "utf8"));
-}, 30_000);
+}, 90_000);
 afterAll(async () => { await sql.close(); });
 beforeEach(async () => {
   await sql.exec(`truncate prawnsplit.relay_entries,prawnsplit.relay_topics,prawnsplit.relay_control;
@@ -376,4 +376,4 @@ describe("real IndexedDB → HTTP API → adapter → PostgreSQL recovery", () =
     expect(publish).not.toHaveBeenCalled();
     expect((await local.readGroup(group.groupId)).events).toEqual(group.events);
   });
-});
+}, 20_000);

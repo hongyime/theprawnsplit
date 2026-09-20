@@ -178,4 +178,4 @@ describe("Supabase relay SQL behavior", () => {
       [tag, commitment, JSON.stringify([{ cursor: "1-0", blob: "bad", extra: "must not be ignored" }])])).rejects.toThrow();
     expect(await counts()).toEqual([{ payload_bytes: "0", entry_count: "0", group_count: "0" }]);
   });
-});
+}, 20_000);

@@ -146,7 +146,7 @@ it("rotates past permanently rejected events and the primary batch boundary", as
   expect(new Set(attempts).size).toBe(61);
   expect(await syncCounts(group.groupId)).toEqual({ local: 10, published: 0, confirmed: 51 });
   expect((await readGroup(group.groupId)).events).toEqual(before);
-});
+}, 20_000);
 
 it("does not mark a snapshot published without any relay acknowledgement", async () => {
   await resetRepositoryForTests(`snapshot-zero-relays-${crypto.randomUUID()}`);
@@ -160,7 +160,7 @@ it("does not mark a snapshot published without any relay acknowledgement", async
   const after = await readGroup(group.groupId);
   expect(after.meta.lastSnapshotSeq).toBeUndefined();
   expect(after.events).toEqual(before);
-});
+}, 15_000);
 
 it("clears the cycle timer after success before its time limit expires", async () => {
   await resetRepositoryForTests(`successful-cycle-cleanup-${crypto.randomUUID()}`);

@@ -63,12 +63,12 @@ jobs:
 
       - name: Run bandit (SARIF)
         if: steps.detect.outputs.has_python == 'true'
+        # Suppress findings only, not configuration errors or uncaught exceptions.
         run: |
           bandit -r . \
             -x './.venv,./venv,./__pycache__,./node_modules,./.git,./tests,./test' \
             -f sarif -o bandit.sarif \
-            --severity-level low --confidence-level low \
-            || true
+            --severity-level low --confidence-level low --exit-zero
 
       - name: Upload SARIF to Code Scanning
         if: always() && steps.detect.outputs.has_python == 'true'

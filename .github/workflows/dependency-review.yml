@@ -30,9 +30,9 @@ jobs:
         with:
           node-version: "24"
 
-      - name: Verify fallback checker contracts
+      - name: Verify security workflow contracts
         if: ${{ !github.event.repository.private }}
-        run: node --test test/maintenance/dependency-advisories.test.mjs
+        run: node --test --test-concurrency=1 test/maintenance/dependency-advisories.test.mjs test/maintenance/scanner-exit.test.mjs
 
       - name: Detect native dependency review support
         id: capability

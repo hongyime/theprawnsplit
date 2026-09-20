@@ -9,6 +9,7 @@ permissions: read-all
 jobs:
   dependency-review:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     permissions:
       contents: read
       pull-requests: write
@@ -21,10 +22,34 @@ jobs:
 
       - uses: actions/checkout@v7.0.1
         if: ${{ !github.event.repository.private }}
+        with:
+          fetch-depth: 2
+
+      - uses: actions/setup-node@v7
+        if: ${{ !github.event.repository.private }}
+        with:
+          node-version: "24"
+
+      - name: Verify fallback checker contracts
+        if: ${{ !github.event.repository.private }}
+        run: node --test test/maintenance/dependency-advisories.test.mjs
+
+      - name: Detect native dependency review support
+        id: capability
+        if: ${{ !github.event.repository.private }}
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node scripts/check-dependency-advisories.mjs --capability
 
       - name: Dependency Review
-        if: ${{ !github.event.repository.private }}
+        if: ${{ !github.event.repository.private && steps.capability.outputs.native_supported == 'true' }}
         uses: actions/dependency-review-action@v5
         with:
           fail-on-severity: moderate
           comment-summary-in-pr: always
+
+      - name: Review introduced locked dependencies without dependency graph
+        if: ${{ !github.event.repository.private && steps.capability.outputs.native_supported == 'false' }}
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: node scripts/check-dependency-advisories.mjs --base "$BASE_SHA"

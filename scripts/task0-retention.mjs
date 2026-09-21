@@ -58,41 +58,56 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
  * INTR-002: pre-signs `eventCount` events for a fresh cohort and durably
  * journals their public wire objects (id/pubkey/tag/sig — never the private
  * key) BEFORE any publish attempt starts, then checkpoints progress after
- * every attempt. Previously the cohort's tag/pubkey/ids existed only in
- * memory until the entire ~20s+ publish loop finished; an interruption
- * anywhere in that loop meant those already-live relay events became
- * permanently unrecoverable from local state, and a rerun would silently
- * start an unrelated new cohort instead of resuming. Refuses to start a
- * fresh cohort while a prior interrupted run's journal still exists, rather
- * than orphaning it.
+ * every attempt. If `journalPath` already exists from an interrupted prior
+ * run, RESUMES from its last checkpoint using the exact same pre-signed
+ * events (no new signing key needed) instead of starting an unrelated new
+ * cohort or refusing outright — as long as the journal's relays/eventCount/
+ * payloadBytes match what is being requested; a mismatched or malformed
+ * journal is rejected rather than guessed at.
  *
  * `publishOne(event, index, acks)` must mutate `acks` in place (matching the
  * Promise.allSettled shape each caller already uses) and does the actual
  * relay I/O; this function only owns pre-signing, journaling and ordering.
  */
 export async function runJournaledCohort({ journalPath, relays, eventCount, payloadBytes, spacingMs, publishOne, onProgress }) {
+  let pk, tag, events, acks, resumeFrom;
+
   if (existsSync(journalPath)) {
-    throw new Error(`${journalPath} exists from an interrupted run; resume support is a separate step. Delete it deliberately only if you intend to discard that cohort.`);
+    const journal = JSON.parse(readFileSync(journalPath, "utf8"));
+    const compatible = journal && typeof journal === "object"
+      && journal.kind === KIND
+      && typeof journal.pubkey === "string" && typeof journal.tag === "string"
+      && Array.isArray(journal.relays) && journal.relays.length === relays.length && journal.relays.every((r, i) => r === relays[i])
+      && journal.eventCount === eventCount && journal.payloadBytes === payloadBytes
+      && Array.isArray(journal.events) && journal.events.length === eventCount
+      && typeof journal.ackedThrough === "number" && journal.ackedThrough >= -1 && journal.ackedThrough < eventCount
+      && journal.acks && typeof journal.acks === "object";
+    if (!compatible) {
+      throw new Error(`${journalPath} exists but its schema/identity does not match this cohort's expected relays/eventCount/payloadBytes; refusing to guess. Move or delete it deliberately to start a new cohort.`);
+    }
+    pk = journal.pubkey; tag = journal.tag; events = journal.events; acks = journal.acks;
+    resumeFrom = journal.ackedThrough + 1;
+    console.log(`Resuming journaled cohort tag=${tag.slice(0, 12)}… from event ${resumeFrom}/${eventCount} (no new signing key needed).`);
+  } else {
+    const sk = generateSecretKey();
+    pk = getPublicKey(sk);
+    const seed = webcrypto.getRandomValues(new Uint8Array(32));
+    const digest = await webcrypto.subtle.digest("SHA-256", seed);
+    tag = Buffer.from(digest).toString("hex");
+    events = [];
+    for (let i = 0; i < eventCount; i++) {
+      const content = Buffer.from(webcrypto.getRandomValues(new Uint8Array(payloadBytes))).toString("base64");
+      events.push(finalizeEvent({ kind: KIND, created_at: Math.floor(Date.now() / 1000), tags: [["t", tag], ["s", String(i)]], content }, sk));
+    }
+    acks = Object.fromEntries(relays.map((r) => [r, 0]));
+    resumeFrom = 0;
+    // Durably journal the pre-signed public cohort BEFORE any network I/O. sk never leaves this scope.
+    await checkpointArtifactAtomically(journalPath, JSON.stringify({ kind: KIND, pubkey: pk, tag, relays, eventCount, payloadBytes, events, ackedThrough: -1, acks }, null, 2) + "\n");
   }
 
-  const sk = generateSecretKey();
-  const pk = getPublicKey(sk);
-  const seed = webcrypto.getRandomValues(new Uint8Array(32));
-  const digest = await webcrypto.subtle.digest("SHA-256", seed);
-  const tag = Buffer.from(digest).toString("hex");
-
-  const events = [];
-  for (let i = 0; i < eventCount; i++) {
-    const content = Buffer.from(webcrypto.getRandomValues(new Uint8Array(payloadBytes))).toString("base64");
-    events.push(finalizeEvent({ kind: KIND, created_at: Math.floor(Date.now() / 1000), tags: [["t", tag], ["s", String(i)]], content }, sk));
-  }
-
-  const acks = Object.fromEntries(relays.map((r) => [r, 0]));
   const journalOf = (ackedThrough) => JSON.stringify({ kind: KIND, pubkey: pk, tag, relays, eventCount, payloadBytes, events, ackedThrough, acks }, null, 2) + "\n";
-  // Durably journal the pre-signed public cohort BEFORE any network I/O. sk never leaves this scope.
-  await checkpointArtifactAtomically(journalPath, journalOf(-1));
 
-  for (let i = 0; i < events.length; i++) {
+  for (let i = resumeFrom; i < events.length; i++) {
     await publishOne(events[i], i, acks);
     await checkpointArtifactAtomically(journalPath, journalOf(i));
     await onProgress?.(i, acks);

@@ -83,15 +83,52 @@ test('produces a manifest with the same shape ids/tag/pubkey/acks as the journal
   }
 });
 
-test('refuses to start a fresh cohort while an interrupted run\'s journal still exists, rather than orphaning it', async () => {
+test('resumes an interrupted cohort from the correct index instead of starting an unrelated new one', async () => {
   const { dir, journalPath } = await freshJournalPath();
   try {
-    await runJournaledCohort({ journalPath, relays: ['wss://a.example'], eventCount: 1, payloadBytes: 16, spacingMs: 0, publishOne: async () => {} });
-    // Success path deletes the journal; recreate one to simulate an interrupted run.
-    await runJournaledCohort({ journalPath, relays: ['wss://a.example'], eventCount: 1, payloadBytes: 16, spacingMs: 0, publishOne: async () => { throw new Error('simulated interruption'); } }).catch(() => {});
+    const attempted = [];
+    await assert.rejects(() =>
+      runJournaledCohort({
+        journalPath, relays: ['wss://a.example'], eventCount: 4, payloadBytes: 16, spacingMs: 0,
+        publishOne: async (_event, i, acks) => {
+          attempted.push(i);
+          if (i === 2) throw new Error('simulated interruption');
+          acks['wss://a.example']++;
+        },
+      }),
+    );
+    assert.deepEqual(attempted, [0, 1, 2]);
+    const beforeResume = JSON.parse(await readFile(journalPath, 'utf8'));
+
+    const { manifest, journalPath: returnedPath } = await runJournaledCohort({
+      journalPath, relays: ['wss://a.example'], eventCount: 4, payloadBytes: 16, spacingMs: 0,
+      publishOne: async (_event, i, acks) => { attempted.push(i); acks['wss://a.example']++; },
+    });
+
+    assert.deepEqual(attempted, [0, 1, 2, 2, 3]); // index 2 re-attempted (never checkpointed as acked); 3 is new; 0/1 never repeated
+    assert.equal(manifest.tag, beforeResume.tag);
+    assert.equal(manifest.pubkey, beforeResume.pubkey);
+    assert.deepEqual(manifest.ids, beforeResume.events.map((e) => e.id));
+    assert.equal(manifest.acks['wss://a.example'], 4); // all 4 eventually acked across both runs combined
+    assert.equal(returnedPath, journalPath);
+    // runJournaledCohort never deletes the journal itself even on a completed resume — that stays the caller's job.
+    assert.equal(await readFile(journalPath, 'utf8').then(() => true, () => false), true);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test('rejects resuming a journal whose relays/eventCount/payloadBytes do not match what was requested, instead of guessing', async () => {
+  const { dir, journalPath } = await freshJournalPath();
+  try {
+    await runJournaledCohort({ journalPath, relays: ['wss://a.example'], eventCount: 4, payloadBytes: 16, spacingMs: 0, publishOne: async (_e, i, acks) => { if (i === 1) throw new Error('interrupt'); acks['wss://a.example']++; } }).catch(() => {});
     await assert.rejects(
-      () => runJournaledCohort({ journalPath, relays: ['wss://a.example'], eventCount: 1, payloadBytes: 16, spacingMs: 0, publishOne: async () => {} }),
-      /journal.*exists/i,
+      () => runJournaledCohort({ journalPath, relays: ['wss://different.example'], eventCount: 4, payloadBytes: 16, spacingMs: 0, publishOne: async () => {} }),
+      /does not match/i,
+    );
+    await assert.rejects(
+      () => runJournaledCohort({ journalPath, relays: ['wss://a.example'], eventCount: 999, payloadBytes: 16, spacingMs: 0, publishOne: async () => {} }),
+      /does not match/i,
     );
   } finally {
     await rm(dir, { recursive: true, force: true });

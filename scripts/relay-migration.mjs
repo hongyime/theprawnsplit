@@ -2,6 +2,7 @@
 import { constants, createCipheriv, createDecipheriv, createHash, createPublicKey, privateDecrypt,
   publicEncrypt, randomBytes } from 'node:crypto';
 import { readFile, writeFile } from 'node:fs/promises';
+import { publishArtifactAtomically } from './atomic-artifact.mjs';
 import { pathToFileURL } from 'node:url';
 
 const TAG = /^[0-9a-f]{64}$/;
@@ -280,7 +281,7 @@ async function main() {
     const publicKey = prepared.publicKey;
     const sealed = JSON.stringify(sealSnapshot(snapshot, publicKey));
     stage = 'write_encrypted_artifact';
-    await writeFile(filename, sealed + '\n', { flag: 'wx', mode: 0o600 });
+    await publishArtifactAtomically(filename, sealed + '\n');
     const result = { status: snapshot.stable ? 'ready_for_private_review' : 'source_changed_repeat_required',
       ...snapshotSummary(snapshot), artifact_sha256: createHash('sha256').update(sealed + '\n').digest('hex') };
     console.log(JSON.stringify(result));

@@ -404,7 +404,7 @@ const HARD_BLOCK_RE = /^(auth-required|blocked):/i;
  *   WARN  ≥1 accepted, but ≥1 rejected with a retryable reason
  *   FAIL  0 accepted, OR any accepted=false with a WoT/policy reason
  */
-async function vet(relay) {
+export async function vet(relay) {
   if (!relay) {
     console.error("usage: node scripts/task0-retention.mjs vet <relay-url>");
     process.exit(1);
@@ -430,7 +430,7 @@ async function vet(relay) {
       if (attempt < 3) await sleep(3000);
       else {
         console.log(`\nVERDICT: FAIL — could not open socket to ${relay}`);
-        return;
+        return "FAIL";
       }
     }
   }
@@ -487,7 +487,15 @@ async function vet(relay) {
   if (socketFail) console.log("  → Socket never opened. Relay unreachable.");
   if (verdict === "WARN") console.log("  → Partial acceptance. Investigate before adding to defaults.");
 
+  return verdict;
 }
+
+export function exitCodeForVerdict(verdict) {
+  if (verdict === "PASS") return 0;
+  if (verdict === "WARN") return 2;
+  return 1;
+}
+
 
 // NIP-11 relay information document — reads limitation.max_message_length (PRD A13).
 async function nip11(relay) {
@@ -632,7 +640,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   if (cmd === "publish") await publish();
   else if (cmd === "check") await check(MANIFEST, REPORT);
   else if (cmd === "probe") await probe(process.argv[3] || "wss://nos.lol");
-  else if (cmd === "vet") await vet(process.argv[3]);
+  else if (cmd === "vet") process.exitCode = exitCodeForVerdict(await vet(process.argv[3]));
   else if (cmd === "publish-slow") await publishSlow();
   else if (cmd === "check-slow") await check(SLOW_MANIFEST, SLOW_REPORT);
   else if (cmd === "publish-current") await publishCurrent();

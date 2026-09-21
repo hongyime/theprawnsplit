@@ -594,7 +594,7 @@
     if (archived) return;
     const fromMode = splitMode;
     const preview = sharePreview;
-    const total = parseMinor(expenseTotal);
+    const total = amountPreview.ok ? amountPreview.baseMinor : null;
     splitMode = nextMode;
     if (!preview.ok || total === null || total === 0n) {
       for (const participant of selectedParticipants) {

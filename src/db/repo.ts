@@ -391,7 +391,21 @@ export async function readGroup(groupId: string): Promise<GroupRecord> {
 
 export async function saveGroup(group: StoredGroup): Promise<void> {
   const database = await db();
-  await database.put("groups", group);
+  // PERF-003: callers (Trip.svelte's renameGroup/setCurrency/commit) routinely
+  // spread the full hydrated GroupRecord and pass it straight through. Only
+  // ever persist the bare StoredGroup shape here, never duplicate the
+  // authoritative events/meta/identity stores into this row.
+  const persisted: StoredGroup = {
+    groupId: group.groupId,
+    name: group.name,
+    currency: group.currency,
+    deviceId: group.deviceId,
+    nextCounter: group.nextCounter,
+    createdAt: group.createdAt,
+    secretB64: group.secretB64,
+    tagHex: group.tagHex,
+  };
+  await database.put("groups", persisted);
 }
 
 export async function appendEvents(groupId: string, events: Event[]): Promise<GroupRecord> {

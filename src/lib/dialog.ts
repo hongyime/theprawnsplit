@@ -75,3 +75,23 @@ export function activateDialogLifecycle(dialog: HTMLElement, options: DialogLife
     if (opener && document.contains(opener)) opener.focus();
   };
 }
+
+/**
+ * Svelte action form for `use:dialogLifecycle={{ onEscape }}` on the actual
+ * `role="dialog"` element. Re-runs are cheap: `update()` only swaps which
+ * escape handler is live, it never re-steals initial focus or reattaches the
+ * keydown listener — that only happens once, on mount, matching how a real
+ * dialog should behave across reactive prop changes while it stays open.
+ */
+export function dialogLifecycle(node: HTMLElement, params: DialogLifecycleOptions = {}) {
+  let current = params;
+  const teardown = activateDialogLifecycle(node, { onEscape: () => current.onEscape?.() });
+  return {
+    update(next: DialogLifecycleOptions = {}) {
+      current = next;
+    },
+    destroy() {
+      teardown();
+    },
+  };
+}

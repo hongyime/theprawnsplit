@@ -50,6 +50,7 @@
   import { expenseHistoryRows } from "@/lib/expense-history";
   import { frozenViewPolicy } from "@/lib/freeze-policy";
   import { buildJoinLink } from "@/lib/join-link";
+  import { dialogLifecycle } from "@/lib/dialog";
   import { isManualFallbackDue } from "@/lib/manual-fallback";
   import {
     archiveConfirmationText,
@@ -1772,7 +1773,7 @@
     {/if}
     {#if claimCandidate}
       <div class="modal-backdrop" role="presentation">
-        <div class="modal" role="dialog" aria-modal="true" aria-label="Claim Participant">
+        <div class="modal" role="dialog" aria-modal="true" aria-label="Claim Participant" use:dialogLifecycle={{ onEscape: () => (claimCandidatePid = "") }}>
           <h2>Claim {claimCandidate.name}</h2>
           <dl class="claim-details">
             <div>
@@ -1797,7 +1798,7 @@
     {/if}
     {#if activeInstallLevel && activeInstallLevel >= 3}
       <div class="modal-backdrop" role="presentation">
-        <div class="modal" role="dialog" aria-modal="true" aria-label="Protect This Trip">
+        <div class="modal" role="dialog" aria-modal="true" aria-label="Protect This Trip" use:dialogLifecycle={{ onEscape: dismissActiveInstallPrompt }}>
           <h2>{activeInstallLevel === 4 ? "Storage Survived" : "Storage Is Still Best Effort"}</h2>
           <p>{activeInstallLevel === 4 ? "This Trip Returned After More Than 7 Days. Keep A Fresh Export And Install The App When Possible." : "Install The App So The Browser Can Give This Trip Stronger Storage Protection."}</p>
           <div class="prompt-actions">
@@ -1808,7 +1809,7 @@
     {/if}
     {#if joinQrDataUrl}
       <div class="modal-backdrop" role="presentation">
-        <div class="modal" role="dialog" aria-modal="true" aria-label="Join QR Code">
+        <div class="modal" role="dialog" aria-modal="true" aria-label="Join QR Code" use:dialogLifecycle={{ onEscape: () => (joinQrDataUrl = "") }}>
           <h2>Join QR</h2>
           <img class="join-qr" src={joinQrDataUrl} alt="Join QR Code" />
           <div class="prompt-actions">

@@ -55,6 +55,45 @@ function readCurrentRelays() {
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 /**
+ * REL-003: matches the real client's wire shape exactly (src/crypto/envelope.ts
+ * encryptJson + src/relay/nostr.ts nostrEventTemplate/publish) — a 12-byte
+ * random IV followed by AES-GCM ciphertext, base64-encoded, carried as ONE
+ * signed event's `content`. `events` here is a plain JSON-serializable array
+ * (the probe never touches real ledger event types); `key` is a raw
+ * webcrypto AES-GCM CryptoKey generated locally for this measurement only.
+ */
+export async function encryptEventBatch(key, events) {
+  const iv = webcrypto.getRandomValues(new Uint8Array(12));
+  const plaintext = Buffer.from(JSON.stringify(events), "utf8");
+  const encrypted = new Uint8Array(await webcrypto.subtle.encrypt({ name: "AES-GCM", iv }, key, plaintext));
+  const out = new Uint8Array(iv.length + encrypted.length);
+  out.set(iv);
+  out.set(encrypted, iv.length);
+  return Buffer.from(out).toString("base64");
+}
+
+export async function decryptEventBatch(key, blob) {
+  const bytes = Buffer.from(blob, "base64");
+  const iv = bytes.subarray(0, 12);
+  const ciphertext = bytes.subarray(12);
+  const plaintext = await webcrypto.subtle.decrypt({ name: "AES-GCM", iv }, key, ciphertext);
+  return JSON.parse(Buffer.from(plaintext).toString("utf8"));
+}
+
+/**
+ * Builds exactly ONE production-shaped signed event carrying an encrypted
+ * `events` batch as its content — the actual client batching contract.
+ * Previously `batch50` instead built `["EVENT", e0, e1, ..., e49]`: a
+ * multi-event array that is not even a valid NIP-01 client message, so any
+ * relay-acceptance/size conclusions drawn from it did not measure what the
+ * real client sends. This function performs no network I/O.
+ */
+export async function buildProductionBatchEvent({ tag, sk, kind, key, events }) {
+  const content = await encryptEventBatch(key, events);
+  return finalizeEvent({ kind, created_at: Math.floor(Date.now() / 1000), tags: [["t", tag]], content }, sk);
+}
+
+/**
  * INTR-002: pre-signs `eventCount` events for a fresh cohort and durably
  * journals their public wire objects (id/pubkey/tag/sig — never the private
  * key) BEFORE any publish attempt starts, then checkpoints progress after
@@ -470,28 +509,33 @@ async function nip11(relay) {
 async function batch50() {
   const relays = readCurrentRelays();
   const sk = generateSecretKey();
+  const key = await webcrypto.subtle.generateKey({ name: "AES-GCM", length: 256 }, true, ["encrypt", "decrypt"]);
   const seed = webcrypto.getRandomValues(new Uint8Array(32));
   const digest = await webcrypto.subtle.digest("SHA-256", seed);
   const tag = Buffer.from(digest).toString("hex");
 
-  console.log(`A13 batch50: ${EVENT_COUNT} events x ~${PAYLOAD_BYTES} B, kind ${KIND}, tag ${tag.slice(0, 12)}…`);
-  console.log(`relays (${relays.length}): ${relays.join(", ")}`);
-
-  const events = [];
-  for (let i = 0; i < EVENT_COUNT; i++) {
-    const content = Buffer.from(webcrypto.getRandomValues(new Uint8Array(PAYLOAD_BYTES))).toString("base64");
-    events.push(finalizeEvent(
-      { kind: KIND, created_at: Math.floor(Date.now() / 1000), tags: [["t", tag], ["s", String(i)]], content },
-      sk,
-    ));
-  }
-  const message = JSON.stringify(["EVENT", ...events]);
+  // REL-003: one production-shaped event carrying an AES-GCM-encrypted batch
+  // of EVENT_COUNT synthetic ~PAYLOAD_BYTES items — matching the real client's
+  // batching contract (src/relay/sync.ts publishBlob + nostr.ts publish: one
+  // signed event per call, content = the encrypted blob). The pre-fix
+  // version sent EVENT_COUNT separate plaintext events crammed into a single
+  // `["EVENT", e0, e1, ...]` array, which is not a valid NIP-01 client
+  // message and so measured a stimulus the real client never sends.
+  const batchEvents = Array.from({ length: EVENT_COUNT }, (_, i) => ({
+    s: i,
+    content: Buffer.from(webcrypto.getRandomValues(new Uint8Array(PAYLOAD_BYTES))).toString("base64"),
+  }));
+  const event = await buildProductionBatchEvent({ tag, sk, kind: KIND, key, events: batchEvents });
+  const message = JSON.stringify(["EVENT", event]);
   const messageBytes = Buffer.byteLength(message);
-  console.log(`single message size: ${messageBytes} bytes`);
+
+  console.log(`A13 batch50 (corrected production-shaped stimulus): one event, content = AES-GCM(${EVENT_COUNT} items x ~${PAYLOAD_BYTES} B), kind ${KIND}, tag ${tag.slice(0, 12)}…`);
+  console.log(`relays (${relays.length}): ${relays.join(", ")}`);
+  console.log(`single event message size: ${messageBytes} bytes`);
 
   const results = [];
   for (const relay of relays) {
-    const row = { relay, maxMessageLength: null, nip11Error: "", messageBytes, accepted: 0, rejected: [], socketError: "", okCount: 0 };
+    const row = { relay, maxMessageLength: null, nip11Error: "", messageBytes, accepted: false, rejectReason: "", socketError: "", okReceived: false };
 
     try {
       const info = await nip11(relay);
@@ -516,24 +560,20 @@ async function batch50() {
       continue;
     }
 
-    const oks = new Promise((resolve) => {
-      ws.onmessage = (e) => {
-        try {
-          const d = JSON.parse(e.data);
-          if (d[0] === "OK") {
-            row.okCount++;
-            if (d[2]) row.accepted++;
-            else row.rejected.push(String(d[3] ?? ""));
-          } else if (d[0] === "NOTICE") {
-            row.rejected.push(`NOTICE: ${d[1]}`);
-          } else if (d[0] === "AUTH") {
-            row.rejected.push("AUTH challenge received");
-          }
-        } catch {}
-      };
-      resolve();
-    });
-      await oks;
+    ws.onmessage = (e) => {
+      try {
+        const d = JSON.parse(e.data);
+        if (d[0] === "OK" && d[1] === event.id) {
+          row.okReceived = true;
+          if (d[2]) row.accepted = true;
+          else row.rejectReason = String(d[3] ?? "");
+        } else if (d[0] === "NOTICE") {
+          row.rejectReason = `NOTICE: ${d[1]}`;
+        } else if (d[0] === "AUTH") {
+          row.rejectReason = "AUTH challenge received";
+        }
+      } catch {}
+    };
     try {
       ws.send(message);
     } catch (err) {
@@ -544,16 +584,15 @@ async function batch50() {
     results.push(row);
     console.log(`\n${relay}:`);
     console.log(`  NIP-11 max_message_length: ${row.maxMessageLength ?? "—"}${row.nip11Error ? ` (${row.nip11Error})` : ""}`);
-    console.log(`  OK replies: ${row.okCount}/50, accepted: ${row.accepted}/50${row.socketError ? `, socket: ${row.socketError}` : ""}`);
-    for (const reason of row.rejected.slice(0, 5)) console.log(`  reject reason: "${reason}"`);
+    console.log(`  OK reply: ${row.okReceived ? "yes" : "no"}, accepted: ${row.accepted ? "yes" : "no"}${row.socketError ? `, socket: ${row.socketError}` : ""}${row.rejectReason ? `, reason: "${row.rejectReason}"` : ""}`);
   }
 
   const date = new Date().toISOString().slice(0, 16).replace("T", " ");
-  const lines = [``, `## A13 batch publish probe (PRD §12 A13)`, ``, `Measured ${date}: ${EVENT_COUNT} events x ~${PAYLOAD_BYTES} B sent as ONE WebSocket message (${messageBytes} bytes total) to the current default pool. Verbatim rejection text preserved.`, ``, `| relay | NIP-11 max_message_length | message bytes | accepted | OK replies | notes |`, `|---|---|---|---|---|---|`];
+  const lines = [``, `## A13 batch publish probe — corrected production-shaped stimulus (PRD §12 A13)`, ``, `Measured ${date}: ONE signed event whose content is an AES-GCM-encrypted batch of ${EVENT_COUNT} synthetic items (~${PAYLOAD_BYTES} B each), sent as a single valid NIP-01 ["EVENT", event] message (${messageBytes} bytes total) to the current default pool. Supersedes the pre-fix measurement below, which sent an invalid multi-event array and did not measure the real client's actual per-publish-call stimulus; that section is left unmodified as a historical record, not corrected in place. Verbatim rejection text preserved.`, ``, `| relay | NIP-11 max_message_length | message bytes | accepted | OK reply | notes |`, `|---|---|---|---|---|---|`];
   for (const r of results) {
-    const notes = [r.socketError, r.nip11Error, ...r.rejected.map((x) => `reject: "${x}"`)].filter(Boolean).join("; ")
-      || (r.okCount === 0 ? "no OK replies — message dropped without rejection text" : r.accepted === EVENT_COUNT ? "all accepted" : "partial acknowledgement without rejection text");
-    lines.push(`| ${r.relay} | ${r.maxMessageLength ?? "—"} | ${r.messageBytes} | ${r.accepted}/${EVENT_COUNT} | ${r.okCount}/${EVENT_COUNT} | ${notes} |`);
+    const notes = [r.socketError, r.nip11Error, r.rejectReason ? `reject: "${r.rejectReason}"` : ""].filter(Boolean).join("; ")
+      || (!r.okReceived ? "no OK reply — message dropped without rejection text" : r.accepted ? "accepted" : "rejected without reason text");
+    lines.push(`| ${r.relay} | ${r.maxMessageLength ?? "—"} | ${r.messageBytes} | ${r.accepted ? "yes" : "no"} | ${r.okReceived ? "yes" : "no"} | ${notes} |`);
   }
   mkdirSync(".agents", { recursive: true });
   appendFileSync(REPORT, lines.join("\n") + "\n");

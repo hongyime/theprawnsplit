@@ -41,5 +41,10 @@ describe("duplicate participant banner (rendered)", () => {
     expect(screen.getByRole("button", { name: "Not Same" })).toBeTruthy();
     // Balance text confirms duplicate detection does not automatically alter balances.
     expect(document.body.textContent).toContain("Without Changing Balances Automatically");
+    // FE-004: the reconciliation hint must be visible without expanding the advanced disclosure.
+    expect(screen.getByRole("button", { name: "Merge" }).closest(".advanced-panel")).toBeNull();
+    expect(screen.getByRole("button", { name: "Not Same" })).toBeTruthy();
+    // Balance text confirms duplicate detection does not automatically alter balances.
+    expect(document.body.textContent).toContain("Without Changing Balances Automatically");
   }, 90_000);
 });

@@ -1393,24 +1393,70 @@
       </section>
     {/if}
     {#if !needsSetup}
+      <section class="sync-strip" aria-label="Trip Status">
+        <span><Icon name="shield" size={17} /> {syncStatus}</span>
+        <span class="protection-status" aria-label="Protection Status">
+          <span class:ok={isStandalone}>{protectionCopy[0]}</span>
+          <span class:ok={persistedStorage === true} class:warn={persistedStorage === false}>{protectionCopy[1]}</span>
+          <span class:ok={unconfirmedCount === 0 && state.quarantined.length === 0} class:warn={unconfirmedCount > 0 || state.quarantined.length > 0}>{protectionCopy[2]}</span>
+        </span>
+      </section>
+      {#if reconciliationAnomalies.length}
+        <section class="reconcile-panel" aria-label="Reconciliation Issues">
+          <h2><Icon name="git-merge" size={18} /> Reconcile People</h2>
+          {#each reconciliationAnomalies as anomaly}
+            <div class="reconcile-row">
+              <div>
+                {#if anomaly.code === "possible-duplicate-participants" && anomaly.pid && anomaly.relatedPid}
+                  <strong>{participantLabel(anomaly.pid)} may be the same as {participantLabel(anomaly.relatedPid)}</strong>
+                  <span>Resolve The Duplicate Hint Without Changing Balances Automatically.</span>
+                {:else if anomaly.code === "distinct-participants-merged"}
+                  <strong>People Marked Distinct Are Currently Merged</strong>
+                  <span>{anomaly.message}</span>
+                {:else if anomaly.code === "unverified-reclaim" && anomaly.pid}
+                  <strong>{participantLabel(anomaly.pid)} has an unverified recovered device</strong>
+                  <span>{shortDevice(participantClaimEvent(anomaly.eventId)?.deviceId)} needs peer re-attestation before it can confirm settlements. {reattestationMessage(anomaly.eventId)}</span>
+                {:else}
+                  <strong>{anomaly.code}</strong>
+                  <span>{anomaly.message}</span>
+                {/if}
+              </div>
+              <div class="reconcile-actions">
+                {#if anomaly.code === "possible-duplicate-participants" && anomaly.pid && anomaly.relatedPid}
+                  <button type="button" disabled={archived} on:click={() => mergeParticipants(anomaly.relatedPid!, anomaly.pid!)}>Merge</button>
+                  <button type="button" class="secondary" disabled={archived} on:click={() => markParticipantsDistinct(anomaly.pid!, anomaly.relatedPid!)}>Not Same</button>
+                {:else if anomaly.code === "distinct-participants-merged"}
+                  {#each mergeUndoEventIds(anomaly) as mergeEventId, index}
+                    <button type="button" disabled={archived} on:click={() => voidEvent(mergeEventId)}>Undo Merge {index + 1}</button>
+                  {/each}
+                  {#if anomaly.eventId}
+                    <button type="button" class="secondary" disabled={archived} on:click={() => voidEvent(anomaly.eventId!)}>Remove Mark</button>
+                  {/if}
+                {:else if anomaly.code === "unverified-reclaim" && anomaly.pid}
+                  {#if localPeerIdentityFor(anomaly.pid)}
+                    <button type="button" disabled={archived} on:click={() => reattestClaim(anomaly.eventId)}>Re-attest</button>
+                  {/if}
+                  {#if anomaly.eventId}
+                    <button type="button" class="secondary" disabled={archived} on:click={() => voidEvent(anomaly.eventId!)}>Void Claim</button>
+                  {/if}
+                {/if}
+              </div>
+            </div>
+          {/each}
+        </section>
+      {/if}
       <details class="advanced-panel">
         <summary><Icon name="settings" size={17} /> Sync, Backup, And Recovery</summary>
         {#if showInstallHint}<p class="subtle">On iOS, Use Share Then Add To Home Screen For Offline Launch.</p>{/if}
         <section class="sync-strip">
-      <span><Icon name="shield" size={17} /> {syncStatus}</span>
-      <span class="protection-status" aria-label="Protection Status">
-        <span class:ok={isStandalone}>{protectionCopy[0]}</span>
-        <span class:ok={persistedStorage === true} class:warn={persistedStorage === false}>{protectionCopy[1]}</span>
-        <span class:ok={unconfirmedCount === 0 && state.quarantined.length === 0} class:warn={unconfirmedCount > 0 || state.quarantined.length > 0}>{protectionCopy[2]}</span>
-      </span>
-      {#if hasLocalClaim}
-        <button type="button" on:click={() => { if (downloadIdentityBackup()) void markIdentityBackupPromptHandled(); }}><Icon name="key-round" size={17} /> Identity Backup</button>
-      {:else}
-        <span>Claim A Person Before Adding Expenses.</span>
-      {/if}
-      <button type="button" class="secondary" on:click={() => downloadExport()}><Icon name="download" size={17} /> Export</button>
-      <button type="button" class="secondary" on:click={shareDelta}><Icon name="share" size={17} /> Share Delta</button>
-      <button type="button" class="secondary" on:click={() => (relaySettingsOpen = !relaySettingsOpen)} title="Relay Settings"><Icon name="settings" size={17} /> Relays</button>
+          {#if hasLocalClaim}
+            <button type="button" on:click={() => { if (downloadIdentityBackup()) void markIdentityBackupPromptHandled(); }}><Icon name="key-round" size={17} /> Identity Backup</button>
+          {:else}
+            <span>Claim A Person Before Adding Expenses.</span>
+          {/if}
+          <button type="button" class="secondary" on:click={() => downloadExport()}><Icon name="download" size={17} /> Export</button>
+          <button type="button" class="secondary" on:click={shareDelta}><Icon name="share" size={17} /> Share Delta</button>
+          <button type="button" class="secondary" on:click={() => (relaySettingsOpen = !relaySettingsOpen)} title="Relay Settings"><Icon name="settings" size={17} /> Relays</button>
         </section>
     {#if relaySettingsOpen}
       <section class="relay-settings-panel" aria-label="Relay Settings">
@@ -1441,51 +1487,6 @@
           <div class:error-diagnostic={diagnostic.severity === "error"} class="diagnostic-row">
             <strong>{diagnostic.relay} {diagnostic.operation}: {diagnostic.code}</strong>
             <span>{relayDiagnosticActionText(diagnostic)}</span>
-          </div>
-        {/each}
-      </section>
-    {/if}
-
-    {#if reconciliationAnomalies.length}
-      <section class="reconcile-panel" aria-label="Reconciliation Issues">
-        <h2><Icon name="git-merge" size={18} /> Reconcile People</h2>
-        {#each reconciliationAnomalies as anomaly}
-          <div class="reconcile-row">
-            <div>
-              {#if anomaly.code === "possible-duplicate-participants" && anomaly.pid && anomaly.relatedPid}
-                <strong>{participantLabel(anomaly.pid)} may be the same as {participantLabel(anomaly.relatedPid)}</strong>
-                <span>Resolve The Duplicate Hint Without Changing Balances Automatically.</span>
-              {:else if anomaly.code === "distinct-participants-merged"}
-                <strong>People Marked Distinct Are Currently Merged</strong>
-                <span>{anomaly.message}</span>
-              {:else if anomaly.code === "unverified-reclaim" && anomaly.pid}
-                <strong>{participantLabel(anomaly.pid)} has an unverified recovered device</strong>
-                <span>{shortDevice(participantClaimEvent(anomaly.eventId)?.deviceId)} needs peer re-attestation before it can confirm settlements. {reattestationMessage(anomaly.eventId)}</span>
-              {:else}
-                <strong>{anomaly.code}</strong>
-                <span>{anomaly.message}</span>
-              {/if}
-            </div>
-            <div class="reconcile-actions">
-              {#if anomaly.code === "possible-duplicate-participants" && anomaly.pid && anomaly.relatedPid}
-                <button type="button" disabled={archived} on:click={() => mergeParticipants(anomaly.relatedPid!, anomaly.pid!)}>Merge</button>
-                <button type="button" class="secondary" disabled={archived} on:click={() => markParticipantsDistinct(anomaly.pid!, anomaly.relatedPid!)}>Not Same</button>
-              {:else if anomaly.code === "distinct-participants-merged"}
-                {#each mergeUndoEventIds(anomaly) as mergeEventId, index}
-                  <button type="button" disabled={archived} on:click={() => voidEvent(mergeEventId)}>Undo Merge {index + 1}</button>
-                {/each}
-                {#if anomaly.eventId}
-                  <button type="button" class="secondary" disabled={archived} on:click={() => voidEvent(anomaly.eventId!)}>Remove Mark</button>
-                {/if}
-              {:else if anomaly.code === "unverified-reclaim" && anomaly.pid}
-                {#if localPeerIdentityFor(anomaly.pid)}
-                  <button type="button" disabled={archived} on:click={() => reattestClaim(anomaly.eventId)}>Re-attest</button>
-                {/if}
-                {#if anomaly.eventId}
-                  <button type="button" class="secondary" disabled={archived} on:click={() => voidEvent(anomaly.eventId!)}>Void Claim</button>
-                {/if}
-              {/if}
-            </div>
           </div>
         {/each}
       </section>

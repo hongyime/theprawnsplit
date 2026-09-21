@@ -845,7 +845,13 @@
 
   async function copyJoinLink(): Promise<void> {
     if (!group) return;
-    const url = buildJoinLink(window.location.href, createJoinSeed(group));
+    let url: string;
+    try {
+      url = buildJoinLink(window.location.href, createJoinSeed(group));
+    } catch (err) {
+      if (!disposed) syncStatus = err instanceof Error ? err.message : "Failed To Build Join Link.";
+      return;
+    }
     try {
       await navigator.clipboard.writeText(url);
       if (disposed) return;

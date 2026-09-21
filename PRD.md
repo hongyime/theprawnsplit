@@ -1051,23 +1051,28 @@ Anyone holding `groupSecret` has full read and write access forever. There is:
 - No revocation
 - No way to remove a member
 - No way to delete data already published to relays you do not control
-**Mitigation — Fork & Re-key (resolves Q2).** In-band cryptographic rotation is
-pointless: `groupSecret` is a symmetric root, so an attacker holding it can read any
-rotation event. True rotation requires a new channel. The mechanism is therefore a
-one-tap flow:
- 
+**Mitigation (proposed design, not yet implemented) — Fork & Re-key (resolves
+Q2).** In-band cryptographic rotation is pointless: `groupSecret` is a symmetric
+root, so an attacker holding it can read any rotation event. True rotation
+requires a new channel. The proposed mechanism is a one-tap flow:
+
 ```
 Compromised link → export snapshot → generate new groupSecret
                  → re-seed roster + balances → new share URL
 ```
- 
-The old `groupTag` is abandoned; activity continues on a clean tag. Participants
-re-join via the new link; shadow participants carry over automatically.
- 
-**Caveat the fork does NOT address:** everything already published under the old
-`groupTag` remains on relays outside your control, permanently and undeletably.
-Forking limits the blast radius **forward only**, never backward. The app MUST state
-this at the moment of forking rather than implying the old data is gone.
+
+The old `groupTag` would be abandoned; activity would continue on a clean tag.
+Participants would re-join via the new link; shadow participants would carry
+over automatically. **No fork/re-key action exists in the app today** — there
+is no UI entry point and no implementing code path. Until it ships, a
+compromised link has no in-app remediation beyond the participant simply
+stopping use of the old link.
+
+**Caveat the fork, once built, would not address:** everything already published
+under the old `groupTag` remains on relays outside your control, permanently and
+undeletably. Forking would limit the blast radius **forward only**, never
+backward. Its implementation MUST state this at the moment of forking rather
+than implying the old data is gone.
  
 ### 10.3 No ledger-level event signing in v1
  

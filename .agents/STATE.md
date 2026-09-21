@@ -1,5 +1,15 @@
 # Project State
 
+## 02_EXECUTE — approved, executing T21 next (20/73 complete; T18/INTR-002-journal a9d03d4, T19/INTR-002-resume 88bc31f, T20/REL-003 0165ea0)
+
+- All 49 audit findings selected; requested order P2 → P1 → P3, with dependency-bound work deferred until prerequisites pass.
+- Planning artifacts: `bugfix.md`, `design.md`, `tasks.md`; resume gate: `execute_state.json`.
+- T01–T04 and T06–T09 complete (8/73). REL-005/e49d292, REL-006/2ca2e2b, REL-007/7469aba fixed. NEW-001 fixed in `8c834a9b8e18a93d48193f1d723d0422e6759a10` (test-only timeout overrides for real-crypto/PGlite-heavy tests on this machine — not a logic bug, confirmed via extended-timeout diagnostic then 27/27 + 100+ test regression sweep). Next T10 join-link Unicode round-trip.
+- T05 no longer blocked: NEW-001 fixed above. T05 itself (sharp/devalue dependency upgrade) has not yet been executed; scheduled in normal queue order.
+- All four selected gates resolved by explicit owner decision: SEC-003 budgets (20/group enrollments, 50/author groups, 5 events/s/group, 5MB/group storage, limited export metadata), SEC-002 (any group member authorizes reversal; legacy non-compliant events deleted), DATA-006 (inconsistent legacy groups deleted, no legacy-interpretation needed), REL-008 (no encrypted backup needed; hosted prawnsplit schema verified via Supabase Management API). None of the four code fixes (T24/T46-47/T32-33/T25-26) are implemented yet; all unblocked for normal queue order. Owner also authorized and Sisyphus executed deletion of all rows in prawnsplit.relay_entries/relay_topics/relay_control (Supabase project esplfwgzljvdrnvqaisj) as confirmed test-only data — before/after counts in execute_state.json verification.policy_gates_resolution.live_data_deletion. A Supabase PAT the user pasted in chat was used in-memory only (never written to any file) and the user was told to rotate it.
+- Initial baseline `e63962f47dc4b38378bed33eadd57b134458411d` is preserved in 262 verified ignored backups. Current source commit is `8c834a9b8e18a93d48193f1d723d0422e6759a10`; no uncommitted application/tool source patch. No push/deployment. Live mutation this cycle: the authorized prawnsplit-schema-only deletion above (scoped, evidenced, not a code/build/deploy action). No remaining owned fixture/browser/vitest process. T08 preserves one fixture startup timeout separately from four meaningful RED assertions; T09's real-browser RED/GREEN evidence (screenshot + JSON) is retained under cycle-1 backups; no deadlines weakened.
+- Earlier preservation and UI context below is retained; no historical record or pending operator gate was removed.
+
 CR-017 remains in progress (2026-09-15). Work directly on main: no feature
 branches or PRs. Follow `.agents/PROTOCOL.md` for source verification.
 
@@ -47,3 +57,16 @@ alias array ensures stubs are used in tests only.
 resolving pre-existing svelte-check TypeScript errors in supabase test files.
 svelte-check: 0 errors. vite build: 247 modules clean.
 Both new components pass all isolated UI tests. CR-017 data/relay gates unchanged.
+
+<!-- MOLT_AUTO_START -->
+## Auto State
+
+- Updated: 2026-09-21 16:30:41 +08:00
+- Machine: PRAWN-E14
+- Harness: claude
+- Event: stop
+- Branch: maintenance/prawn-ui-20260916
+- HEAD: 4a4fd4b
+- Dirty files: 6
+- Resume hint: Read .agents/STATE.md, then the latest file in .agents/handoffs/ if present.
+<!-- MOLT_AUTO_END -->

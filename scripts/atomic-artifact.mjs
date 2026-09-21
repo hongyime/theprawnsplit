@@ -14,7 +14,7 @@
  * publication, the final path is simply never created at all — no partial
  * artifact, no poisoned filename, safe to retry under a new one.
  */
-import { open, link, unlink } from 'node:fs/promises';
+import { open, link, rename, unlink } from 'node:fs/promises';
 import { randomBytes } from 'node:crypto';
 import { dirname, join } from 'node:path';
 
@@ -78,4 +78,24 @@ export async function publishArtifactAtomically(finalPath, contents, { mode = 0o
     throw new Error(`Atomic publish is not supported for this destination (${code ?? (error instanceof Error ? error.message : String(error))}); refusing to fall back to a less-safe write. Staging copy retained at ${staging}.`);
   }
   await unlink(staging);
+}
+
+/**
+ * Atomically REPLACE (or create) `finalPath` with `contents`. Unlike
+ * `publishArtifactAtomically`, this is explicitly allowed to clobber a
+ * previous version — it is for progress journals/checkpoints that are
+ * meant to be repeatedly overwritten in place, not one-shot final artifacts.
+ * Still never leaves a truncated `finalPath` behind: the write happens on a
+ * staging file first, and only a complete staging file is renamed over it.
+ */
+export async function checkpointArtifactAtomically(finalPath, contents, { mode = 0o600 } = {}) {
+  const staging = stagingPathFor(finalPath);
+  const handle = await open(staging, 'wx', mode);
+  try {
+    await handle.writeFile(contents);
+    await handle.sync();
+  } finally {
+    await handle.close();
+  }
+  await rename(staging, finalPath);
 }

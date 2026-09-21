@@ -35,4 +35,18 @@ describe("export prompt UI boundary", () => {
     expect(archiveGroup).toContain("downloadExport(undefined, archivedExportGroup);");
     expect(archiveGroup).not.toContain("activeExportPrompt");
   });
+
+  it("exposes permanent manual Export and Share Delta actions outside the transient prompt/overdue/empty branches (FE-001)", () => {
+    const source = appSource();
+    const syncStrip = source.match(/<section class="sync-strip">([\s\S]*?)\n {8}<\/section>/)?.[1] ?? "";
+
+    expect(syncStrip).toContain('on:click={() => downloadExport()}');
+    expect(syncStrip).toContain("on:click={shareDelta}");
+
+    const permanentBlock = source.match(/\{#if !needsSetup\}\n {6}<details class="advanced-panel">([\s\S]*?)<\/details>/)?.[1] ?? "";
+    expect(permanentBlock).toContain(syncStrip);
+
+    expect(permanentBlock).not.toContain("manualFallbackDue");
+    expect(permanentBlock).not.toContain("activeExportPrompt");
+  });
 });

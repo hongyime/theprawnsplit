@@ -1408,6 +1408,8 @@
       {:else}
         <span>Claim A Person Before Adding Expenses.</span>
       {/if}
+      <button type="button" class="secondary" on:click={() => downloadExport()}><Icon name="download" size={17} /> Export</button>
+      <button type="button" class="secondary" on:click={shareDelta}><Icon name="share" size={17} /> Share Delta</button>
       <button type="button" class="secondary" on:click={() => (relaySettingsOpen = !relaySettingsOpen)} title="Relay Settings"><Icon name="settings" size={17} /> Relays</button>
         </section>
     {#if relaySettingsOpen}

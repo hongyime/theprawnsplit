@@ -1,6 +1,6 @@
 # Project State
 
-## 02_EXECUTE — approved, executing T28 next (27/73 complete; T25/REL-008-B4 recorded, T26/REL-008 e24a20b, T27/DATA-003 67d6c9a)
+## 02_EXECUTE — approved, executing T30 next (29/73 complete; T27/DATA-003 67d6c9a, T28/DATA-003 satisfied-by-T27, T29/DATA-005 72882f3)
 
 - All 49 audit findings selected; requested order P2 → P1 → P3, with dependency-bound work deferred until prerequisites pass.
 - Planning artifacts: `bugfix.md`, `design.md`, `tasks.md`; resume gate: `execute_state.json`.

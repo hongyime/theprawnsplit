@@ -1,13 +1,15 @@
 import { openDB, type DBSchema, type IDBPDatabase } from "idb";
-import type { Event } from "@theprawnsplit/core";
+import { parseEvent, type Event } from "@theprawnsplit/core";
 import { bytesToHex } from "@/crypto/bytes";
 import { bigintReplacer, bigintReviver } from "@/lib/money";
 import { inferCurrency, newId } from "@/lib/ids";
 import { createGroupSecret, groupKey, groupTag, secretFromBase64, secretToBase64 } from "@/crypto/group";
 import { mintClaimKey, type ClaimAlg } from "@/crypto/claim";
 import { emptyDurabilityPromptState, normalizeDurabilityPromptState, type DurabilityPromptState } from "@/lib/durability";
+import { validateIdentityKeypair } from "@/lib/identity-backup-validation";
 import type { RelaySettings } from "@/lib/relay-settings";
 import type { SubgroupPreset } from "@/lib/subgroups";
+import { config } from "@/config";
 
 export interface StoredGroup {
   groupId: string;
@@ -540,13 +542,16 @@ function assertImportGroup(value: unknown): void {
 
 function assertImportEvents(value: unknown): void {
   if (!Array.isArray(value)) throw new Error("Import artifact is missing events");
+  // DATA-003: delegate to core's full per-variant parser instead of only
+  // checking BaseEvent-shaped fields. A future-schema-version event is
+  // accepted (it round-trips verbatim under quarantine at fold time); any
+  // other parse failure — including a known variant with a malformed
+  // type-specific field, or an HLC that passes typeof==='number' but is
+  // NaN/Infinity/negative — rejects the whole import, matching this
+  // function's existing all-or-nothing contract.
   for (const event of value) {
-    if (!isRecord(event) || typeof event.t !== "string" || typeof event.id !== "string" || typeof event.dev !== "string" || typeof event.v !== "number") {
-      throw new Error("Import artifact contains malformed events");
-    }
-    if (!isRecord(event.hlc) || typeof event.hlc.wall !== "number" || typeof event.hlc.ctr !== "number" || typeof event.hlc.dev !== "string") {
-      throw new Error("Import artifact contains malformed events");
-    }
+    const result = parseEvent(event, { supportedVersion: config.schemaVersion });
+    if (result.kind === "invalid") throw new Error("Import artifact contains malformed events");
   }
 }
 
@@ -590,11 +595,36 @@ export async function restoreIdentityBackup(backup: DeviceIdentityBackup): Promi
   if (!group) throw new Error("Import the matching TripLedgerExport or open the join link before restoring identity");
   if (group.tagHex !== backup.tagHex) throw new Error("Identity backup does not match this trip");
 
-  const tx = database.transaction(["identity"], "readwrite");
+  // DATA-003: prove every candidate keypair actually imports under its
+  // declared algorithm and that claimSkJwk/claimPkJwk correspond to the
+  // same real keypair (not merely record-shaped) BEFORE opening any IDB
+  // transaction — crypto.subtle work is async, and awaiting it inside a
+  // transaction can close the transaction before the write finishes (the
+  // same hazard ensureGroup's own comment documents for group creation).
   for (const identity of backup.identities) {
-    await tx.objectStore("identity").put({ ...identity, groupId: group.groupId });
+    const result = await validateIdentityKeypair(identity);
+    if (!result.ok) throw new Error(`Identity backup contains an invalid keypair (${result.reason})`);
   }
-  await tx.done;
+
+  const tx = database.transaction(["identity"], "readwrite");
+  try {
+    for (const identity of backup.identities) {
+      // Recheck the target identity inside the write transaction: if this
+      // pid's identity was concurrently replaced with different key
+      // material after the async validation above started, do not
+      // silently overwrite it with a backup validated against stale state.
+      const existing = await tx.objectStore("identity").get([group.groupId, identity.pid]);
+      if (existing && (existing.claimPk !== identity.claimPk || existing.alg !== identity.alg)) {
+        throw new Error("Identity backup conflicts with identity material written after validation began");
+      }
+      await tx.objectStore("identity").put({ ...identity, groupId: group.groupId });
+    }
+    await tx.done;
+  } catch (error) {
+    try { tx.abort(); } catch { /* The transaction may already be aborted. */ }
+    await tx.done.catch(() => {});
+    throw error;
+  }
   return readGroup(group.groupId);
 }
 

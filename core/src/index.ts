@@ -1,5 +1,6 @@
 export * from "./canonical";
 export * from "./fold";
+export * from "./event-validation";
 export * from "./hlc";
 export * from "./identity";
 export * from "./money";

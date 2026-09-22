@@ -9,13 +9,14 @@ const tag = 'a'.repeat(64), proof = 'b'.repeat(64);
 const pair = generateKeyPairSync('rsa', { modulusLength: 3072,
   publicKeyEncoding: { type: 'spki', format: 'pem' }, privateKeyEncoding: { type: 'pkcs8', format: 'pem' } });
 const copy = value => JSON.parse(JSON.stringify(value));
-function source({ rows = 23, changed = false, extraField = false, unknownKey = false } = {}) {
+function source({ rows = 23, changed = false, extraField = false, unknownKey = false, admissionKeys = false } = {}) {
   const records = Array.from({ length: rows }, (_, i) => [
     `9007199254740993-${i}`, ['blob', `private-ciphertext-${i}+/=\r\n`, 'author', 'private-author'],
   ]);
   if (extraField) records[0][1].push('unrecognized', 'retain-or-refuse');
   const allKeys = [`tp:${tag}`, `ts:${tag}`, 'theprawnsplit:keepalive'];
   if (unknownKey) allKeys.push('unreviewed-private-key');
+  if (admissionKeys) allKeys.push(`ad:enroll:${tag}`, `ad:groups:private-author`, `ad:rate:${tag}:1700000000`, `ad:bytes:${tag}`);
   let lengths = 0;
   const calls = [];
   const read = async command => {
@@ -80,6 +81,16 @@ test('a changing source remains inspectable but cannot pass the import gate', as
 test('unsupported source fields or key namespaces abort instead of being discarded', async () => {
   await assert.rejects(exportSnapshot(source({ extraField: true }).read), /unsupported_stream_fields/);
   await assert.rejects(exportSnapshot(source({ unknownKey: true }).read), /unsupported_source_key/);
+});
+
+test('SEC-003 admission-tracking keys (ad: prefix) are skipped by export, never read or included', async () => {
+  const fake = source({ admissionKeys: true });
+  const snapshot = await exportSnapshot(fake.read);
+  assert.equal(snapshot.stable, true);
+  const touchedAdmissionKeys = fake.calls.filter(command => typeof command[1] === 'string' && command[1].startsWith('ad:'));
+  assert.deepEqual(touchedAdmissionKeys, []);
+  const snapshotText = JSON.stringify(snapshot);
+  assert.ok(!snapshotText.includes('ad:'));
 });
 
 test('numeric cursor comparison preserves uint64 values and rejects overflow', () => {

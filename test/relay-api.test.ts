@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
-import handler, { isValidWriteProof, parseRelayNumericLimit, verifyRelayWriteProof, writeProofCommitment } from "../api/relay";
+import handler, { checkAdmission, isValidWriteProof, parseRelayNumericLimit, verifyRelayWriteProof, writeProofCommitment } from "../api/relay";
 
 const tag = "a".repeat(64);
 const proof = "b".repeat(64);
@@ -115,5 +115,29 @@ describe("operated relay API", () => {
 
     expect(response.status).toBe(405);
     await expect(body(response)).resolves.toEqual({ error: "method not allowed" });
+  });
+
+  it("checkAdmission returns null (admit) when the budget allows the write", async () => {
+    const store: import("../server/relay-admission").AdmissionStore = {
+      async reserveSetSlot() { return "added"; },
+      async releaseSetSlot() {},
+      async incrby() { return 1; },
+      async decrby() {},
+    };
+    await expect(checkAdmission(store, tag, "device-a", 100)).resolves.toBeNull();
+  });
+
+  it("checkAdmission returns a 429 with a Retry-After header when the budget is exceeded, and does not throw", async () => {
+    const store: import("../server/relay-admission").AdmissionStore = {
+      async reserveSetSlot() { return "rejected"; },
+      async releaseSetSlot() {},
+      async incrby() { return 1; },
+      async decrby() {},
+    };
+    const response = await checkAdmission(store, tag, "device-a", 100);
+    expect(response).not.toBeNull();
+    expect(response!.status).toBe(429);
+    expect(response!.headers.get("retry-after")).toBe("60");
+    await expect(body(response!)).resolves.toEqual({ error: "relay resource budget exceeded" });
   });
 });

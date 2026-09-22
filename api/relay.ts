@@ -1,5 +1,6 @@
 import { Redis } from "@upstash/redis";
 import { SupabaseRelayStore, validRedisCursor } from "../server/supabase-relay";
+import { createUpstashAdmissionStore, reserveAdmission, type AdmissionStore } from "../server/relay-admission";
 
 export const config = { runtime: "edge" };
 
@@ -66,6 +67,22 @@ export async function verifyRelayWriteProof(store: RelayStore, tag: string, writ
   return (await store.get<string>(key)) === commitment;
 }
 
+// SEC-003/B1: rejects with HTTP 429 + Retry-After before any proof/cursor is
+// claimed or any history is written, whenever the owner-approved enrollment,
+// rate or storage budget for this tag/author would be exceeded. Returns null
+// (admit) when the write may proceed.
+export async function checkAdmission(
+  store: AdmissionStore,
+  tag: string,
+  author: string,
+  blobBytes: number,
+): Promise<Response | null> {
+  const decision = await reserveAdmission(store, tag, author, blobBytes);
+  if (decision.admitted) return null;
+  const response = bad("relay resource budget exceeded", 429);
+  response.headers.set("retry-after", String(decision.retryAfterSeconds));
+  return response;
+}
 function parseLimit(value: string | null): number {
   const parsed = Number(value ?? 100);
   if (!Number.isFinite(parsed) || parsed < 1) return 100;
@@ -107,6 +124,13 @@ export default async function handler(req: Request): Promise<Response> {
         return cursor === null ? bad("invalid proof", 403) : json({ cursor });
       }
       const store = redis();
+      const admissionRejected = await checkAdmission(
+        createUpstashAdmissionStore(store),
+        tag,
+        body.author,
+        new TextEncoder().encode(body.blob).byteLength,
+      );
+      if (admissionRejected) return admissionRejected;
       if (!(await verifyRelayWriteProof(store, tag, body.writeProof))) return bad("invalid proof", 403);
 
       const cursor = await store.xadd(streamKey(tag), "*", {

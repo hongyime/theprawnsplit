@@ -7,6 +7,7 @@ import { createGroupSecret, groupKey, groupTag, secretFromBase64, secretToBase64
 import { mintClaimKey, type ClaimAlg } from "@/crypto/claim";
 import { emptyDurabilityPromptState, normalizeDurabilityPromptState, type DurabilityPromptState } from "@/lib/durability";
 import { validateIdentityKeypair } from "@/lib/identity-backup-validation";
+import { eventFingerprint } from "@/lib/event-fingerprint";
 import type { RelaySettings } from "@/lib/relay-settings";
 import type { SubgroupPreset } from "@/lib/subgroups";
 import { config } from "@/config";
@@ -741,17 +742,60 @@ export async function updateTransportVectors(
   await database.put("meta", { ...meta, versionVector: mergedVersion, discardVector: mergedDiscard, lastSyncAt: Date.now() });
 }
 
+// DATA-005: thrown by upsertRemoteEvents when an incoming event shares an id
+// with an already-stored event but has different content. Carries both
+// sides so a caller can log/surface them for explicit reconciliation rather
+// than the batch's cursor/checkpoint silently advancing past the conflict.
+export class EventIdentityConflictError extends Error {
+  constructor(
+    public readonly groupId: string,
+    public readonly eventId: string,
+    public readonly existing: Event,
+    public readonly incoming: Event,
+  ) {
+    super(`Event ${eventId} in group ${groupId} has conflicting content across replicas`);
+    this.name = "EventIdentityConflictError";
+  }
+}
+
 export async function upsertRemoteEvents(groupId: string, events: Event[], cursorUpdates: Record<string, string> = {}): Promise<number> {
   const database = await db();
   const tx = database.transaction(["events", "meta"], "readwrite");
   let added = 0;
   try {
+    // DATA-005: resolve every conflict check (read-only) BEFORE issuing any
+    // write. An id that already exists locally is not automatically a
+    // no-op — a same-id, different-content event (opposite arrival order
+    // across replicas, a replay, or a corrupted/malicious peer) must never
+    // be silently discarded in favor of whichever copy happened to land
+    // first — that is exactly how two devices end up permanently
+    // disagreeing about what one event id means while both claim
+    // confirmation. Deciding this BEFORE any put() also means a thrown
+    // conflict never needs to roll back an already-issued write within
+    // this same transaction.
+    const toInsert: Event[] = [];
     for (const event of events) {
       const key: [string, string] = [groupId, event.id];
-      if (!(await tx.objectStore("events").get(key))) {
-        await tx.objectStore("events").put({ groupId, eventId: event.id, eventJson: encodeEvent(event), syncState: "confirmed", publishedAt: Date.now() });
-        added += 1;
+      const existingRow = await tx.objectStore("events").get(key);
+      if (!existingRow) {
+        toInsert.push(event);
+        continue;
       }
+      const existingEvent = decodeEvent(existingRow.eventJson);
+      const [existingFingerprint, incomingFingerprint] = await Promise.all([
+        eventFingerprint(existingEvent),
+        eventFingerprint(event),
+      ]);
+      if (existingFingerprint !== incomingFingerprint) {
+        throw new EventIdentityConflictError(groupId, event.id, existingEvent, event);
+      }
+      // Identical content already stored under this id — a true repeat, not
+      // a conflict. Idempotent no-op, matching this function's existing
+      // "skip an id we already have" contract for the non-conflicting case.
+    }
+    for (const event of toInsert) {
+      await tx.objectStore("events").put({ groupId, eventId: event.id, eventJson: encodeEvent(event), syncState: "confirmed", publishedAt: Date.now() });
+      added += 1;
     }
     const meta = await tx.objectStore("meta").get(groupId);
     if (meta) {

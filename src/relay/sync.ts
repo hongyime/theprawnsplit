@@ -20,6 +20,7 @@ import {
 import { decryptEnvelope, encryptEnvelope, encryptEvents, type SnapshotEnvelope } from "@/crypto/envelope";
 import { relayWriteProof } from "@/crypto/group";
 import { normalizeRelaySettings } from "@/lib/relay-settings";
+import { eventFingerprint } from "@/lib/event-fingerprint";
 import { HttpRelay } from "./http";
 import { NostrRelay } from "./nostr";
 import { classifyRelayIssue, isDuplicateRelayAck } from "./diagnostics";
@@ -236,6 +237,11 @@ async function runSyncCycle(groupId: string, relayOverride: Relay[] | undefined,
     const remoteEvents: Event[] = [];
     const snapshots: SnapshotEnvelope[] = [];
     const readBackCounts = new Map<string, number>();
+    // DATA-005: "legacy confirmation counts only ids" was the exact root
+    // cause — a relay page that echoes back a different body under an id
+    // this device already has locally must never count toward that id's
+    // confirmation. Fingerprint-compare against the local copy first.
+    const localById = new Map(group.events.map((event) => [event.id, event]));
     const cursorUpdates: Record<string, string> = {};
     for (const relayResult of fetched) {
       if ("reason" in relayResult) {
@@ -251,7 +257,14 @@ async function runSyncCycle(groupId: string, relayOverride: Relay[] | undefined,
           const envelope = await decryptEnvelope(key, entry.blob);
           if (envelope.type === "events") {
             remoteEvents.push(...envelope.events);
-            for (const event of envelope.events) readBackCounts.set(event.id, (readBackCounts.get(event.id) ?? 0) + 1);
+            for (const event of envelope.events) {
+              const local = localById.get(event.id);
+              if (local && (await eventFingerprint(local)) !== (await eventFingerprint(event))) {
+                result.errors.push(`event ${event.id} disagrees with a relay readback of the same id; not counted toward confirmation`);
+                continue;
+              }
+              readBackCounts.set(event.id, (readBackCounts.get(event.id) ?? 0) + 1);
+            }
           } else {
             snapshots.push(envelope);
           }

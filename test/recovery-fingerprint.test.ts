@@ -1,6 +1,6 @@
 import { expect, it } from "vitest";
 import { defaultParticipant } from "@/lib/events";
-import { eventFingerprint } from "@/relay/migrated-sync";
+import { eventFingerprint } from "@/lib/event-fingerprint";
 import type { Event } from "@theprawnsplit/core";
 
 it("preserves own prototype-named JSON data when deciding whether an event is covered", async () => {

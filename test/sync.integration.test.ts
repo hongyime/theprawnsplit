@@ -325,6 +325,40 @@ describe("Phase 2 sync integration", { timeout: 30_000 }, () => {
     expect((await readGroup(group.groupId)).meta.unsyncedSince).toBeUndefined();
   });
 
+  it("DATA-005: does not confirm an event whose relay readback disagrees with the local copy under the same id", async () => {
+    await resetRepositoryForTests("prawn-readback-conflict");
+    let group = await ensureGroup();
+    const original: Event = event(group.deviceId, group.nextCounter, "ExpenseAdded", {
+      xid: "x1", desc: "Lunch", at: 1_800_000_000_000, date: "2024-01-01",
+      financials: { minor: 1000n, payers: [{ pid: "p1", minor: 1000n }], shares: [{ pid: "p1", minor: 1000n }] },
+    });
+    await appendEvents(group.groupId, [original]);
+    group = await readGroup(group.groupId);
+    await markEvents(group.groupId, [original.id], "published");
+    group = await readGroup(group.groupId);
+
+    // Seed the relay with a DIFFERENT body under original.id, then make its
+    // publish() refuse any further write — otherwise syncOnce's own retry-
+    // publish of the still-unconfirmed local copy would create a SECOND,
+    // agreeing entry in the same cycle and legitimately self-heal the
+    // conflict (a real and correct behavior, just not what this test is
+    // isolating: a readback that disagrees, with no other copy anywhere).
+    const disagreeing = new MemoryRelay("disagreeing", true);
+    const key = await groupKey(secretFromBase64(group.secretB64));
+    const conflicting: Event = { ...original, desc: "Dinner" } as Event;
+    await publishEvents([disagreeing], key, group.tagHex, group.deviceId, [conflicting]);
+    disagreeing.publish = async () => ({ ok: false, reason: "relay refuses further writes for this test" });
+
+    const result = await syncOnce(group.groupId, [disagreeing]);
+
+    expect(result.errors.some((message) => message.includes(original.id) && message.includes("disagrees"))).toBe(true);
+    const reread = await readGroup(group.groupId);
+    expect(reread.events.find((candidate) => candidate.id === original.id)).toMatchObject({ desc: "Lunch" });
+    // The disagreeing readback must never flip this id's own syncState to
+    // confirmed — it stays exactly as markEvents left it ('published').
+    expect(await syncCounts(group.groupId)).toMatchObject({ published: 1 });
+  });
+
   it("publishes snapshots only after the covered raw events are confirmed", async () => {
     const relays = [new MemoryRelay("r1"), new MemoryRelay("r2")];
 

@@ -2,10 +2,10 @@ import { admitTransportEvents, canonicalState, fold, type Event } from "@thepraw
 import { config } from "@/config";
 import { decryptEnvelope, encryptEnvelope, encryptEvents, type SnapshotEnvelope } from "@/crypto/envelope";
 import { relayWriteProof } from "@/crypto/group";
-import { bytesToHex } from "@/crypto/bytes";
-import { confirmedEvents, dueBufferedEvents, encodeEvent, getGroupCrypto, markEvents, markSnapshotPublished,
+import { confirmedEvents, dueBufferedEvents, getGroupCrypto, markEvents, markSnapshotPublished,
   pendingOutboundEventRows, putBufferedEvents, readGroup, removeBufferedEvents, updateMeta, updateTransportVectors,
   upsertRemoteEvents, vectorFromEvents, type GroupRecord } from "@/db/repo";
+import { eventFingerprint } from "@/lib/event-fingerprint";
 import type { HttpRelay } from "./http";
 import { recoverNostrPage, type NostrRecoverySource } from "./nostr-recovery";
 import { prepareSourcePackets, readSourceFragment } from "./source-archive";
@@ -20,18 +20,9 @@ const after = (a: string, b: string): boolean => {
   const left = a.split("-").map(BigInt), right = b.split("-").map(BigInt);
   return left[0]! > right[0]! || (left[0] === right[0] && left[1]! > right[1]!);
 };
-
-export async function eventFingerprint(event: Event): Promise<string> {
-  // Preserve the persisted bigint tags while canonicalizing object-key order.
-  // Object.fromEntries retains an own "__proto__" field as data; assigning it
-  // into a plain accumulator would silently omit it from the fingerprint.
-  const ordered = JSON.stringify(JSON.parse(encodeEvent(event)), (_name, value: unknown) =>
-    value && typeof value === "object" && !Array.isArray(value)
-      ? Object.fromEntries(Object.keys(value).sort().map((name) => [name, (value as Record<string, unknown>)[name]]))
-      : value);
-  const bytes = new TextEncoder().encode(ordered);
-  return bytesToHex(new Uint8Array(await crypto.subtle.digest("SHA-256", bytes)));
-}
+// DATA-005: eventFingerprint now lives in src/lib/event-fingerprint.ts,
+// shared with upsertRemoteEvents and the legacy sync path's readback
+// confirmation check, instead of being duplicated privately in this file.
 
 /** Only the explicitly migrated generation uses this path. No Nostr publish
  * operation is reachable here; its retained sources are read for late devices. */

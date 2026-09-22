@@ -1,6 +1,6 @@
 # Project State
 
-## 02_EXECUTE — approved, executing T21 next (20/73 complete; T18/INTR-002-journal a9d03d4, T19/INTR-002-resume 88bc31f, T20/REL-003 0165ea0)
+## 02_EXECUTE — approved, executing T25 next (24/73 complete; T22/DRIFT-005 011817a, T23/SEC-003-B1 recorded no-commit, T24/SEC-003 2caa4a9, NEW-002/test-drift 795dc2a)
 
 - All 49 audit findings selected; requested order P2 → P1 → P3, with dependency-bound work deferred until prerequisites pass.
 - Planning artifacts: `bugfix.md`, `design.md`, `tasks.md`; resume gate: `execute_state.json`.
@@ -61,12 +61,12 @@ Both new components pass all isolated UI tests. CR-017 data/relay gates unchange
 <!-- MOLT_AUTO_START -->
 ## Auto State
 
-- Updated: 2026-09-21 16:30:41 +08:00
+- Updated: 2026-09-22 09:57:55 +08:00
 - Machine: PRAWN-E14
 - Harness: claude
 - Event: stop
 - Branch: maintenance/prawn-ui-20260916
-- HEAD: 4a4fd4b
+- HEAD: 011817a
 - Dirty files: 6
 - Resume hint: Read .agents/STATE.md, then the latest file in .agents/handoffs/ if present.
 <!-- MOLT_AUTO_END -->

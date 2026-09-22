@@ -1,6 +1,6 @@
 # Project State
 
-## 02_EXECUTE — approved, executing T25 next (24/73 complete; T22/DRIFT-005 011817a, T23/SEC-003-B1 recorded no-commit, T24/SEC-003 2caa4a9, NEW-002/test-drift 795dc2a)
+## 02_EXECUTE — approved, executing T27 next (26/73 complete; T24/SEC-003 2caa4a9, NEW-002/test-drift 795dc2a, T25/REL-008-B4 recorded, T26/REL-008 e24a20b)
 
 - All 49 audit findings selected; requested order P2 → P1 → P3, with dependency-bound work deferred until prerequisites pass.
 - Planning artifacts: `bugfix.md`, `design.md`, `tasks.md`; resume gate: `execute_state.json`.

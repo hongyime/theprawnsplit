@@ -30,3 +30,10 @@ Free plans only; never delete records or upgrade to force a fit.
 
 Detailed source-release history: `.agents/handoffs/split-source-retention-20260915.json`.
 The existing owner HTML contains the current operator result and remaining gates.
+
+Dependabot PR #12 (trufflehog 3.97.4->3.97.5) was blocked by a failing
+dependency-review check. Root cause: Dependency Graph / vulnerability alerts
+were disabled at the repo level, so the dependency-review action couldn't
+execute at all - not an actual vulnerability finding. Enabled Dependency Graph
+via GitHub API, re-ran the check (passed), merged PR #12. Ended because: task
+complete.

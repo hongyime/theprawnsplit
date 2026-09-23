@@ -1,39 +1,32 @@
 # Project State
 
-## Last change — 2026-09-22
+## Last change — 2026-09-23
 
-Dependabot PR #12 (trufflehog patch bump) was blocked by a failing
-`dependency-review` check. Root cause: Dependency Graph and vulnerability
-alerts were disabled at the repo level, so the `dependency-review` action
-could not run at all (not an actual vulnerability finding — the action simply
-could not execute without the graph enabled).
+T30 (DATA-001) committed at `f3a6e6c` — 30/73 tasks complete in the
+02_EXECUTE cycle (see tasks.md/bugfix.md/execute_state.json). Full history
+of every completed task (T01–T30 + NEW-001/NEW-002) is in .agents/JOURNAL.md
+and in the git log on this branch. Next: T31.
 
-Fixed by enabling Dependency Graph via the GitHub API. Re-ran the check
-(passed). Merged PR #12.
+A separate, unrelated session fixed Dependabot PR #12 (trufflehog patch
+bump) on `main` by enabling Dependency Graph via the GitHub API — merged,
+done, no action needed here. That work never touched any file this
+T-series cycle depends on.
 
 ## Status
 
-DONE — Dependency Graph enabled, dependency-review check passes, PR #12
-merged.
-Ended because: task complete.
+IN PROGRESS — 02_EXECUTE cycle, 30/73 tasks + 2 NEW findings complete.
+Next: T31.
 
 ## Active work context
 
-CR-017 remains in progress (2026-09-15). Work directly on main: no feature
-branches or PRs. Follow `.agents/PROTOCOL.md` for source verification.
-
-Original-source retention is released at `7c02b124904754c2c834801660d5bcebd5753167`.
-All five main workflows, all four local/hosted protocol commands and 18 production
-browser cases passed: 81 core, 326 app and 11 encrypted-export tests, zero Svelte
-diagnostics. Production still uses Upstash; Supabase writes/imports remain off.
-
-PR #11 (maintenance/prawn-ui-20260916) is open against main.
-Commit ed332a0 on branch maintenance/prawn-ui-20260916.
-
-Remaining CR-017 gates: establish source coverage beyond known groups/default
-relays, obtain verified old-writer freeze access, capture the final consistent
-encrypted delta, and measure current shared quota/growth before cutover. Free
-plans only; never delete records or upgrade to force a fit.
+Working branch: `maintenance/prawn-ui-20260916`, pushed to
+`origin/maintenance/prawn-ui-20260916`. Not yet merged into `main` via PR
+(compare link: https://github.com/hongyime/theprawnsplit/compare/main...maintenance/prawn-ui-20260916).
+Every task's exact commit hash is recorded in tasks.md/bugfix.md/
+execute_state.json (local-only pipeline artifacts, not git-tracked) and in
+the git log itself. Multiple agents/sessions may be active on this repo
+concurrently — always `git fetch` and check `git log --oneline -5` on both
+`main` and this branch before assuming either is unchanged.
 
 <!-- MOLT_AUTO_START -->
 ## Auto State

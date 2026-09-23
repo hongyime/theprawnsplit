@@ -21,6 +21,18 @@ export interface StoredGroup {
   createdAt: number;
   secretB64: string;
   tagHex: string;
+  // DATA-002: absent/undefined means linked (the normal, historical case --
+  // created via createGroup/ensureGroup with a secret that genuinely
+  // derives this tagHex). false means this group's secretB64/tagHex pair
+  // is self-consistent but NOT verified against the original trip this
+  // import came from -- it cannot decrypt or authenticate against that
+  // trip's real relay history until a verified matching seed is attached.
+  linked?: boolean;
+  // The imported file's original tagHex, retained only while linked is
+  // false, so a later attachVerifiedSeed() call can verify a supplied
+  // seed actually corresponds to the SAME trip this group was imported
+  // from, not some unrelated one.
+  sourceTagHex?: string;
 }
 
 export interface StoredEvent {
@@ -408,6 +420,13 @@ export async function saveGroup(group: StoredGroup): Promise<void> {
     secretB64: group.secretB64,
     tagHex: group.tagHex,
   };
+  // DATA-002: linked/sourceTagHex are optional and must only be assigned
+  // when actually present -- exactOptionalPropertyTypes forbids explicit
+  // undefined, and omitting them here (rather than always spreading) is
+  // exactly what would silently "relink" an unlinked group on its next
+  // unrelated save (rename, currency change, commit).
+  if (group.linked !== undefined) persisted.linked = group.linked;
+  if (group.sourceTagHex !== undefined) persisted.sourceTagHex = group.sourceTagHex;
   await database.put("groups", persisted);
 }
 
@@ -457,14 +476,24 @@ export async function replaceFromExport(exported: TripLedgerExport): Promise<Gro
   }
 
   // No local trip matches this tag at all: create an isolated new local
-  // group, exactly as before.
+  // group. DATA-002: the export never carries a secret (by design), so
+  // there is no way to verify this device actually holds the real trip's
+  // key material. A fresh secret is generated for this NEW group's OWN
+  // identity -- its tagHex is derived FROM that fresh secret, never reused
+  // from the import file, so the stored tag/secret pair is always self-
+  // consistent. The group is marked explicitly unlinked/offline; the
+  // import file's original tag is retained as sourceTagHex so a later
+  // attachVerifiedSeed() call can verify a supplied seed genuinely
+  // corresponds to the SAME trip this import came from.
   const secret = createGroupSecret();
   const group: StoredGroup = {
     ...exported.group,
     secretB64: secretToBase64(secret),
-    tagHex: tagHex || (await groupTag(secret)),
+    tagHex: await groupTag(secret),
     deviceId: newId("d"),
     nextCounter: exported.events.length + 1,
+    linked: false,
+    sourceTagHex: tagHex,
   };
   const tx = database.transaction(["groups", "events", "meta"], "readwrite");
   await tx.objectStore("groups").put(group);
@@ -483,6 +512,28 @@ export async function replaceFromExport(exported: TripLedgerExport): Promise<Gro
   return readGroup(group.groupId);
 }
 
+// DATA-002: upgrades an explicitly unlinked/offline group (created by
+// replaceFromExport when no local trip matched the import's tag) to a
+// fully linked one, once the caller supplies a seed that genuinely
+// corresponds to the SAME trip this group was imported from. Never
+// silently replaces an already-linked group's key material, and never
+// trusts a seed's claimed tagHex without independently deriving it from
+// the seed's own secret first.
+export async function attachVerifiedSeed(groupId: string, seed: Pick<JoinSeed, "secretB64" | "tagHex">): Promise<GroupRecord> {
+  const database = await db();
+  const group = await database.get("groups", groupId);
+  if (!group) throw new Error("Group not found");
+  if (group.linked !== false) throw new Error("This trip already has verified key material; refusing to replace it");
+  const secret = secretFromBase64(seed.secretB64);
+  const derivedTag = await groupTag(secret);
+  if (derivedTag !== seed.tagHex || derivedTag !== group.sourceTagHex) {
+    throw new Error("Provided seed does not match the trip this import came from");
+  }
+  const linked: StoredGroup = { ...group, secretB64: seed.secretB64, tagHex: derivedTag, linked: true };
+  delete linked.sourceTagHex;
+  await saveGroup(linked);
+  return readGroup(groupId);
+}
 export function createExport(group: GroupRecord): TripLedgerExport {
   return {
     type: "TripLedgerExport",
@@ -781,39 +832,39 @@ export class EventIdentityConflictError extends Error {
 
 export async function upsertRemoteEvents(groupId: string, events: Event[], cursorUpdates: Record<string, string> = {}): Promise<number> {
   const database = await db();
+  // DATA-005: resolve every conflict check (including the crypto-heavy
+  // fingerprint hashes) BEFORE opening the write transaction at all --
+  // NOT merely before issuing any write within an already-open one.
+  // crypto.subtle.digest (via eventFingerprint) is a real async
+  // operation; awaiting it while an IDB transaction is open can let the
+  // transaction auto-deactivate under load (InvalidStateError on the next
+  // objectStore() call), the same hazard ensureGroup's own comment
+  // documents for crypto work generally. database.get() below uses its
+  // own short-lived internal transaction per call, never held open across
+  // the fingerprint awaits.
+  const toInsert: Event[] = [];
+  for (const event of events) {
+    const existingRow = await database.get("events", [groupId, event.id]);
+    if (!existingRow) {
+      toInsert.push(event);
+      continue;
+    }
+    const existingEvent = decodeEvent(existingRow.eventJson);
+    const [existingFingerprint, incomingFingerprint] = await Promise.all([
+      eventFingerprint(existingEvent),
+      eventFingerprint(event),
+    ]);
+    if (existingFingerprint !== incomingFingerprint) {
+      throw new EventIdentityConflictError(groupId, event.id, existingEvent, event);
+    }
+    // Identical content already stored under this id — a true repeat, not
+    // a conflict. Idempotent no-op, matching this function's existing
+    // "skip an id we already have" contract for the non-conflicting case.
+  }
+
   const tx = database.transaction(["events", "meta"], "readwrite");
   let added = 0;
   try {
-    // DATA-005: resolve every conflict check (read-only) BEFORE issuing any
-    // write. An id that already exists locally is not automatically a
-    // no-op — a same-id, different-content event (opposite arrival order
-    // across replicas, a replay, or a corrupted/malicious peer) must never
-    // be silently discarded in favor of whichever copy happened to land
-    // first — that is exactly how two devices end up permanently
-    // disagreeing about what one event id means while both claim
-    // confirmation. Deciding this BEFORE any put() also means a thrown
-    // conflict never needs to roll back an already-issued write within
-    // this same transaction.
-    const toInsert: Event[] = [];
-    for (const event of events) {
-      const key: [string, string] = [groupId, event.id];
-      const existingRow = await tx.objectStore("events").get(key);
-      if (!existingRow) {
-        toInsert.push(event);
-        continue;
-      }
-      const existingEvent = decodeEvent(existingRow.eventJson);
-      const [existingFingerprint, incomingFingerprint] = await Promise.all([
-        eventFingerprint(existingEvent),
-        eventFingerprint(event),
-      ]);
-      if (existingFingerprint !== incomingFingerprint) {
-        throw new EventIdentityConflictError(groupId, event.id, existingEvent, event);
-      }
-      // Identical content already stored under this id — a true repeat, not
-      // a conflict. Idempotent no-op, matching this function's existing
-      // "skip an id we already have" contract for the non-conflicting case.
-    }
     for (const event of toInsert) {
       await tx.objectStore("events").put({ groupId, eventId: event.id, eventJson: encodeEvent(event), syncState: "confirmed", publishedAt: Date.now() });
       added += 1;

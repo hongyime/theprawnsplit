@@ -124,8 +124,14 @@ describe("replaceFromExport (DATA-001)", () => {
     const created = await replaceFromExport(exported);
 
     expect(created.groupId).not.toBe(group.groupId);
-    expect(created.tagHex).toBe("e".repeat(64));
-    // The original group is completely untouched.
+    // DATA-002: the stored tagHex is derived from the newly generated
+    // secret, never copied verbatim from the import file (see
+    // import-linkage.test.ts for the full DATA-002 coverage) -- this
+    // no-match group is explicitly unlinked/offline, with the import
+    // file's original tag preserved separately as sourceTagHex.
+    expect(created.tagHex).not.toBe("e".repeat(64));
+    expect(created.linked).toBe(false);
+    expect(created.sourceTagHex).toBe("e".repeat(64));
     expect((await readGroup(group.groupId)).events).toEqual(group.events);
   });
 });

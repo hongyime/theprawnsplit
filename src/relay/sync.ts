@@ -101,6 +101,16 @@ export function syncOnce(groupId: string, relayOverride?: Relay[], opts: SyncOnc
 
 async function runSyncCycle(groupId: string, relayOverride: Relay[] | undefined, opts: SyncOnceOptions): Promise<SyncResult> {
   const group = await readGroup(groupId);
+  // DATA-002: an explicitly unlinked/offline group's secret/tag pair is
+  // self-consistent but NOT verified against any real trip's relay
+  // history — publishing to it would either fail outright or, worse,
+  // silently claim a tag no peer actually shares. Local reads/writes and
+  // export/import stay fully available; only network sync is gated.
+  if (group.linked === false) {
+    const result = emptySyncResult();
+    result.errors.push("This trip was imported without a verified join link and stays offline-only until one is provided.");
+    return result;
+  }
   const relays = relayOverride ?? createRelays(group);
   const deadline = syncNetworkBudget(opts.networkBudgetMs);
   try {

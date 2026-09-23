@@ -846,6 +846,13 @@
 
   async function copyJoinLink(): Promise<void> {
     if (!group) return;
+    // DATA-002: this group's secret/tag pair is not verified against any
+    // real trip — sharing a link built from it would never let anyone join
+    // the actual trip this was imported from.
+    if (group.linked === false) {
+      syncStatus = "This Trip Was Imported Without A Verified Join Link. Ask The Trip Owner For Their Join Link To Connect It.";
+      return;
+    }
     let url: string;
     try {
       url = buildJoinLink(window.location.href, createJoinSeed(group));
@@ -871,6 +878,10 @@
 
   async function showJoinQrCode(): Promise<void> {
     if (!group) return;
+    if (group.linked === false) {
+      syncStatus = "This Trip Was Imported Without A Verified Join Link. Ask The Trip Owner For Their Join Link To Connect It.";
+      return;
+    }
     try {
       const link = buildJoinLink(window.location.href, createJoinSeed(group));
       const QRCode = await import("qrcode");

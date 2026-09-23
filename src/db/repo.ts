@@ -433,20 +433,41 @@ export async function appendEvents(groupId: string, events: Event[]): Promise<Gr
 export async function replaceFromExport(exported: TripLedgerExport): Promise<GroupRecord> {
   if (exported.type !== "TripLedgerExport" || exported.version !== 1) throw new Error("Unsupported export");
   const database = await db();
+  const groups = await database.getAll("groups");
+  const tagHex = exported.group.tagHex;
+  const existingByTag = groups.find((candidate) => candidate.tagHex === tagHex);
+  const collidingById = groups.find((candidate) => candidate.groupId === exported.group.groupId && candidate.tagHex !== tagHex);
+  // DATA-001: a local groupId reused by an import file for a DIFFERENT
+  // trip (a stale/corrupted/crafted export) must never be treated as an
+  // update to that unrelated local trip. groupId is only a local primary
+  // key; tagHex is a trip's real cryptographic identity.
+  if (collidingById) throw new Error("Import artifact's group id collides with a different local trip's identity; refusing to overwrite it");
+
+  if (existingByTag) {
+    // DATA-001: the same trip already exists locally (matched by its real
+    // identity, tagHex) — union the imported events into it rather than
+    // deleting and replacing anything. Reuses this group's own secret,
+    // deviceId, outbox and meta (cursors, version vector, durability
+    // state) untouched; upsertRemoteEvents already provides transactional,
+    // content-fingerprint-aware conflict detection (DATA-005) for exactly
+    // this kind of union, so a genuinely conflicting same-id event still
+    // rejects the whole import rather than silently picking a winner.
+    await upsertRemoteEvents(existingByTag.groupId, exported.events);
+    return readGroup(existingByTag.groupId);
+  }
+
+  // No local trip matches this tag at all: create an isolated new local
+  // group, exactly as before.
   const secret = createGroupSecret();
   const group: StoredGroup = {
     ...exported.group,
     secretB64: secretToBase64(secret),
-    tagHex: exported.group.tagHex || (await groupTag(secret)),
+    tagHex: tagHex || (await groupTag(secret)),
     deviceId: newId("d"),
     nextCounter: exported.events.length + 1,
   };
   const tx = database.transaction(["groups", "events", "meta"], "readwrite");
   await tx.objectStore("groups").put(group);
-  const index = tx.objectStore("events").index("byGroup");
-  for (const cursor of await index.getAllKeys(group.groupId)) {
-    await tx.objectStore("events").delete(cursor as [string, string]);
-  }
   for (const event of exported.events) {
     await tx.objectStore("events").put({ groupId: group.groupId, eventId: event.id, eventJson: encodeEvent(event), syncState: "local" });
   }

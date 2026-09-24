@@ -16,6 +16,16 @@ function event(dev: string, ctr: number, wall = ctr): Event {
   } as never);
 }
 
+function marker(dev: string, ctr: number, wall = ctr): Event {
+  return base("ParticipantAdded", {
+    id: `${dev}:${ctr}`,
+    dev,
+    hlc: hlc(wall, ctr, dev),
+    pid: `p-${dev}`,
+    name: dev,
+  } as never);
+}
+
 describe("REQ-SYN-19/24/27 transport admission", () => {
   it("drops surplus from one author only and advances discardVector", () => {
     const incoming = [event("throwaway", 1), event("throwaway", 2), event("throwaway", 3), event("peer", 1)];
@@ -121,5 +131,49 @@ describe("REQ-SYN-19/24/27 transport admission", () => {
     expect(result.admitted.map((e) => e.id)).toEqual([wellFormed.id]);
     // Malformed events still advance the discard vector so they are never refetched.
     expect(result.discardVector).toEqual({ broken: 2 });
+  });
+});
+
+describe("DATA-004 batch-context author classification", () => {
+  it("treats a brand-new author as known for cap purposes once their own marker appears anywhere in this batch", () => {
+    const incoming = [event("newdev", 1), event("newdev", 2), marker("newdev", 3), event("newdev", 4), event("newdev", 5)];
+    const result = admitTransportEvents(incoming, [], {}, {
+      now: 10,
+      supportedVersion: 1,
+      maxFutureDriftMs: 120_000,
+      capUnknownAuthor: 2,
+      capKnownAuthor: 1000,
+      capGroupTotal: 10_000,
+      bufferMaxEvents: 500,
+    });
+    // Without the fix, only 2 events (capUnknownAuthor) would fit before the
+    // 3rd overflows it, even though this author's own marker (proving they
+    // are legitimate) is IN this same batch — just not first.
+    expect(result.dropped).toEqual([]);
+    expect(result.admitted).toHaveLength(5);
+  });
+
+  it("does not trust a marker event with a malformed HLC as an eligibility signal", () => {
+    const badMarker = marker("faker", 1);
+    if (badMarker.t !== "ParticipantAdded") throw new Error("wrong fixture");
+    badMarker.hlc = { wall: Number.NaN, ctr: 1, dev: "faker" };
+    const incoming = [badMarker, event("faker", 2), event("faker", 3)];
+    const result = admitTransportEvents(incoming, [], {}, {
+      now: 10,
+      supportedVersion: 1,
+      maxFutureDriftMs: 120_000,
+      capUnknownAuthor: 1,
+      capKnownAuthor: 1000,
+      capGroupTotal: 10_000,
+      bufferMaxEvents: 500,
+    });
+    // The malformed marker itself is dropped; the remaining well-formed
+    // events must still be judged under capUnknownAuthor, not
+    // capKnownAuthor — a malformed marker must never grant elevated trust.
+    expect(result.dropped.map((d) => [d.event.id, d.reason])).toEqual([
+      ["faker:1", "malformed"],
+      ["faker:3", "cap"],
+    ]);
+    expect(result.admitted.map((e) => e.id)).toEqual(["faker:2"]);
   });
 });

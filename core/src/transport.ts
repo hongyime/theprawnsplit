@@ -41,6 +41,15 @@ function knownAuthors(events: Event[]): Set<string> {
   }
   return known;
 }
+function hasFiniteHlc(event: Event): boolean {
+  // CR-011 convergence decision: events whose HLC numbers are not finite are
+  // rejected at admission. A non-finite wall makes `a.wall - b.wall` NaN, which
+  // is falsy, so the comparator would silently fall through to ctr/dev and the
+  // resulting order is intransitive between malformed and well-formed events —
+  // sort() output would then depend on input permutation (divergence).
+  return Number.isFinite(event.hlc.wall) && Number.isFinite(event.hlc.ctr);
+}
+
 
 function authorCounts(events: Event[]): Map<string, number> {
   const counts = new Map<string, number>();
@@ -58,7 +67,17 @@ export function admitTransportEvents(
   currentDiscardVector: Record<string, number>,
   opts: TransportAdmissionOptions,
 ): TransportAdmissionResult {
-  const known = knownAuthors(current);
+  // DATA-004: a brand-new author's first-ever sync batch contains their own
+  // ParticipantAdded/ParticipantClaimed marker PLUS many other events; if
+  // "known" only ever looked at the pre-batch ledger (`current`), every one
+  // of their events in THIS batch — including ones before their marker in
+  // array order — would be judged under the low capUnknownAuthor instead of
+  // capKnownAuthor, even though the batch itself proves who they are.
+  // Scanning `incoming` too (order-independent: known is a set, not applied
+  // positionally) fixes that. Malformed-HLC events are excluded from this
+  // scan (hasFiniteHlc filter) so a marker that will itself be dropped can
+  // never be trusted to elevate its author's cap.
+  const known = new Set([...knownAuthors(current), ...knownAuthors(incoming.filter(hasFiniteHlc))]);
   const counts = authorCounts(current);
   const admitted: Event[] = [];
   const buffered: BufferedEvent[] = [];
@@ -68,12 +87,7 @@ export function admitTransportEvents(
   let groupCount = current.length;
 
   for (const event of incoming) {
-    // CR-011 convergence decision: events whose HLC numbers are not finite are
-    // rejected at admission. A non-finite wall makes `a.wall - b.wall` NaN, which
-    // is falsy, so the comparator would silently fall through to ctr/dev and the
-    // resulting order is intransitive between malformed and well-formed events —
-    // sort() output would then depend on input permutation (divergence).
-    if (!Number.isFinite(event.hlc.wall) || !Number.isFinite(event.hlc.ctr)) {
+    if (!hasFiniteHlc(event)) {
       dropped.push({ event, reason: "malformed" });
       bump(discardVector, event);
       continue;

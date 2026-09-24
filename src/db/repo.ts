@@ -33,6 +33,15 @@ export interface StoredGroup {
   // seed actually corresponds to the SAME trip this group was imported
   // from, not some unrelated one.
   sourceTagHex?: string;
+  // CONC-001: a stable-command-identity map from caller-provided commandId
+  // to the counter range reserved for it. Lets a retried command (same
+  // commandId) reuse its ORIGINAL reservation instead of allocating a new,
+  // overlapping range and creating a duplicate logical event. An unused
+  // reservation (command abandoned before appendReservedEvents ever runs)
+  // simply leaves a permanent gap in the counter sequence -- never a
+  // delivered/overwritten event, and deliberately never garbage-collected
+  // since gaps are explicitly tolerated by this finding's fix approach.
+  reservations?: Record<string, number[]>;
 }
 
 export interface StoredEvent {
@@ -435,6 +444,7 @@ export async function saveGroup(group: StoredGroup): Promise<void> {
   // unrelated save (rename, currency change, commit).
   if (group.linked !== undefined) persisted.linked = group.linked;
   if (group.sourceTagHex !== undefined) persisted.sourceTagHex = group.sourceTagHex;
+  if (group.reservations !== undefined) persisted.reservations = group.reservations;
   await database.put("groups", persisted);
 }
 
@@ -454,6 +464,83 @@ export async function appendEvents(groupId: string, events: Event[]): Promise<Gr
   }
   await tx.objectStore("meta").put(meta);
   await tx.done;
+  return readGroup(groupId);
+}
+
+export interface EventReservation {
+  deviceId: string;
+  counters: number[];
+}
+
+// CONC-001: two-phase event creation. Reserve counters atomically FIRST
+// (fast, transactional, no signing/construction work happens inside this
+// transaction), build and sign the actual events OUTSIDE any transaction
+// (this can take arbitrary time -- e.g. async crypto signing -- without
+// ever holding a transaction open), then insert them via
+// appendReservedEvents (collision-safe, using add() not put()). A retried
+// command (same commandId) reuses its ORIGINAL reservation instead of a
+// fresh, overlapping one -- so retries never duplicate a logical event
+// under two different ids, and two concurrent callers can never receive
+// overlapping counter ranges regardless of how their construction/signing
+// work interleaves afterward.
+export async function reserveEventIds(groupId: string, commandId: string, count: number): Promise<EventReservation> {
+  const database = await db();
+  const tx = database.transaction("groups", "readwrite");
+  const group = await tx.store.get(groupId);
+  if (!group) throw new Error("Group not found");
+  const existing = group.reservations?.[commandId];
+  if (existing) {
+    await tx.done;
+    return { deviceId: group.deviceId, counters: existing };
+  }
+  const counters = Array.from({ length: count }, (_, index) => group.nextCounter + index);
+  const nextGroup: StoredGroup = {
+    ...group,
+    nextCounter: group.nextCounter + count,
+    reservations: { ...group.reservations, [commandId]: counters },
+  };
+  await tx.store.put(nextGroup);
+  await tx.done;
+  return { deviceId: group.deviceId, counters };
+}
+
+// Appends events built from a reservation's counters. Uses add() (not
+// put()) so a genuine id collision -- which reservation should prevent,
+// but this is the defensive backstop -- throws instead of silently
+// overwriting unrelated content. Clears the now-delivered command's
+// reservation entry on success (an unconsumed reservation, e.g. an
+// abandoned command, is left in place forever -- a permanent gap, never
+// re-issued to a different command, and never treated as delivered).
+export async function appendReservedEvents(groupId: string, commandId: string, events: Event[]): Promise<GroupRecord> {
+  const database = await db();
+  const tx = database.transaction(["groups", "events", "meta"], "readwrite");
+  try {
+    const group = await tx.objectStore("groups").get(groupId);
+    if (!group) throw new Error("Group not found");
+    const meta =
+      (await tx.objectStore("meta").get(groupId)) ??
+      ({ groupId, versionVector: {}, discardVector: {}, cursors: {}, nostrSk: createNostrSecretHex() } satisfies StoredMeta);
+    for (const event of events) {
+      const stamped = withVersionVector(event, meta.versionVector);
+      await tx.objectStore("events").add({ groupId, eventId: stamped.id, eventJson: encodeEvent(stamped), syncState: "local" });
+      meta.versionVector[stamped.dev] = Math.max(meta.versionVector[stamped.dev] ?? 0, counterFromEvents([stamped]));
+      meta.unsyncedSince ??= Date.now();
+    }
+    if (group.reservations && commandId in group.reservations) {
+      const { [commandId]: _removed, ...rest } = group.reservations;
+      await tx.objectStore("groups").put({ ...group, reservations: rest });
+    }
+    await tx.objectStore("meta").put(meta);
+    await tx.done;
+  } catch (err) {
+    // A failed request (e.g. add()'s ConstraintError on a genuine id
+    // collision) aborts the whole transaction automatically; tx.done will
+    // separately reject with that abort once it fires. Await-and-swallow
+    // it here so it never surfaces as an unhandled rejection, then
+    // rethrow the ORIGINAL, more specific error to the caller.
+    await tx.done.catch(() => undefined);
+    throw err;
+  }
   return readGroup(groupId);
 }
 

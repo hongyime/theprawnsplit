@@ -2,11 +2,11 @@
 
 ## Last change — 2026-09-23
 
-T35 (CONC-002 — transactional, field-scoped metadata writers) done at
-commit `583ba63` — 35/73 tasks + 3 NEW findings complete in the
+T36 (CONC-003 — insert-or-return persisted claim identity atomically) done
+at commit `10ec5ce` — 36/73 tasks + 3 NEW findings complete in the
 02_EXECUTE cycle (see tasks.md/bugfix.md/execute_state.json). Full
 history of every completed task is in .agents/JOURNAL.md and in the git
-log on this branch. Next: T36.
+log on this branch. Next: T37.
 
 A separate, unrelated session fixed Dependabot PR #12 (trufflehog patch
 bump) on `main` by enabling Dependency Graph via the GitHub API — merged,
@@ -15,8 +15,8 @@ T-series cycle depends on.
 
 ## Status
 
-IN PROGRESS — 02_EXECUTE cycle, 35/73 tasks + 3 NEW findings complete.
-Next: T36.
+IN PROGRESS — 02_EXECUTE cycle, 36/73 tasks + 3 NEW findings complete.
+Next: T37.
 
 ## Active work context
 

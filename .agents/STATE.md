@@ -2,11 +2,13 @@
 
 ## Last change — 2026-09-23
 
-T36 (CONC-003 — insert-or-return persisted claim identity atomically) done
-at commit `10ec5ce` — 36/73 tasks + 3 NEW findings complete in the
-02_EXECUTE cycle (see tasks.md/bugfix.md/execute_state.json). Full
-history of every completed task is in .agents/JOURNAL.md and in the git
-log on this branch. Next: T37.
+T37 (CONC-001 — atomic two-phase event identity reservation allocator)
+done at commit `b435a84` — 37/73 tasks + 3 NEW findings complete in the
+02_EXECUTE cycle (see tasks.md/bugfix.md/execute_state.json). Scope note:
+T37 built the allocator only; the OLD factory()/commit()/appendEvents()
+path in Trip.svelte is unchanged and still vulnerable until T38 migrates
+every caller. Full history of every completed task is in
+.agents/JOURNAL.md and in the git log on this branch. Next: T38.
 
 A separate, unrelated session fixed Dependabot PR #12 (trufflehog patch
 bump) on `main` by enabling Dependency Graph via the GitHub API — merged,
@@ -15,8 +17,8 @@ T-series cycle depends on.
 
 ## Status
 
-IN PROGRESS — 02_EXECUTE cycle, 36/73 tasks + 3 NEW findings complete.
-Next: T37.
+IN PROGRESS — 02_EXECUTE cycle, 37/73 tasks + 3 NEW findings complete.
+Next: T38.
 
 ## Active work context
 

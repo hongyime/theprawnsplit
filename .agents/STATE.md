@@ -2,11 +2,11 @@
 
 ## Last change — 2026-09-23
 
-T33 (DATA-006 — replicated, freeze-before-first-expense base currency
-contract) done at commit `633436f` — 33/73 tasks + 3 NEW findings complete
-in the 02_EXECUTE cycle (see tasks.md/bugfix.md/execute_state.json). Full
+T34 (DATA-004 — classify batch authors from validated context) done at
+commit `9f801bf` — 34/73 tasks + 3 NEW findings complete in the
+02_EXECUTE cycle (see tasks.md/bugfix.md/execute_state.json). Full
 history of every completed task is in .agents/JOURNAL.md and in the git
-log on this branch. Next: T34.
+log on this branch. Next: T35.
 
 A separate, unrelated session fixed Dependabot PR #12 (trufflehog patch
 bump) on `main` by enabling Dependency Graph via the GitHub API — merged,
@@ -15,8 +15,8 @@ T-series cycle depends on.
 
 ## Status
 
-IN PROGRESS — 02_EXECUTE cycle, 33/73 tasks + 3 NEW findings complete.
-Next: T34.
+IN PROGRESS — 02_EXECUTE cycle, 34/73 tasks + 3 NEW findings complete.
+Next: T35.
 
 ## Active work context
 

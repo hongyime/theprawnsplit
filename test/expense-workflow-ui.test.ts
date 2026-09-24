@@ -38,10 +38,10 @@ describe("expense workflow UI boundary", () => {
 
     expect(addExpense).toContain("const dates = defaultExpenseDate();");
     expect(addExpense).toContain("const financials = makeExpenseFinancials(amountPreview.baseMinor, payerPreview.payers, sharePreview.shares);");
-    expect(addExpense).toContain('const event = makeEvent(f, "ExpenseAdded"');
+    expect(addExpense).toContain('makeEvent(f, "ExpenseAdded"');
     expect(addExpense).toContain("...dates,");
     expect(addExpense).toContain("amountPreview.rate ? 2 : 1");
-    expect(editExpense).toContain('const event = makeEvent(f, "ExpenseEdited"');
+    expect(editExpense).toContain('makeEvent(f, "ExpenseEdited"');
     expect(editExpense).toContain("editFinancialsForTotal({ current: expense.financials, nextMinor: minor, eventId: id })");
     expect(editExpense).toContain("meta: { desc: desc.trim() || expense.desc }");
     expect(voidExpense).toContain('makeEvent(f, "ExpenseVoided", { xid })');

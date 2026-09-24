@@ -5,7 +5,7 @@
   import NeoButton from "@/lib/NeoButton.svelte";
   import { allocate, eventSortKey, fold, greedySettlement, type Event, type Financials, type VerificationContext, type State } from "@theprawnsplit/core";
   import {
-    appendEvents,
+    appendReservedEvents,
     applyDelta,
     createDelta,
     createExport,
@@ -17,6 +17,7 @@
     readGroup,
     recordAppLaunch,
     replaceFromExport,
+    reserveEventIds,
     restoreIdentityBackup,
     saveGroup,
     stringifyExport,
@@ -25,6 +26,7 @@
     type GroupRecord,
     type SyncCounts,
   } from "@/db/repo";
+
   import {
     dismissInstallPrompt,
     exportPromptReason,
@@ -259,19 +261,23 @@
     counts = await syncCounts(group.groupId);
   }
 
-  function factory(): EventFactory {
+  // CONC-001/T38: reserve counters atomically FIRST (via reserveEventIds),
+  // build/sign the events using the reservation OUTSIDE any transaction,
+  // then insert via appendReservedEvents (collision-safe, add() not put()).
+  // Replaces the old factory()/commit() pattern, which read group.nextCounter
+  // directly (a stale-snapshot race between concurrent actions) and used
+  // put() (silent-overwrite) semantics on insert.
+  async function commitReserved<T extends Event[]>(count: number, build: (f: EventFactory) => Promise<T> | T): Promise<T> {
     if (!group) throw new Error("No Group");
-    return { deviceId: group.deviceId, nextCounter: group.nextCounter };
-  }
-
-  async function commit(events: Event[], nextFactory: EventFactory): Promise<void> {
-    if (!group) return;
-    const updatedGroup = { ...group, nextCounter: nextFactory.nextCounter };
-    await saveGroup(updatedGroup);
-    group = await appendEvents(group.groupId, events);
+    const commandId = crypto.randomUUID();
+    const reservation = await reserveEventIds(group.groupId, commandId, count);
+    const f: EventFactory = { deviceId: reservation.deviceId, nextCounter: reservation.counters[0]! };
+    const events = await build(f);
+    group = await appendReservedEvents(group.groupId, commandId, events);
     await refreshCounts();
     await refreshState();
     await refreshDurabilityPrompts();
+    return events;
   }
 
   async function addParticipant(): Promise<void> {
@@ -283,8 +289,7 @@
       error = `${match.name} Already Exists. Claim That Person Or Resolve The Duplicate Before Adding Another Record.`;
       return;
     }
-    const f = factory();
-    await commit([defaultParticipant(f, name)], f);
+    await commitReserved(1, (f) => [defaultParticipant(f, name)]);
     participantName = "";
     showToast(`${name} Added.`);
   }
@@ -292,26 +297,20 @@
   async function completeSetup(): Promise<void> {
     const name = setupName.trim();
     if (!name || !group || joinBlocked || archived || setupNameMatch) return;
-    const f = factory();
-    const event = defaultParticipant(f, name);
+    const [event] = await commitReserved(1, (f) => [defaultParticipant(f, name)]);
     if (event.t !== "ParticipantAdded") return;
-    await commit([event], f);
     setupName = "";
     const identity = await ensureClaimIdentity(group, event.pid);
-    const claimFactory = factory();
     const sig = await signClaim(identity.claimSkJwk, identity.alg, `${group.tagHex}:${event.pid}:${group.deviceId}:${identity.claimPk}`);
-    await commit(
-      [
-        makeEvent(claimFactory, "ParticipantClaimed", {
-          pid: event.pid,
-          deviceId: group.deviceId,
-          claimPk: identity.claimPk,
-          alg: identity.alg,
-          sig,
-        }),
-      ],
-      claimFactory,
-    );
+    await commitReserved(1, (f) => [
+      makeEvent(f, "ParticipantClaimed", {
+        pid: event.pid,
+        deviceId: group!.deviceId,
+        claimPk: identity.claimPk,
+        alg: identity.alg,
+        sig,
+      }),
+    ]);
     selectedPids = { ...selectedPids, [event.pid]: true };
     payerPid = event.pid;
     showToast(`${name} Is Ready. Add The First Expense.`);
@@ -336,20 +335,16 @@
       return;
     }
     const identity = await ensureClaimIdentity(group, pid);
-    const f = factory();
     const sig = await signClaim(identity.claimSkJwk, identity.alg, `${group.tagHex}:${pid}:${group.deviceId}:${identity.claimPk}`);
-    await commit(
-      [
-        makeEvent(f, "ParticipantClaimed", {
-          pid,
-          deviceId: group.deviceId,
-          claimPk: identity.claimPk,
-          alg: identity.alg,
-          sig,
-        }),
-      ],
-      f,
-    );
+    await commitReserved(1, (f) => [
+      makeEvent(f, "ParticipantClaimed", {
+        pid,
+        deviceId: group!.deviceId,
+        claimPk: identity.claimPk,
+        alg: identity.alg,
+        sig,
+      }),
+    ]);
     claimCandidatePid = "";
     if (!options.quiet) showToast(`${participantLabel(pid)} Claimed On This Device.`);
   }
@@ -375,49 +370,41 @@
     if (isDeviceLinkReplay(group.events, request)) throw new Error("Device Link Request Was Already Used");
     const signer = localIdentityForPid(request.pid);
     if (!signer) throw new Error(`Claim ${participantLabel(request.pid)} On This Device Before Authorising Another Device`);
-    const f = factory();
     const sig = await signClaim(signer.claimSkJwk, signer.alg, linkPayload(request));
-    await commit(
-      [
-        makeEvent(f, "DeviceLinked", {
-          pid: request.pid,
-          parentDevice: group.deviceId,
-          newDevice: request.newDevice,
-          newClaimPk: request.newClaimPk,
-          alg: request.alg,
-          nonce: request.nonce,
-          sig,
-        }),
-      ],
-      f,
-    );
+    await commitReserved(1, (f) => [
+      makeEvent(f, "DeviceLinked", {
+        pid: request.pid,
+        parentDevice: group!.deviceId,
+        newDevice: request.newDevice,
+        newClaimPk: request.newClaimPk,
+        alg: request.alg,
+        nonce: request.nonce,
+        sig,
+      }),
+    ]);
     syncStatus = `Device Linked For ${participantLabel(request.pid)}.`;
   }
 
   async function mergeParticipants(from: string, into: string): Promise<void> {
     if (!group || archived || from === into) return;
-    const f = factory();
-    await commit([makeEvent(f, "ParticipantMerged", { from, into })], f);
+    await commitReserved(1, (f) => [makeEvent(f, "ParticipantMerged", { from, into })]);
   }
 
   async function markParticipantsDistinct(a: string, b: string): Promise<void> {
     if (!group || archived || a === b) return;
-    const f = factory();
-    await commit([makeEvent(f, "ParticipantsMarkedDistinct", { a, b })], f);
+    await commitReserved(1, (f) => [makeEvent(f, "ParticipantsMarkedDistinct", { a, b })]);
   }
 
   async function deactivateParticipant(pid: string): Promise<void> {
     if (!group || archived) return;
     const ok = window.confirm(`${participantLabel(pid)} Will Be Removed From Default New-Expense Split Selections. Historical Balances And Settlements Stay Unchanged.`);
     if (!ok) return;
-    const f = factory();
-    await commit([makeEvent(f, "ParticipantDeactivated", { pid })], f);
+    await commitReserved(1, (f) => [makeEvent(f, "ParticipantDeactivated", { pid })]);
   }
 
   async function voidEvent(targetId: string): Promise<void> {
     if (!group || archived) return;
-    const f = factory();
-    await commit([makeEvent(f, "EventVoided", { targetId })], f);
+    await commitReserved(1, (f) => [makeEvent(f, "EventVoided", { targetId })]);
   }
 
   async function voidParticipantClaim(pid: string): Promise<void> {
@@ -521,21 +508,17 @@
     if (!claim) return;
     const attestor = localPeerIdentityFor(claim.pid);
     if (!attestor) return;
-    const f = factory();
     const sig = await signClaim(attestor.claimSkJwk, attestor.alg, `${group.tagHex}:reattest:${claim.pid}:${claim.deviceId}:${claim.claimPk}`);
-    await commit(
-      [
-        makeEvent(f, "ClaimReattested", {
-          pid: claim.pid,
-          newDevice: claim.deviceId,
-          newClaimPk: claim.claimPk,
-          alg: claim.alg,
-          attestor: attestor.pid,
-          sig,
-        }),
-      ],
-      f,
-    );
+    await commitReserved(1, (f) => [
+      makeEvent(f, "ClaimReattested", {
+        pid: claim.pid,
+        newDevice: claim.deviceId,
+        newClaimPk: claim.claimPk,
+        alg: claim.alg,
+        attestor: attestor.pid,
+        sig,
+      }),
+    ]);
   }
 
   function participantLabel(pid: string): string {
@@ -647,17 +630,15 @@
     }
     if (!amountPreview.ok) return;
     const wasFirstExpense = expenses.length === 0;
-    const f = factory();
     const dates = defaultExpenseDate();
     const financials = makeExpenseFinancials(amountPreview.baseMinor, payerPreview.payers, sharePreview.shares);
     if (amountPreview.rate) financials.rate = amountPreview.rate;
-    const event = makeEvent(f, "ExpenseAdded", {
+    await commitReserved(1, (f) => [makeEvent(f, "ExpenseAdded", {
       xid: crypto.randomUUID(),
       financials,
       desc: expenseDesc.trim(),
       ...dates,
-    }, amountPreview.rate ? 2 : 1);
-    await commit([event], f);
+    }, amountPreview.rate ? 2 : 1)]);
     if (wasFirstExpense) {
       await requestStoragePersistenceAfterFirstExpense();
       await markFirstExpensePersistenceRequested();
@@ -672,8 +653,7 @@
 
   async function voidExpense(xid: string): Promise<void> {
     if (archived) return;
-    const f = factory();
-    await commit([makeEvent(f, "ExpenseVoided", { xid })], f);
+    await commitReserved(1, (f) => [makeEvent(f, "ExpenseVoided", { xid })]);
   }
 
   async function editExpense(xid: string): Promise<void> {
@@ -686,22 +666,21 @@
     if (amount === null) return;
     const minor = parseMinor(amount);
     if (minor === null) return;
-    const f = factory();
-    const id = `${f.deviceId}:${f.nextCounter}`;
-    const event = makeEvent(f, "ExpenseEdited", {
-      xid,
-      financials: editFinancialsForTotal({ current: expense.financials, nextMinor: minor, eventId: id }),
-      meta: { desc: desc.trim() || expense.desc },
+    await commitReserved(1, (f) => {
+      const id = `${f.deviceId}:${f.nextCounter}`;
+      return [makeEvent(f, "ExpenseEdited", {
+        xid,
+        financials: editFinancialsForTotal({ current: expense.financials, nextMinor: minor, eventId: id }),
+        meta: { desc: desc.trim() || expense.desc },
+      })];
     });
-    await commit([event], f);
   }
 
   async function recordSettlement(from: string, to: string, amount: string): Promise<void> {
     const minor = parseMinor(amount);
     if (minor === null) return;
     if (!canRecordSettlement({ archived, allowSettlementActions: frozenPolicy.allowSettlementActions, from, to, minor })) return;
-    const f = factory();
-    await commit([makeEvent(f, "SettlementRecorded", { sid: crypto.randomUUID(), from, to, minor })], f);
+    await commitReserved(1, (f) => [makeEvent(f, "SettlementRecorded", { sid: crypto.randomUUID(), from, to, minor })]);
     settleAmount = "";
     showToast("Settlement Recorded.");
   }
@@ -727,24 +706,21 @@
     ) {
       return;
     }
-    const f = factory();
     const claimSig = await signClaim(identity.claimSkJwk, identity.alg, `${group.tagHex}:confirm:${sid}`);
-    await commit([makeEvent(f, "SettlementConfirmed", { sid, pid: settlement.to, claimSig })], f);
+    await commitReserved(1, (f) => [makeEvent(f, "SettlementConfirmed", { sid, pid: settlement.to, claimSig })]);
   }
 
   async function disputeSettlement(sid: string): Promise<void> {
     if (!group || archived || !frozenPolicy.allowSettlementActions) return;
     const note = window.prompt("Dispute Note", "Payment Not Received");
     if (note === null) return;
-    const f = factory();
     const trimmed = note.trim();
-    await commit([makeEvent(f, "SettlementDisputed", trimmed ? { sid, note: trimmed } : { sid })], f);
+    await commitReserved(1, (f) => [makeEvent(f, "SettlementDisputed", trimmed ? { sid, note: trimmed } : { sid })]);
   }
 
   async function voidSettlement(sid: string): Promise<void> {
     if (!group || archived || !frozenPolicy.allowSettlementActions || !canVoidRecordedSettlement(group.events, sid, group.deviceId)) return;
-    const f = factory();
-    await commit([makeEvent(f, "SettlementVoided", { sid })], f);
+    await commitReserved(1, (f) => [makeEvent(f, "SettlementVoided", { sid })]);
   }
 
   function downloadExport(reason?: ExportPromptReason, sourceGroup = group): void {
@@ -819,16 +795,21 @@
     const outstandingLabels = plan.outstanding.map((transfer) => `${participantLabel(transfer.from)} Pays ${participantLabel(transfer.to)} ${formatMinor(transfer.minor, group!.currency)}`);
     const ok = window.confirm(archiveConfirmationText(outstandingLabels));
     if (!ok) return;
-    const f = factory();
+    const commandId = crypto.randomUUID();
+    const reservation = await reserveEventIds(group.groupId, commandId, 1);
+    const f: EventFactory = { deviceId: reservation.deviceId, nextCounter: reservation.counters[0]! };
     const archiveEvent = makeEvent(f, "GroupArchived", {
       outstanding: plan.outstanding,
     });
-    const archivedExportGroup = groupWithPendingArchiveEvent(group, archiveEvent, f.nextCounter);
+    const archivedExportGroup = groupWithPendingArchiveEvent(group, archiveEvent, reservation.counters[0]!);
     for (const action of plan.actions) {
       if (action === "download-export") {
         downloadExport(undefined, archivedExportGroup);
       } else {
-        await commit([archiveEvent], f);
+        group = await appendReservedEvents(group.groupId, commandId, [archiveEvent]);
+        await refreshCounts();
+        await refreshState();
+        await refreshDurabilityPrompts();
       }
     }
   }
@@ -837,8 +818,7 @@
     if (!group || !archived) return;
     const ok = window.confirm(unarchiveConfirmationText());
     if (!ok) return;
-    const f = factory();
-    await commit([makeEvent(f, "GroupUnarchived", {})], f);
+    await commitReserved(1, (f) => [makeEvent(f, "GroupUnarchived", {})]);
   }
 
   function archiveOutstandingLabels(event: NonNullable<typeof archiveSummary>): string[] {
@@ -937,9 +917,7 @@
 
   async function setCurrency(newCurrency: string): Promise<void> {
     if (!group || !groupProfileEditable || expenses.length > 0) return;
-    const f = factory();
-    const event = makeEvent(f, "BaseCurrencyEstablished", { currency: normalizeCurrency(newCurrency) });
-    await commit([event], f);
+    await commitReserved(1, (f) => [makeEvent(f, "BaseCurrencyEstablished", { currency: normalizeCurrency(newCurrency) })]);
     expenseCurrency = state?.currency ?? normalizeCurrency(newCurrency);
     showToast(`Currency Set To ${state?.currency ?? normalizeCurrency(newCurrency)}.`);
   }

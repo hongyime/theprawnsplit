@@ -31,7 +31,7 @@ describe("setCurrency freeze-before-first-expense guard (DATA-006/B3)", () => {
     const source = appSource();
     const setCurrency = source.match(/async function setCurrency\(newCurrency: string\): Promise<void> \{([\s\S]*?)\n  \}/)?.[1] ?? "";
     expect(setCurrency).toContain('makeEvent(f, "BaseCurrencyEstablished"');
-    expect(setCurrency).toContain("await commit([event], f)");
+    expect(setCurrency).toContain("await commitReserved(");
     expect(setCurrency).not.toContain("await saveGroup(group)");
   });
 

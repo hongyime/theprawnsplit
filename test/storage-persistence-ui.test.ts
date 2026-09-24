@@ -20,7 +20,7 @@ describe("storage persistence request boundary", () => {
     expect(source.match(/navigator\.storage\.persist\(\)/g)).toHaveLength(1);
     expect(requestPersistence).toContain("persistedStorage = await navigator.storage.persist();");
     expect(addExpense).toContain("const wasFirstExpense = expenses.length === 0;");
-    expect(addExpense).toContain("await commit([event], f);");
+    expect(addExpense).toContain('await commitReserved(1, (f) => [makeEvent(f, "ExpenseAdded"');
     expect(addExpense).toMatch(/if \(wasFirstExpense\) \{[\s\S]*await requestStoragePersistenceAfterFirstExpense\(\);[\s\S]*await markFirstExpensePersistenceRequested\(\);[\s\S]*\}/);
   });
 });

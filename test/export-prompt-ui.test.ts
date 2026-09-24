@@ -30,7 +30,7 @@ describe("export prompt UI boundary", () => {
     expect(exportPromptBanner).toContain("on:click={dismissActiveExportPrompt}");
 
     expect(archiveGroup).toContain("const plan = createArchiveTransitionPlan(suggestedSettlements);");
-    expect(archiveGroup).toContain("const archivedExportGroup = groupWithPendingArchiveEvent(group, archiveEvent, f.nextCounter);");
+    expect(archiveGroup).toContain("const archivedExportGroup = groupWithPendingArchiveEvent(group, archiveEvent, reservation.counters[0]!);");
     expect(archiveGroup).toContain('if (action === "download-export")');
     expect(archiveGroup).toContain("downloadExport(undefined, archivedExportGroup);");
     expect(archiveGroup).not.toContain("activeExportPrompt");

@@ -149,6 +149,7 @@
   $: expenses = state ? expenseDisplayRows(state.expenses.values()) : [];
   $: settlements = state ? [...state.settlements.values()] : [];
   $: anomalies = state ? state.anomalies : [];
+  $: currency = state?.currency || group?.currency || "USD";
   $: reconciliationAnomalies = anomalies.filter((anomaly) =>
     ["possible-duplicate-participants", "distinct-participants-merged", "unverified-reclaim"].includes(anomaly.code),
   );
@@ -157,8 +158,8 @@
   $: suggestedSettlements = state ? greedySettlement(state.balances) : [];
   $: amountPreview = currencyAmountPreview({
     amountText: expenseTotal,
-    currency: expenseCurrency || group?.currency || "USD",
-    baseCurrency: group?.currency || "USD",
+    currency: expenseCurrency || currency,
+    baseCurrency: currency,
     rateText: exchangeRate,
   });
   $: sharePreview = buildSharePreview(amountPreview, participants, selectedPids, splitMode, exactShares, shareWeights, percentages);
@@ -205,8 +206,8 @@
   $: setupNameMatch = findParticipantNameMatch(setupName, participants);
   $: participantClaimGroups = groupParticipantsForClaim(participants);
   $: claimCandidate = claimCandidatePid ? participants.find((participant) => participant.pid === claimCandidatePid) : undefined;
-  $: groupCurrencyOptions = currencyOptions(group?.currency);
-  $: expenseCurrencyOptions = currencyOptions(expenseCurrency || group?.currency);
+  $: groupCurrencyOptions = currencyOptions(currency);
+  $: expenseCurrencyOptions = currencyOptions(expenseCurrency || currency);
 
   function showToast(message: string): void {
     if (disposed) return;
@@ -487,7 +488,7 @@
   }
 
   function claimBalance(pid: string): string {
-    return formatMinor(state?.balances.get(pid) ?? 0n, group?.currency ?? "USD");
+    return formatMinor(state?.balances.get(pid) ?? 0n, currency);
   }
 
   function matchText(match: ParticipantNameMatch): string {
@@ -620,7 +621,7 @@
 
   function payerSummary(payers: { pid: string; minor: bigint }[]): string {
     if (payers.length <= 1) return `${participantLabel(payers[0]?.pid ?? "")} Paid`;
-    return payers.map((payer) => `${participantLabel(payer.pid)} ${formatMinor(payer.minor, group?.currency ?? "USD")}`).join(" · ");
+    return payers.map((payer) => `${participantLabel(payer.pid)} ${formatMinor(payer.minor, currency)}`).join(" · ");
   }
 
   function expenseCoverageLabel(xid: string): string {
@@ -635,7 +636,7 @@
 
   function rateSummary(rate: Financials["rate"]): string {
     if (!rate || !group) return "";
-    return `${rate.currency} At ${rate.toBase} ${group.currency}`;
+    return `${rate.currency} At ${rate.toBase} ${currency}`;
   }
 
   async function addExpense(): Promise<void> {
@@ -934,12 +935,13 @@
     await saveGroup(group);
   }
 
-  async function setCurrency(currency: string): Promise<void> {
-    if (!group || !groupProfileEditable) return;
-    group = { ...group, currency: normalizeCurrency(currency) };
-    expenseCurrency = group.currency;
-    await saveGroup(group);
-    showToast(`Currency Set To ${group.currency}.`);
+  async function setCurrency(newCurrency: string): Promise<void> {
+    if (!group || !groupProfileEditable || expenses.length > 0) return;
+    const f = factory();
+    const event = makeEvent(f, "BaseCurrencyEstablished", { currency: normalizeCurrency(newCurrency) });
+    await commit([event], f);
+    expenseCurrency = state?.currency ?? normalizeCurrency(newCurrency);
+    showToast(`Currency Set To ${state?.currency ?? normalizeCurrency(newCurrency)}.`);
   }
 
   async function runSync(): Promise<void> {
@@ -1284,7 +1286,7 @@
           </label>
           <label>
             <span>Main Currency</span>
-            <select value={group.currency} aria-label="Main Currency" disabled={!groupProfileEditable} on:change={(e) => setCurrency((e.currentTarget as HTMLSelectElement).value)}>
+            <select value={currency} aria-label="Main Currency" disabled={!groupProfileEditable || expenses.length > 0} on:change={(e) => setCurrency((e.currentTarget as HTMLSelectElement).value)}>
               {#each groupCurrencyOptions as code}
                 <option value={code}>{code}{commonCurrencies.includes(code as typeof commonCurrencies[number]) ? " · Common" : ""}</option>
               {/each}
@@ -1607,7 +1609,7 @@
           {#each balances as [pid, minor]}
             <div class:positive={minor > 0n} class:negative={minor < 0n} class="balance-row">
               <span>{participantLabel(pid)}</span>
-              <strong>{formatMinor(minor, group.currency)}</strong>
+              <strong>{formatMinor(minor, currency)}</strong>
             </div>
           {/each}
         {:else}
@@ -1621,13 +1623,13 @@
           <input value={expenseDesc} placeholder="Description" disabled={archived} on:input={(e) => { expenseDesc = (e.currentTarget as HTMLInputElement).value; showExpenseHint = true; }} />
           <input value={expenseTotal} inputmode="decimal" placeholder="Total" disabled={archived} on:input={(e) => { expenseTotal = (e.currentTarget as HTMLInputElement).value; showExpenseHint = true; }} />
           <div class="currency-row">
-            <select class="currency" bind:value={expenseCurrency} aria-label="Expense Currency" disabled={archived} on:change={() => (expenseCurrency = normalizeCurrency(expenseCurrency || group!.currency))}>
+            <select class="currency" bind:value={expenseCurrency} aria-label="Expense Currency" disabled={archived} on:change={() => (expenseCurrency = normalizeCurrency(expenseCurrency || currency))}>
               {#each expenseCurrencyOptions as code}
                 <option value={code}>{code}</option>
               {/each}
             </select>
-            {#if normalizeCurrency(expenseCurrency || group.currency) !== group.currency}
-              <input bind:value={exchangeRate} inputmode="decimal" placeholder={`1 ${normalizeCurrency(expenseCurrency)} To ${group.currency}`} aria-label="Exchange Rate To Group Currency" disabled={archived} on:input={() => (showExpenseHint = true)} />
+            {#if normalizeCurrency(expenseCurrency || currency) !== currency}
+              <input bind:value={exchangeRate} inputmode="decimal" placeholder={`1 ${normalizeCurrency(expenseCurrency)} To ${currency}`} aria-label="Exchange Rate To Group Currency" disabled={archived} on:input={() => (showExpenseHint = true)} />
             {/if}
           </div>
           <div class="segmented payer-mode" aria-label="Payer Mode">
@@ -1667,7 +1669,7 @@
                 {:else if splitMode === "percentage"}
                   <input bind:value={percentages[participant.pid]} inputmode="decimal" placeholder="%" disabled={archived} />
                 {:else}
-                  <span>{sharePreview.ok ? formatMinor(sharePreview.shares.find((s) => s.pid === participant.pid)?.minor ?? 0n, group.currency) : "—"}</span>
+                  <span>{sharePreview.ok ? formatMinor(sharePreview.shares.find((s) => s.pid === participant.pid)?.minor ?? 0n, currency) : "—"}</span>
                 {/if}
               </label>
             {/each}
@@ -1701,7 +1703,7 @@
         {:else}
           {#each suggestedSettlements as transfer}
             <button type="button" class="settle-suggestion" disabled={archived} on:click={() => recordSettlement(transfer.from, transfer.to, formatMinorInput(transfer.minor))}>
-              {participantLabel(transfer.from)} Pays {participantLabel(transfer.to)} {formatMinor(transfer.minor, group.currency)}
+              {participantLabel(transfer.from)} Pays {participantLabel(transfer.to)} {formatMinor(transfer.minor, currency)}
             </button>
           {/each}
           <div class="form-grid">
@@ -1717,7 +1719,7 @@
               {@const claims = settlementClaimView(group.events, settlement.sid)}
               <div class="settlement-row">
                 <span class="settlement-claims">
-                  <strong>{participantLabel(settlement.from)} Paid {participantLabel(settlement.to)} {formatMinor(settlement.minor, group.currency)}</strong>
+                  <strong>{participantLabel(settlement.from)} Paid {participantLabel(settlement.to)} {formatMinor(settlement.minor, currency)}</strong>
                   {#if claims.dispute}
                     <span>Dispute: {claims.dispute.note || "Payment Disputed"}</span>
                   {/if}
@@ -1764,14 +1766,14 @@
                   <summary>{expense.financialHistory.length - 1} Correction{expense.financialHistory.length === 2 ? "" : "s"}</summary>
                   {#each expenseHistoryRows(expense) as row}
                     <span class:active-history={row.active}>
-                      {row.label}: {formatMinor(row.financials.minor, group.currency)}{row.active ? " Active" : ""}
+                      {row.label}: {formatMinor(row.financials.minor, currency)}{row.active ? " Active" : ""}
                     </span>
                   {/each}
                 </details>
               {/if}
             </div>
             <div>
-              <strong>{formatMinor(expense.financials.minor, group.currency)}</strong>
+              <strong>{formatMinor(expense.financials.minor, currency)}</strong>
               <button type="button" disabled={archived} on:click={() => editExpense(expense.xid)} title="Edit Expense"><Icon name="receipt-text" size={16} /></button>
               <button type="button" disabled={archived} on:click={() => voidExpense(expense.xid)} title="Void Expense"><Icon name="trash" size={16} /></button>
             </div>

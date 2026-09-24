@@ -13,6 +13,7 @@ import type {
   ExpenseState,
   Financials,
   FoldOptions,
+  HLC,
   Money,
   ParticipantState,
   SettlementState,
@@ -137,6 +138,34 @@ export function fold(events: Event[], opts: FoldOptions, ctx?: VerificationConte
   });
 
   const voided = voidedEventIds(supported);
+
+  // DATA-006/B3: base currency is now versioned, replicated data, not a
+  // silent local-only mutation. GroupCreated.currency is the default; a
+  // BaseCurrencyEstablished event lets any device correct it, but ONLY
+  // before the first ExpenseAdded (by HLC) for this group — once money is
+  // flowing, the currency is permanent. The earliest-by-HLC valid
+  // correction wins; anything after the freeze point, or any additional
+  // correction beyond the first accepted one (covers two devices each
+  // proposing a correction before ever syncing), is quarantined as a
+  // conflicting anomaly rather than silently applied.
+  const groupCreatedEvent = supported.find((event): event is Event & { t: "GroupCreated" } => event.t === "GroupCreated");
+  const firstExpenseHlc = supported
+    .filter((event): event is Event & { t: "ExpenseAdded" } => event.t === "ExpenseAdded")
+    .reduce<HLC | null>((earliest, event) => (!earliest || compareHlc(event.hlc, earliest) < 0 ? event.hlc : earliest), null);
+  const currencyCorrections = supported
+    .filter((event): event is Event & { t: "BaseCurrencyEstablished" } => event.t === "BaseCurrencyEstablished" && !voided.has(event.id))
+    .sort((a, b) => compareHlc(a.hlc, b.hlc));
+  let currency = groupCreatedEvent?.currency ?? "";
+  let currencyAccepted = false;
+  for (const correction of currencyCorrections) {
+    const beforeFirstExpense = !firstExpenseHlc || compareHlc(correction.hlc, firstExpenseHlc) < 0;
+    if (!currencyAccepted && beforeFirstExpense) {
+      currency = correction.currency;
+      currencyAccepted = true;
+    } else {
+      quarantined.push(correction.id);
+    }
+  }
   if (ctx) anomalies.push(...claimAnomalies(supported, ctx));
   const contestedPids = ctx ? contestedClaimPids(supported, ctx) : new Set<string>();
   const mergeEdges = activeMergeEdges(supported);
@@ -362,6 +391,7 @@ export function fold(events: Event[], opts: FoldOptions, ctx?: VerificationConte
     anomalies,
     quarantined: [...new Set(quarantined)].sort(),
     frozen: quarantined.length > 0,
+    currency,
   };
 }
 

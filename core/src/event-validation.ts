@@ -148,6 +148,8 @@ const variantParsers: Record<string, VariantParser> = {
     isNonEmptyString(v.name) && isNonEmptyString(v.currency)
       ? { ...base, t: "GroupCreated", name: v.name, currency: v.currency }
       : null,
+  BaseCurrencyEstablished: (v, base) => (isNonEmptyString(v.currency) ? { ...base, t: "BaseCurrencyEstablished", currency: v.currency } : null),
+
 
   ParticipantAdded: (v, base) =>
     isNonEmptyString(v.pid) && isNonEmptyString(v.name) ? { ...base, t: "ParticipantAdded", pid: v.pid, name: v.name } : null,

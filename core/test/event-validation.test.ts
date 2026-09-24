@@ -185,6 +185,13 @@ describe("parseEvent — simple reference-only variants", () => {
     const bad = { ...good, outstanding: [{ from: "p1", to: "p2", minor: 100 }] };
     expect(parseEvent(bad, { supportedVersion })).toMatchObject({ kind: "invalid" });
   });
+
+  it("accepts and rejects BaseCurrencyEstablished correctly", () => {
+    const good = { v: 1 as const, id: `${dev}:11`, hlc, dev, t: "BaseCurrencyEstablished" as const, currency: "EUR" };
+    expect(parseEvent(good, { supportedVersion })).toEqual({ kind: "known", event: good });
+    const bad = { ...good, currency: "" };
+    expect(parseEvent(bad, { supportedVersion })).toMatchObject({ kind: "invalid" });
+  });
 });
 
 describe("parseEvent — unknown t within a supported version is invalid, not quarantined", () => {

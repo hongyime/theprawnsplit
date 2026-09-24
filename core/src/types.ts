@@ -23,6 +23,7 @@ export interface Financials {
 
 export type Event =
   | (BaseEvent & { t: "GroupCreated"; name: string; currency: string })
+  | (BaseEvent & { t: "BaseCurrencyEstablished"; currency: string })
   | (BaseEvent & { t: "ParticipantAdded"; pid: string; name: string })
   | (BaseEvent & { t: "ParticipantRenamed"; pid: string; name: string })
   | (BaseEvent & {
@@ -126,6 +127,7 @@ export interface State {
   balances: Map<string, Money>;
   anomalies: Anomaly[];
   quarantined: string[];
+  currency: string;
   frozen: boolean;
 }
 

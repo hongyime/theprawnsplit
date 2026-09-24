@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { canonicalStateBytes } from "../src/canonical";
 import { fold } from "../src/fold";
-import { base, claim, confirm, financials, groupTag, link, sig, verifier } from "./helpers";
+import { base, claim, confirm, financials, groupTag, hlc, link, sig, verifier } from "./helpers";
 
 describe("REQ-MON-15/REQ-SYN-12 fold", () => {
   it("computes zero-sum balances over live admitted events", () => {
@@ -494,5 +494,87 @@ describe("REQ-MON-15/REQ-SYN-12 fold", () => {
     );
 
     expect(state.participants.get("alice")?.devices).toEqual(["alice-phone"]);
+  });
+});
+
+describe("DATA-006/B3 base currency contract", () => {
+  it("uses GroupCreated.currency when no correction exists", () => {
+    const state = fold([base("GroupCreated", { name: "Trip", currency: "USD", hlc: hlc(1) } as never)], { supportedVersion: 1 });
+    expect(state.currency).toBe("USD");
+  });
+
+  it("accepts a BaseCurrencyEstablished correction made before the first expense", () => {
+    const state = fold(
+      [
+        base("GroupCreated", { name: "Trip", currency: "USD", hlc: hlc(1) } as never),
+        base("BaseCurrencyEstablished", { currency: "EUR", hlc: hlc(2) } as never),
+        base("ExpenseAdded", {
+          xid: "x1",
+          financials: financials(100n, [["alice", 100n]], [["alice", 100n]]),
+          desc: "Lunch",
+          at: 1,
+          date: "2026-08-21",
+          hlc: hlc(3),
+        } as never),
+      ],
+      { supportedVersion: 1 },
+    );
+    expect(state.currency).toBe("EUR");
+    expect(state.quarantined).toEqual([]);
+  });
+
+  it("quarantines a correction that arrives after the first expense", () => {
+    const state = fold(
+      [
+        base("GroupCreated", { name: "Trip", currency: "USD", hlc: hlc(1) } as never),
+        base("ExpenseAdded", {
+          xid: "x1",
+          financials: financials(100n, [["alice", 100n]], [["alice", 100n]]),
+          desc: "Lunch",
+          at: 1,
+          date: "2026-08-21",
+          hlc: hlc(2),
+        } as never),
+        base("BaseCurrencyEstablished", { id: "late-correction", currency: "EUR", hlc: hlc(3) } as never),
+      ],
+      { supportedVersion: 1 },
+    );
+    expect(state.currency).toBe("USD");
+    expect(state.quarantined).toEqual(["late-correction"]);
+    expect(state.frozen).toBe(true);
+  });
+
+  it("accepts only the earliest of two pre-expense corrections, quarantining the rest", () => {
+    const state = fold(
+      [
+        base("GroupCreated", { name: "Trip", currency: "USD", hlc: hlc(1) } as never),
+        base("BaseCurrencyEstablished", { id: "correction-a", currency: "EUR", hlc: hlc(2, 0, "dev-a") } as never),
+        base("BaseCurrencyEstablished", { id: "correction-b", currency: "GBP", hlc: hlc(2, 0, "dev-b") } as never),
+        base("ExpenseAdded", {
+          xid: "x1",
+          financials: financials(100n, [["alice", 100n]], [["alice", 100n]]),
+          desc: "Lunch",
+          at: 1,
+          date: "2026-08-21",
+          hlc: hlc(3),
+        } as never),
+      ],
+      { supportedVersion: 1 },
+    );
+    expect(state.currency).toBe("EUR");
+    expect(state.quarantined).toEqual(["correction-b"]);
+  });
+
+  it("ignores a voided correction entirely, neither accepting nor quarantining it", () => {
+    const state = fold(
+      [
+        base("GroupCreated", { name: "Trip", currency: "USD", hlc: hlc(1) } as never),
+        base("BaseCurrencyEstablished", { id: "voided-correction", currency: "EUR", hlc: hlc(2) } as never),
+        base("EventVoided", { targetId: "voided-correction", hlc: hlc(3) } as never),
+      ],
+      { supportedVersion: 1 },
+    );
+    expect(state.currency).toBe("USD");
+    expect(state.quarantined).toEqual([]);
   });
 });

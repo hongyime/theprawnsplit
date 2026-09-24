@@ -230,14 +230,21 @@ async function ensureSecrets(group: Partial<StoredGroup> & Omit<StoredGroup, "se
 
 async function ensureMeta(group: StoredGroup, events: Event[]): Promise<StoredMeta> {
   const database = await db();
-  const existing = await database.get("meta", group.groupId);
+  // CONC-002: read-then-write must be one transaction, not two separate
+  // database.get/database.put calls — otherwise a concurrent field-scoped
+  // writer (e.g. updateMeta committing a settings change) can land in the
+  // gap between this function's read and write, and get silently clobbered
+  // when this function's write lands using its now-stale snapshot.
+  const tx = database.transaction("meta", "readwrite");
+  const existing = await tx.store.get(group.groupId);
   if (existing) {
     const normalized = {
       ...existing,
       durability: normalizeDurabilityPromptState(existing.durability),
       nostrSk: normalizeNostrSecretHex(existing.nostrSk),
     };
-    if (!existing.durability || normalized.nostrSk !== existing.nostrSk) await database.put("meta", normalized);
+    if (!existing.durability || normalized.nostrSk !== existing.nostrSk) await tx.store.put(normalized);
+    await tx.done;
     return normalized;
   }
   const meta: StoredMeta = {
@@ -247,7 +254,8 @@ async function ensureMeta(group: StoredGroup, events: Event[]): Promise<StoredMe
     cursors: {},
     nostrSk: createNostrSecretHex(),
   };
-  await database.put("meta", meta);
+  await tx.store.put(meta);
+  await tx.done;
   return meta;
 }
 
@@ -801,8 +809,14 @@ export async function updateTransportVectors(
   discardVector: Record<string, number>,
 ): Promise<void> {
   const database = await db();
-  const meta = await database.get("meta", groupId);
-  if (!meta) return;
+  // CONC-002: one transaction, not separate get/put calls (see ensureMeta's
+  // comment for why).
+  const tx = database.transaction("meta", "readwrite");
+  const meta = await tx.store.get(groupId);
+  if (!meta) {
+    await tx.done;
+    return;
+  }
   const mergedVersion = { ...meta.versionVector };
   for (const [dev, counter] of Object.entries(transportVector)) {
     mergedVersion[dev] = Math.max(mergedVersion[dev] ?? 0, counter);
@@ -811,7 +825,8 @@ export async function updateTransportVectors(
   for (const [dev, counter] of Object.entries(discardVector)) {
     mergedDiscard[dev] = Math.max(mergedDiscard[dev] ?? 0, counter);
   }
-  await database.put("meta", { ...meta, versionVector: mergedVersion, discardVector: mergedDiscard, lastSyncAt: Date.now() });
+  await tx.store.put({ ...meta, versionVector: mergedVersion, discardVector: mergedDiscard, lastSyncAt: Date.now() });
+  await tx.done;
 }
 
 // DATA-005: thrown by upsertRemoteEvents when an incoming event shares an id
@@ -895,9 +910,16 @@ export async function saveMeta(meta: StoredMeta): Promise<void> {
 
 export async function markSnapshotPublished(groupId: string, seq: number): Promise<void> {
   const database = await db();
-  const meta = await database.get("meta", groupId);
-  if (!meta) return;
-  await database.put("meta", { ...meta, lastSnapshotSeq: Math.max(meta.lastSnapshotSeq ?? 0, seq), lastSyncAt: Date.now() });
+  // CONC-002: one transaction, not separate get/put calls (see ensureMeta's
+  // comment for why).
+  const tx = database.transaction("meta", "readwrite");
+  const meta = await tx.store.get(groupId);
+  if (!meta) {
+    await tx.done;
+    return;
+  }
+  await tx.store.put({ ...meta, lastSnapshotSeq: Math.max(meta.lastSnapshotSeq ?? 0, seq), lastSyncAt: Date.now() });
+  await tx.done;
 }
 
 export async function ensureClaimIdentity(group: GroupRecord, pid: string): Promise<StoredIdentity> {

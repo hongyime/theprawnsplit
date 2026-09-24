@@ -924,10 +924,18 @@ export async function markSnapshotPublished(groupId: string, seq: number): Promi
 
 export async function ensureClaimIdentity(group: GroupRecord, pid: string): Promise<StoredIdentity> {
   const database = await db();
-  const existing = await database.get("identity", [group.groupId, pid]);
-  if (existing) return existing;
+  // CONC-003: mint the candidate key BEFORE opening any transaction --
+  // mintClaimKey does real async crypto.subtle work, and awaiting unrelated
+  // work inside a transaction can close it before the recheck-and-write
+  // finish (same principle as ensureGroup's own comment above). Then
+  // recheck-and-insert-or-return within ONE transaction so two concurrent
+  // callers can never each persist a DIFFERENT key for the same pid --
+  // whichever transaction commits first wins, and the loser returns that
+  // winner's identity instead of its own now-discarded candidate. Callers
+  // must sign only with the returned identity (already the case for every
+  // caller in Trip.svelte), never with the locally-minted key directly.
   const key = await mintClaimKey();
-  const identity: StoredIdentity = {
+  const candidate: StoredIdentity = {
     groupId: group.groupId,
     pid,
     deviceId: group.deviceId,
@@ -936,8 +944,15 @@ export async function ensureClaimIdentity(group: GroupRecord, pid: string): Prom
     claimPkJwk: key.publicJwk,
     claimSkJwk: key.privateJwk,
   };
-  await database.put("identity", identity);
-  return identity;
+  const tx = database.transaction("identity", "readwrite");
+  const existing = await tx.store.get([group.groupId, pid]);
+  if (existing) {
+    await tx.done;
+    return existing;
+  }
+  await tx.store.put(candidate);
+  await tx.done;
+  return candidate;
 }
 
 export async function getGroupCrypto(group: GroupRecord): Promise<{ secret: Uint8Array; key: CryptoKey }> {

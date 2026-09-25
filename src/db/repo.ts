@@ -1,5 +1,5 @@
 import { openDB, type DBSchema, type IDBPDatabase } from "idb";
-import { compareHlc, parseEvent, type Event, type HLC } from "@theprawnsplit/core";
+import { compareHlc, eventCounter, parseEvent, type Event, type HLC } from "@theprawnsplit/core";
 import { bytesToHex } from "@/crypto/bytes";
 import { bigintReplacer, bigintReviver } from "@/lib/money";
 import { inferCurrency, newId } from "@/lib/ids";
@@ -66,6 +66,53 @@ export interface StoredIdentity {
   claimSkJwk: JsonWebKey;
 }
 
+// DATA-007: sorted, non-overlapping, inclusive [start, end] counter
+// ranges -- the "bounded" exact-coverage representation. A gap-free run
+// compresses to one interval; a hole (a skipped counter while later ones
+// were genuinely admitted) shows up as a separate interval rather than
+// being silently absorbed into a single running maximum.
+export type CoverageIntervals = [number, number][];
+
+// Inserts a single counter into a sorted, non-overlapping interval list,
+// merging with an adjacent/overlapping interval where possible. Pure and
+// side-effect-free; returns a NEW array (never mutates the input).
+export function mergeCoverageCounter(existing: CoverageIntervals, counter: number): CoverageIntervals {
+  const next: CoverageIntervals = [];
+  let inserted = false;
+  for (const [start, end] of existing) {
+    if (inserted || counter < start - 1) {
+      next.push([start, end]);
+      continue;
+    }
+    if (counter > end + 1) {
+      next.push([start, end]);
+      continue;
+    }
+    // counter is adjacent to or inside [start, end] -- merge, possibly
+    // extending into a NEXT interval too if this counter bridges them.
+    const mergedStart = Math.min(start, counter);
+    const mergedEnd = Math.max(end, counter);
+    next.push([mergedStart, mergedEnd]);
+    inserted = true;
+  }
+  if (!inserted) next.push([counter, counter]);
+  // A single bridging insertion can make two previously-separate
+  // intervals adjacent/overlapping (e.g. [1,2] and [4,5], insert 3) --
+  // coalesce the whole list once more to restore the non-overlapping
+  // invariant.
+  next.sort((a, b) => a[0] - b[0]);
+  const coalesced: CoverageIntervals = [];
+  for (const [start, end] of next) {
+    const last = coalesced[coalesced.length - 1];
+    if (last && start <= last[1] + 1) {
+      last[1] = Math.max(last[1], end);
+    } else {
+      coalesced.push([start, end]);
+    }
+  }
+  return coalesced;
+}
+
 export interface StoredMeta {
   groupId: string;
   versionVector: Record<string, number>;
@@ -87,6 +134,18 @@ export interface StoredMeta {
   // never falls behind what this device has already observed, protecting
   // against local clock rollback and a faster peer's events.
   observedHlc?: HLC;
+  // DATA-007: exact durable coverage, separate from versionVector/
+  // transportVector (which track TRANSPORT PROGRESS -- what counter has
+  // been OBSERVED from each author, including buffered/dropped/conflicted
+  // events that were never actually stored). coverage tracks, per author
+  // device, exactly which counters have a REAL event row durably present
+  // in the "events" store on THIS device -- as sorted, non-overlapping,
+  // inclusive [start, end] intervals, so a gap (a gate/cap/conflict that
+  // skipped one counter while later ones were genuinely admitted) is
+  // represented explicitly rather than erased by a single running max.
+  // Absent (legacy pre-fix data) means "no coverage evidence recorded
+  // yet" -- readers must treat this as unknown, never as full coverage.
+  coverage?: Record<string, CoverageIntervals>;
 }
 
 interface StoredBuffer {
@@ -559,6 +618,11 @@ export async function appendReservedEvents(groupId: string, commandId: string, e
       await tx.objectStore("events").add({ groupId, eventId: stamped.id, eventJson: encodeEvent(stamped), syncState: "local" });
       meta.versionVector[stamped.dev] = Math.max(meta.versionVector[stamped.dev] ?? 0, counterFromEvents([stamped]));
       meta.unsyncedSince ??= Date.now();
+      // DATA-007: only an event that just genuinely landed in the events
+      // store (the add() above didn't throw) earns durable-coverage
+      // credit -- never a buffered/dropped/conflicted one, and never
+      // merely because a counter was reserved.
+      meta.coverage = { ...meta.coverage, [stamped.dev]: mergeCoverageCounter(meta.coverage?.[stamped.dev] ?? [], eventCounter(stamped)) };
     }
     if (group.reservations && commandId in group.reservations) {
       const { [commandId]: _removed, ...rest } = group.reservations;
@@ -1079,6 +1143,11 @@ export async function promoteLedger(groupId: string, input: LedgerPromotionInput
       ({ groupId, versionVector: {}, discardVector: {}, cursors: {}, nostrSk: createNostrSecretHex() } satisfies StoredMeta);
     for (const event of input.admitted) {
       await tx.objectStore("events").put({ groupId, eventId: event.id, eventJson: encodeEvent(event), syncState: "confirmed", publishedAt: Date.now() });
+      // DATA-007: only an event that was actually admitted into the events
+      // store here earns durable-coverage credit -- never a buffered,
+      // dropped, or fingerprint-conflicted one (those never reach
+      // input.admitted at all; see resolveIncomingEventConflicts).
+      meta.coverage = { ...meta.coverage, [event.dev]: mergeCoverageCounter(meta.coverage?.[event.dev] ?? [], eventCounter(event)) };
     }
     const mergedVector = { ...meta.versionVector };
     for (const [dev, counter] of Object.entries(input.transportVector)) {

@@ -127,4 +127,36 @@ describe("CONC-001 atomic event identity reservation", () => {
     expect(reservation.hlcFloor.wall).toBe(farFutureRemote.hlc.wall);
     expect(reservation.hlcFloor.dev).toBe(group.deviceId);
   });
+
+  it("records the delivered event's counter as durable coverage for its device, distinct from mere reservation", async () => {
+    await resetRepositoryForTests(`data-007-append-coverage-${crypto.randomUUID()}`);
+    const group = await ensureGroup();
+
+    const reservation = await reserveEventIds(group.groupId, "coverage-command", 1);
+    const counter = reservation.counters[0]!;
+    const event = makeEvent({ deviceId: reservation.deviceId, nextCounter: counter }, "ParticipantAdded", { pid: "p1", name: "Alice" });
+    const delivered = await appendReservedEvents(group.groupId, "coverage-command", [event]);
+
+    expect(delivered.meta.coverage?.[reservation.deviceId]).toEqual([[counter, counter]]);
+  });
+
+  it("does not record coverage for a counter that failed to be admitted due to a genuine id collision", async () => {
+    await resetRepositoryForTests(`data-007-collision-coverage-${crypto.randomUUID()}`);
+    const group = await ensureGroup();
+
+    const reservation = await reserveEventIds(group.groupId, "first-command", 1);
+    const counter = reservation.counters[0]!;
+    const original = makeEvent({ deviceId: reservation.deviceId, nextCounter: counter }, "ParticipantAdded", { pid: "p1", name: "Original" });
+    await appendReservedEvents(group.groupId, "first-command", [original]);
+
+    const colliding = makeEvent({ deviceId: reservation.deviceId, nextCounter: counter }, "ParticipantAdded", { pid: "p2", name: "Colliding" });
+    await expect(appendReservedEvents(group.groupId, "second-command", [colliding])).rejects.toThrow();
+
+    // The original's counter still has coverage (it genuinely landed); the
+    // rejected collision must not have appended a SECOND redundant entry,
+    // nor left coverage in a corrupted or double-counted state.
+    const after = await readGroup(group.groupId);
+    expect(after.meta.coverage?.[reservation.deviceId]).toEqual([[counter, counter]]);
+  });
+
 });

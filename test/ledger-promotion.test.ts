@@ -90,4 +90,67 @@ describe("INTR-001 atomic ledger promotion", () => {
     const stillBuffered = await dueBufferedEvents(group.groupId);
     expect(stillBuffered.map((e) => e.id)).toContain(event.id); // STILL safely in the buffer -- never lost
   });
+
+  it("records an admitted event's counter as durable coverage for its device", async () => {
+    await resetRepositoryForTests(`data-007-promote-coverage-${crypto.randomUUID()}`);
+    const group = await ensureGroup();
+    const event = makeEvent({ deviceId: "remote-peer", nextCounter: 1 }, "ParticipantAdded", { pid: "p1", name: "Remote" });
+
+    const promoted = await promoteLedger(group.groupId, {
+      admitted: [event],
+      promotedBufferIds: [],
+      newlyBuffered: [],
+      transportVector: { "remote-peer": 1 },
+      discardVector: {},
+    });
+
+    expect(promoted.meta.coverage?.["remote-peer"]).toEqual([[1, 1]]);
+  });
+
+  it("does not record coverage for an event that was re-buffered instead of admitted in the same call", async () => {
+    await resetRepositoryForTests(`data-007-rebuffer-no-coverage-${crypto.randomUUID()}`);
+    const group = await ensureGroup();
+    const event = makeEvent({ deviceId: "remote-peer", nextCounter: 1 }, "ParticipantAdded", { pid: "p1", name: "Remote" });
+    await putBufferedEvents(group.groupId, [{ event, retryAt: 0 }]);
+
+    const promoted = await promoteLedger(group.groupId, {
+      admitted: [],
+      promotedBufferIds: [event.id],
+      newlyBuffered: [{ event, retryAt: Date.now() + 60_000 }],
+      transportVector: {},
+      discardVector: {},
+    });
+
+    // Still only buffered, never actually landed in the events store --
+    // must not be credited as durably covered.
+    expect(promoted.meta.coverage?.["remote-peer"]).toBeUndefined();
+  });
+
+  it("does not record coverage for an event whose admission transaction aborted partway through", async () => {
+    await resetRepositoryForTests(`data-007-abort-no-coverage-${crypto.randomUUID()}`);
+    const group = await ensureGroup();
+    const event = makeEvent({ deviceId: "remote-peer", nextCounter: 1 }, "ParticipantAdded", { pid: "p1", name: "Remote" });
+    await putBufferedEvents(group.groupId, [{ event, retryAt: 0 }]);
+
+    const originalPut = IDBObjectStore.prototype.put;
+    const putSpy = vi.spyOn(IDBObjectStore.prototype, "put").mockImplementation(function (this: IDBObjectStore, value: unknown, key?: unknown) {
+      const request = originalPut.call(this, value, key as never);
+      if (this.name === "events" && (value as { eventId?: string }).eventId === event.id) this.transaction.abort();
+      return request;
+    });
+
+    await expect(
+      promoteLedger(group.groupId, {
+        admitted: [event],
+        promotedBufferIds: [event.id],
+        newlyBuffered: [],
+        transportVector: { "remote-peer": 1 },
+        discardVector: {},
+      }),
+    ).rejects.toMatchObject({ name: "AbortError" });
+    putSpy.mockRestore();
+
+    const after = await readGroup(group.groupId);
+    expect(after.meta.coverage?.["remote-peer"]).toBeUndefined();
+  });
 });

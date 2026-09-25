@@ -8,12 +8,11 @@ import {
   markSnapshotPublished,
   markEvents,
   pendingOutboundEventRows,
-  putBufferedEvents,
+  promoteLedger,
   readGroup,
-  removeBufferedEvents,
+  resolveIncomingEventConflicts,
   updateMeta,
   updateTransportVectors,
-  upsertRemoteEvents,
   vectorFromEvents,
   type GroupRecord,
 } from "@/db/repo";
@@ -307,12 +306,7 @@ async function runSyncCycle(groupId: string, relayOverride: Relay[] | undefined,
       capGroupTotal: config.capGroupTotal,
       bufferMaxEvents: config.driftBufferMax,
     });
-    await removeBufferedEvents(groupId, [
-      ...transport.admitted.map((event) => event.id),
-      ...transport.dropped.map((drop) => drop.event.id),
-    ]);
-    await putBufferedEvents(groupId, transport.buffered);
-    await updateTransportVectors(groupId, transport.transportVector, transport.discardVector);
+    const toInsert = await resolveIncomingEventConflicts(groupId, transport.admitted);
     result.buffered = transport.buffered.length;
     result.dropped = transport.dropped.length;
 
@@ -322,9 +316,20 @@ async function runSyncCycle(groupId: string, relayOverride: Relay[] | undefined,
       await markEvents(groupId, confirmedIds, "confirmed");
       result.confirmed = confirmedIds.length;
     }
-    // Commit the read checkpoint in the same transaction as the received events.
-    // A failed local write must leave the relay page available for the next retry.
-    result.received = await upsertRemoteEvents(groupId, transport.admitted, cursorUpdates);
+    // INTR-001: admitted rows, promoted-buffer removal, newly-buffered
+    // additions and the read checkpoint all commit in the SAME atomic
+    // transaction. A failed local write must leave the relay page
+    // available for the next retry -- it must never advance the cursor
+    // or drop a buffered event without having durably admitted it.
+    await promoteLedger(groupId, {
+      admitted: toInsert,
+      promotedBufferIds: [...transport.admitted.map((event) => event.id), ...transport.dropped.map((drop) => drop.event.id)],
+      newlyBuffered: transport.buffered,
+      transportVector: transport.transportVector,
+      discardVector: transport.discardVector,
+      cursorUpdates,
+    });
+    result.received = toInsert.length;
     const snapshotEvery = Math.max(1, config.snapshotEvery);
     const snapshotEvents = await confirmedEvents(groupId);
     const snapshotSeq = Math.floor(snapshotEvents.length / snapshotEvery) * snapshotEvery;

@@ -314,7 +314,7 @@ describe("real IndexedDB → HTTP API → adapter → PostgreSQL recovery", () =
     await local.markEvents(group.groupId, group.events.map((event) => event.id), "confirmed");
     const remote = defaultParticipant({ deviceId: "remote-device", nextCounter: 1 }, "Recover After Failure");
     await publishRaw([remote]); posted = [];
-    vi.spyOn(local, "upsertRemoteEvents").mockRejectedValueOnce(new DOMException("Fixture full", "QuotaExceededError"));
+    vi.spyOn(local, "promoteLedger").mockRejectedValueOnce(new DOMException("Fixture full", "QuotaExceededError"));
     expect((await cycle()).errors.length).toBeGreaterThan(0);
     let state = (await discoverMigration(group.groupId, operated, {}, repository)).state!;
     expect(state.cursor).toBeUndefined();

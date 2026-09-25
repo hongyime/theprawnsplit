@@ -3,8 +3,8 @@ import { config } from "@/config";
 import { decryptEnvelope, encryptEnvelope, encryptEvents, type SnapshotEnvelope } from "@/crypto/envelope";
 import { relayWriteProof } from "@/crypto/group";
 import { confirmedEvents, dueBufferedEvents, getGroupCrypto, markEvents, markSnapshotPublished,
-  pendingOutboundEventRows, putBufferedEvents, readGroup, removeBufferedEvents, updateMeta, updateTransportVectors,
-  upsertRemoteEvents, vectorFromEvents, type GroupRecord } from "@/db/repo";
+  pendingOutboundEventRows, promoteLedger, readGroup, resolveIncomingEventConflicts, updateMeta,
+  vectorFromEvents, type GroupRecord } from "@/db/repo";
 import { eventFingerprint } from "@/lib/event-fingerprint";
 import type { HttpRelay } from "./http";
 import { recoverNostrPage, type NostrRecoverySource } from "./nostr-recovery";
@@ -106,10 +106,20 @@ export async function syncMigrated(groupId: string, operated: Pick<HttpRelay, "f
       safeCheckpoint = false;
       result.errors.push("Some recovered history needs review before its checkpoint can advance");
     }
-    await removeBufferedEvents(groupId, transport.admitted.map((event) => event.id));
-    await putBufferedEvents(groupId, transport.buffered);
-    await updateTransportVectors(groupId, transport.transportVector, transport.discardVector);
-    result.received += await upsertRemoteEvents(groupId, transport.admitted);
+    const toInsert = await resolveIncomingEventConflicts(groupId, transport.admitted);
+    // INTR-001: admitted rows, promoted-buffer removal and newly-buffered
+    // additions all commit in the SAME atomic transaction — a crash/
+    // interruption never removes a buffer entry without having durably
+    // admitted it. Matches this path's existing admitted-only (not
+    // dropped) buffer-removal scope.
+    await promoteLedger(groupId, {
+      admitted: toInsert,
+      promotedBufferIds: transport.admitted.map((event) => event.id),
+      newlyBuffered: transport.buffered,
+      transportVector: transport.transportVector,
+      discardVector: transport.discardVector,
+    });
+    result.received += toInsert.length;
     result.buffered += transport.buffered.length;
     result.dropped += transport.dropped.length;
     if (operatedRead) {

@@ -966,18 +966,22 @@ export class EventIdentityConflictError extends Error {
   }
 }
 
-export async function upsertRemoteEvents(groupId: string, events: Event[], cursorUpdates: Record<string, string> = {}): Promise<number> {
+// DATA-005: resolve every conflict check (including the crypto-heavy
+// fingerprint hashes) BEFORE opening any write transaction at all -- NOT
+// merely before issuing any write within an already-open one.
+// crypto.subtle.digest (via eventFingerprint) is a real async operation;
+// awaiting it while an IDB transaction is open can let the transaction
+// auto-deactivate under load (InvalidStateError on the next objectStore()
+// call), the same hazard ensureGroup's own comment documents for crypto
+// work generally. database.get() below uses its own short-lived internal
+// transaction per call, never held open across the fingerprint awaits.
+//
+// Shared by upsertRemoteEvents and (T41/INTR-001) by both sync paths
+// before they build a promoteLedger() call, so the SAME conflict contract
+// applies regardless of which atomic-write path ultimately inserts the
+// returned events.
+export async function resolveIncomingEventConflicts(groupId: string, events: Event[]): Promise<Event[]> {
   const database = await db();
-  // DATA-005: resolve every conflict check (including the crypto-heavy
-  // fingerprint hashes) BEFORE opening the write transaction at all --
-  // NOT merely before issuing any write within an already-open one.
-  // crypto.subtle.digest (via eventFingerprint) is a real async
-  // operation; awaiting it while an IDB transaction is open can let the
-  // transaction auto-deactivate under load (InvalidStateError on the next
-  // objectStore() call), the same hazard ensureGroup's own comment
-  // documents for crypto work generally. database.get() below uses its
-  // own short-lived internal transaction per call, never held open across
-  // the fingerprint awaits.
   const toInsert: Event[] = [];
   for (const event of events) {
     const existingRow = await database.get("events", [groupId, event.id]);
@@ -993,11 +997,16 @@ export async function upsertRemoteEvents(groupId: string, events: Event[], curso
     if (existingFingerprint !== incomingFingerprint) {
       throw new EventIdentityConflictError(groupId, event.id, existingEvent, event);
     }
-    // Identical content already stored under this id — a true repeat, not
+    // Identical content already stored under this id -- a true repeat, not
     // a conflict. Idempotent no-op, matching this function's existing
     // "skip an id we already have" contract for the non-conflicting case.
   }
+  return toInsert;
+}
 
+export async function upsertRemoteEvents(groupId: string, events: Event[], cursorUpdates: Record<string, string> = {}): Promise<number> {
+  const database = await db();
+  const toInsert = await resolveIncomingEventConflicts(groupId, events);
   const tx = database.transaction(["events", "meta"], "readwrite");
   let added = 0;
   try {

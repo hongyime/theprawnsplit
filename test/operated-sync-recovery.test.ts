@@ -89,7 +89,7 @@ describe("operated relay recovery through the real HTTP adapter and API", () => 
     const { group, key, relay } = await seed("failed-storage");
     const remote = makeEvent({ deviceId: group.deviceId, nextCounter: group.nextCounter }, "ParticipantAdded", { pid: "pending", name: "Pending" });
     await addRow(key, remote.dev, [remote]);
-    vi.spyOn(repository, "upsertRemoteEvents").mockRejectedValueOnce(new DOMException("Fixture storage full", "QuotaExceededError"));
+    vi.spyOn(repository, "promoteLedger").mockRejectedValueOnce(new DOMException("Fixture storage full", "QuotaExceededError"));
     await expect(syncOnce(group.groupId, [relay])).rejects.toThrow("Fixture storage full");
     const after = await repository.readGroup(group.groupId);
     expect(after.meta.cursors).toEqual(group.meta.cursors);
@@ -100,7 +100,7 @@ describe("operated relay recovery through the real HTTP adapter and API", () => 
     const { group, key, relay } = await seed("retry-storage");
     const remote = makeEvent({ deviceId: group.deviceId, nextCounter: group.nextCounter }, "ParticipantAdded", { pid: "recover", name: "Recovered" });
     await addRow(key, remote.dev, [remote]);
-    vi.spyOn(repository, "upsertRemoteEvents").mockRejectedValueOnce(new DOMException("Fixture storage full", "QuotaExceededError"));
+    vi.spyOn(repository, "promoteLedger").mockRejectedValueOnce(new DOMException("Fixture storage full", "QuotaExceededError"));
     await expect(syncOnce(group.groupId, [relay])).rejects.toThrow("Fixture storage full");
     await syncOnce(group.groupId, [relay]);
     const after = await repository.readGroup(group.groupId);

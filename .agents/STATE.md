@@ -2,13 +2,13 @@
 
 ## Last change — 2026-09-23
 
-T40 (INTR-001 — atomic ledger promotion transaction, allocator only)
-done at commit `ee61dc0` — 40/73 tasks + 3 NEW findings complete in the
-02_EXECUTE cycle (see tasks.md/bugfix.md/execute_state.json). Scope note:
-T40 built promoteLedger only; sync.ts/migrated-sync.ts still use the OLD
-separate-calls path until T41 migrates both. Full history of every
-completed task is in .agents/JOURNAL.md and in the git log on this
-branch. Next: T41.
+T41 (INTR-001 — both sync paths now route through atomic ledger
+promotion) done at commit `b1863d8` — 41/73 tasks + 3 NEW findings
+complete in the 02_EXECUTE cycle (see
+tasks.md/bugfix.md/execute_state.json). INTR-001 is now FULLY resolved:
+no old separate-calls promotion path remains in either sync.ts or
+migrated-sync.ts. Full history of every completed task is in
+.agents/JOURNAL.md and in the git log on this branch. Next: T42.
 
 A separate, unrelated session fixed Dependabot PR #12 (trufflehog patch
 bump) on `main` by enabling Dependency Graph via the GitHub API — merged,
@@ -17,8 +17,8 @@ T-series cycle depends on.
 
 ## Status
 
-IN PROGRESS — 02_EXECUTE cycle, 40/73 tasks + 3 NEW findings complete.
-Next: T41.
+IN PROGRESS — 02_EXECUTE cycle, 41/73 tasks + 3 NEW findings complete.
+Next: T42.
 
 ## Active work context
 

@@ -1036,6 +1036,74 @@ export async function upsertRemoteEvents(groupId: string, events: Event[], curso
   return added;
 }
 
+export interface LedgerPromotionInput {
+  admitted: Event[];
+  promotedBufferIds: string[];
+  newlyBuffered: { event: Event; retryAt: number }[];
+  transportVector: Record<string, number>;
+  discardVector: Record<string, number>;
+  cursorUpdates?: Record<string, string>;
+}
+
+// INTR-001: one atomic transaction for admitted event rows, promoted-buffer
+// removal, newly-buffered additions, and vector/cursor/observedHlc
+// metadata -- so a crash or other interruption at ANY point leaves each
+// event either still safely retained in the buffer store or fully admitted
+// into the events store, never removed from the buffer without having
+// been durably admitted (the exact root cause: buffer removal previously
+// committed in its OWN separate transaction, before event insertion and
+// related metadata in LATER separate transactions -- a crash in between
+// could permanently lose the only retained copy of an event that had
+// already been buffered past its originating relay page's cursor).
+export async function promoteLedger(groupId: string, input: LedgerPromotionInput): Promise<GroupRecord> {
+  const database = await db();
+  const tx = database.transaction(["events", "buffer", "meta"], "readwrite");
+  try {
+    for (const eventId of input.promotedBufferIds) {
+      await tx.objectStore("buffer").delete([groupId, eventId]);
+    }
+    for (const { event, retryAt } of input.newlyBuffered) {
+      await tx.objectStore("buffer").put({ groupId, eventId: event.id, eventJson: encodeEvent(event), retryAt });
+    }
+    const meta =
+      (await tx.objectStore("meta").get(groupId)) ??
+      ({ groupId, versionVector: {}, discardVector: {}, cursors: {}, nostrSk: createNostrSecretHex() } satisfies StoredMeta);
+    for (const event of input.admitted) {
+      await tx.objectStore("events").put({ groupId, eventId: event.id, eventJson: encodeEvent(event), syncState: "confirmed", publishedAt: Date.now() });
+    }
+    const mergedVector = { ...meta.versionVector };
+    for (const [dev, counter] of Object.entries(input.transportVector)) {
+      mergedVector[dev] = Math.max(mergedVector[dev] ?? 0, counter);
+    }
+    const mergedDiscard = { ...meta.discardVector };
+    for (const [dev, counter] of Object.entries(input.discardVector)) {
+      mergedDiscard[dev] = Math.max(mergedDiscard[dev] ?? 0, counter);
+    }
+    // LOGIC-002: an admitted event's HLC is a genuinely observed clock;
+    // exactOptionalPropertyTypes forbids an explicit undefined, so only
+    // set the field when a value (existing or newly observed) exists.
+    const nextObservedHlc = input.admitted.reduce<HLC | undefined>(
+      (max, event) => (!max || compareHlc(event.hlc, max) > 0 ? event.hlc : max),
+      meta.observedHlc,
+    );
+    const nextMeta: StoredMeta = {
+      ...meta,
+      versionVector: mergedVector,
+      discardVector: mergedDiscard,
+      cursors: { ...meta.cursors, ...input.cursorUpdates },
+      lastSyncAt: Date.now(),
+    };
+    if (nextObservedHlc !== undefined) nextMeta.observedHlc = nextObservedHlc;
+    await tx.objectStore("meta").put(nextMeta);
+    await tx.done;
+  } catch (err) {
+    try { tx.abort(); } catch { /* The transaction may already be aborted. */ }
+    await tx.done.catch(() => undefined);
+    throw err;
+  }
+  return readGroup(groupId);
+}
+
 export async function saveMeta(meta: StoredMeta): Promise<void> {
   const database = await db();
   await database.put("meta", meta);

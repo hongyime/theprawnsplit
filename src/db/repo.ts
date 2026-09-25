@@ -1,5 +1,5 @@
 import { openDB, type DBSchema, type IDBPDatabase } from "idb";
-import { parseEvent, type Event } from "@theprawnsplit/core";
+import { compareHlc, parseEvent, type Event, type HLC } from "@theprawnsplit/core";
 import { bytesToHex } from "@/crypto/bytes";
 import { bigintReplacer, bigintReviver } from "@/lib/money";
 import { inferCurrency, newId } from "@/lib/ids";
@@ -41,7 +41,11 @@ export interface StoredGroup {
   // simply leaves a permanent gap in the counter sequence -- never a
   // delivered/overwritten event, and deliberately never garbage-collected
   // since gaps are explicitly tolerated by this finding's fix approach.
-  reservations?: Record<string, number[]>;
+  // LOGIC-002: each reservation also carries the HLC floor computed for
+  // it at reservation time, so a retry (same commandId) returns the
+  // EXACT same floor rather than a freshly-recomputed, later one --
+  // keeping the reservation fully idempotent end to end.
+  reservations?: Record<string, { counters: number[]; hlcFloor: HLC }>;
 }
 
 export interface StoredEvent {
@@ -76,6 +80,13 @@ export interface StoredMeta {
   unsyncedSince?: number;
   relaySettings?: RelaySettings;
   subgroups?: SubgroupPreset[];
+  // LOGIC-002: the highest HLC ever admitted for this group (local commits
+  // AND remote syncs, but never future-buffered/dropped events). Advanced
+  // atomically alongside nextCounter during reservation, and after every
+  // remote admission -- used as a floor so a new local event's wall clock
+  // never falls behind what this device has already observed, protecting
+  // against local clock rollback and a faster peer's events.
+  observedHlc?: HLC;
 }
 
 interface StoredBuffer {
@@ -470,6 +481,19 @@ export async function appendEvents(groupId: string, events: Event[]): Promise<Gr
 export interface EventReservation {
   deviceId: string;
   counters: number[];
+  hlcFloor: HLC;
+}
+
+// LOGIC-002: computes the next observed-HLC floor for a NEW local
+// reservation. Mirrors core/src/hlc.ts's receive() semantics (never move
+// wall time backward; bump ctr when wall doesn't advance) but always
+// stamps THIS device's id, since "current" may be a floor most recently
+// advanced by an observed REMOTE peer's event, not a true local clock.
+function advanceObservedHlc(current: HLC | undefined, deviceId: string, now: number): HLC {
+  if (!current) return { wall: now, ctr: 0, dev: deviceId };
+  const wall = Math.max(now, current.wall);
+  const ctr = wall === current.wall ? current.ctr + 1 : 0;
+  return { wall, ctr, dev: deviceId };
 }
 
 // CONC-001: two-phase event creation. Reserve counters atomically FIRST
@@ -483,25 +507,35 @@ export interface EventReservation {
 // under two different ids, and two concurrent callers can never receive
 // overlapping counter ranges regardless of how their construction/signing
 // work interleaves afterward.
+//
+// LOGIC-002: also atomically advances the group's persisted observed HLC
+// (StoredMeta.observedHlc) and returns it as hlcFloor, so the built
+// event's wall clock can never fall behind what this device has already
+// observed (its own prior events or synced remote ones).
 export async function reserveEventIds(groupId: string, commandId: string, count: number): Promise<EventReservation> {
   const database = await db();
-  const tx = database.transaction("groups", "readwrite");
-  const group = await tx.store.get(groupId);
+  const tx = database.transaction(["groups", "meta"], "readwrite");
+  const group = await tx.objectStore("groups").get(groupId);
   if (!group) throw new Error("Group not found");
   const existing = group.reservations?.[commandId];
   if (existing) {
     await tx.done;
-    return { deviceId: group.deviceId, counters: existing };
+    return { deviceId: group.deviceId, counters: existing.counters, hlcFloor: existing.hlcFloor };
   }
   const counters = Array.from({ length: count }, (_, index) => group.nextCounter + index);
+  const meta =
+    (await tx.objectStore("meta").get(groupId)) ??
+    ({ groupId, versionVector: {}, discardVector: {}, cursors: {}, nostrSk: createNostrSecretHex() } satisfies StoredMeta);
+  const hlcFloor = advanceObservedHlc(meta.observedHlc, group.deviceId, Date.now());
   const nextGroup: StoredGroup = {
     ...group,
     nextCounter: group.nextCounter + count,
-    reservations: { ...group.reservations, [commandId]: counters },
+    reservations: { ...group.reservations, [commandId]: { counters, hlcFloor } },
   };
-  await tx.store.put(nextGroup);
+  await tx.objectStore("groups").put(nextGroup);
+  await tx.objectStore("meta").put({ ...meta, observedHlc: hlcFloor });
   await tx.done;
-  return { deviceId: group.deviceId, counters };
+  return { deviceId: group.deviceId, counters, hlcFloor };
 }
 
 // Appends events built from a reservation's counters. Uses add() (not
@@ -977,8 +1011,20 @@ export async function upsertRemoteEvents(groupId: string, events: Event[], curso
       for (const [dev, counter] of Object.entries(vectorFromEvents(events))) {
         mergedVector[dev] = Math.max(mergedVector[dev] ?? 0, counter);
       }
-      await tx.objectStore("meta").put({ ...meta, versionVector: mergedVector,
-        cursors: { ...meta.cursors, ...cursorUpdates }, lastSyncAt: Date.now() });
+      // LOGIC-002: a synced remote event's HLC is a genuinely OBSERVED
+      // clock (this reached admission, unlike a future-buffered or
+      // dropped one) -- advance the persisted floor so this device's
+      // NEXT local event can never sort before it. exactOptionalPropertyTypes
+      // forbids assigning an explicit undefined, so only set the field when
+      // a value (existing or newly observed) actually exists.
+      const nextObservedHlc = toInsert.reduce<HLC | undefined>(
+        (max, event) => (!max || compareHlc(event.hlc, max) > 0 ? event.hlc : max),
+        meta.observedHlc,
+      );
+      const nextMeta: StoredMeta = { ...meta, versionVector: mergedVector,
+        cursors: { ...meta.cursors, ...cursorUpdates }, lastSyncAt: Date.now() };
+      if (nextObservedHlc !== undefined) nextMeta.observedHlc = nextObservedHlc;
+      await tx.objectStore("meta").put(nextMeta);
     }
     await tx.done;
   } catch (error) {

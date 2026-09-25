@@ -6,7 +6,10 @@ import {
   readGroup,
   reserveEventIds,
   resetRepositoryForTests,
+  updateMeta,
+  upsertRemoteEvents,
 } from "@/db/repo";
+
 import { makeEvent } from "@/lib/events";
 
 // CONC-001: the old factory()/commit() path let a UI factory copy a stale
@@ -82,5 +85,46 @@ describe("CONC-001 atomic event identity reservation", () => {
     const after = await readGroup(group.groupId);
     const stored = after.events.find((e) => e.id === original.id);
     expect(stored).toMatchObject({ t: "ParticipantAdded", pid: "p1", name: "Original" });
+  });
+
+  it("never lets a reserved event's clock fall behind an already-observed remote peer's far-future HLC", async () => {
+    await resetRepositoryForTests(`conc-001-hlc-floor-${crypto.randomUUID()}`);
+    const group = await ensureGroup();
+    const farFuture = { wall: Date.now() + 10_000_000, ctr: 3, dev: "fast-peer" };
+    await updateMeta(group.groupId, (meta) => ({ ...meta, observedHlc: farFuture }));
+
+    const reservation = await reserveEventIds(group.groupId, "floor-command", 1);
+
+    expect(reservation.hlcFloor.wall).toBe(farFuture.wall);
+    expect(reservation.hlcFloor.ctr).toBe(farFuture.ctr + 1);
+    expect(reservation.hlcFloor.dev).toBe(group.deviceId); // never inherits the peer's device id
+  });
+
+  it("returns the SAME hlcFloor (not a freshly-recomputed, later one) for a retried command", async () => {
+    await resetRepositoryForTests(`conc-001-hlc-retry-${crypto.randomUUID()}`);
+    const group = await ensureGroup();
+
+    const first = await reserveEventIds(group.groupId, "retry-hlc-command", 1);
+    const second = await reserveEventIds(group.groupId, "retry-hlc-command", 1);
+
+    expect(second.hlcFloor).toEqual(first.hlcFloor);
+  });
+
+  it("advances the persisted observed HLC from admitted remote events, so the NEXT local reservation respects it", async () => {
+    await resetRepositoryForTests(`conc-001-remote-observed-${crypto.randomUUID()}`);
+    const group = await ensureGroup();
+    const farFutureRemote = makeEvent(
+      { deviceId: "fast-remote-peer", nextCounter: 1 },
+      "ParticipantAdded",
+      { pid: "remote-p", name: "Remote" },
+    );
+    if (farFutureRemote.t !== "ParticipantAdded") throw new Error("wrong fixture");
+    farFutureRemote.hlc = { wall: Date.now() + 10_000_000, ctr: 0, dev: "fast-remote-peer" };
+
+    await upsertRemoteEvents(group.groupId, [farFutureRemote]);
+    const reservation = await reserveEventIds(group.groupId, "after-remote-command", 1);
+
+    expect(reservation.hlcFloor.wall).toBe(farFutureRemote.hlc.wall);
+    expect(reservation.hlcFloor.dev).toBe(group.deviceId);
   });
 });

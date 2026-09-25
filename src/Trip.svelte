@@ -271,7 +271,7 @@
     if (!group) throw new Error("No Group");
     const commandId = crypto.randomUUID();
     const reservation = await reserveEventIds(group.groupId, commandId, count);
-    const f: EventFactory = { deviceId: reservation.deviceId, nextCounter: reservation.counters[0]! };
+    const f: EventFactory = { deviceId: reservation.deviceId, nextCounter: reservation.counters[0]!, hlcFloor: reservation.hlcFloor };
     const events = await build(f);
     group = await appendReservedEvents(group.groupId, commandId, events);
     await refreshCounts();
@@ -797,7 +797,7 @@
     if (!ok) return;
     const commandId = crypto.randomUUID();
     const reservation = await reserveEventIds(group.groupId, commandId, 1);
-    const f: EventFactory = { deviceId: reservation.deviceId, nextCounter: reservation.counters[0]! };
+    const f: EventFactory = { deviceId: reservation.deviceId, nextCounter: reservation.counters[0]!, hlcFloor: reservation.hlcFloor };
     const archiveEvent = makeEvent(f, "GroupArchived", {
       outstanding: plan.outstanding,
     });

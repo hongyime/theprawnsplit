@@ -34,6 +34,57 @@ export function eventCounter(event: Event): number {
   return Number.isFinite(parsed) ? parsed : event.hlc.ctr;
 }
 
+// DATA-007: sorted, non-overlapping, inclusive [start, end] counter
+// ranges -- the "bounded" exact-coverage representation. A gap-free run
+// compresses to one interval; a hole (a skipped counter while later ones
+// were genuinely admitted) shows up as a separate interval rather than
+// being silently absorbed into a single running maximum. Lives in core
+// (not the app-only db/repo.ts) because it is now part of the Event wire
+// format (BaseEvent.coverage in ./types) -- both producer (app stamping)
+// and consumer (app sync-coverage.ts) need the identical shape/merge
+// semantics, and core is the single source of truth for wire types.
+export type CoverageIntervals = [number, number][];
+
+// Inserts a single counter into a sorted, non-overlapping interval list,
+// merging with an adjacent/overlapping interval where possible. Pure and
+// side-effect-free; returns a NEW array (never mutates the input).
+export function mergeCoverageCounter(existing: CoverageIntervals, counter: number): CoverageIntervals {
+  const next: CoverageIntervals = [];
+  let inserted = false;
+  for (const [start, end] of existing) {
+    if (inserted || counter < start - 1) {
+      next.push([start, end]);
+      continue;
+    }
+    if (counter > end + 1) {
+      next.push([start, end]);
+      continue;
+    }
+    // counter is adjacent to or inside [start, end] -- merge, possibly
+    // extending into a NEXT interval too if this counter bridges them.
+    const mergedStart = Math.min(start, counter);
+    const mergedEnd = Math.max(end, counter);
+    next.push([mergedStart, mergedEnd]);
+    inserted = true;
+  }
+  if (!inserted) next.push([counter, counter]);
+  // A single bridging insertion can make two previously-separate
+  // intervals adjacent/overlapping (e.g. [1,2] and [4,5], insert 3) --
+  // coalesce the whole list once more to restore the non-overlapping
+  // invariant.
+  next.sort((a, b) => a[0] - b[0]);
+  const coalesced: CoverageIntervals = [];
+  for (const [start, end] of next) {
+    const last = coalesced[coalesced.length - 1];
+    if (last && start <= last[1] + 1) {
+      last[1] = Math.max(last[1], end);
+    } else {
+      coalesced.push([start, end]);
+    }
+  }
+  return coalesced;
+}
+
 function knownAuthors(events: Event[]): Set<string> {
   const known = new Set<string>();
   for (const event of events) {

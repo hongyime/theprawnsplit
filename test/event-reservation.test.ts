@@ -140,6 +140,22 @@ describe("CONC-001 atomic event identity reservation", () => {
     expect(delivered.meta.coverage?.[reservation.deviceId]).toEqual([[counter, counter]]);
   });
 
+  it("stamps the delivered event's own wire-level coverage field with the self-inclusive snapshot (DATA-007 T43 publish half)", async () => {
+    await resetRepositoryForTests(`data-007-stamp-coverage-${crypto.randomUUID()}`);
+    const group = await ensureGroup();
+
+    const reservation = await reserveEventIds(group.groupId, "stamp-coverage-command", 1);
+    const counter = reservation.counters[0]!;
+    const event = makeEvent({ deviceId: reservation.deviceId, nextCounter: counter }, "ParticipantAdded", { pid: "p1", name: "Alice" });
+    const delivered = await appendReservedEvents(group.groupId, "stamp-coverage-command", [event]);
+
+    const stored = delivered.events.find((candidate) => candidate.id === event.id);
+    expect(stored?.coverage?.[reservation.deviceId]).toEqual([[counter, counter]]);
+    // The stamped snapshot must match meta.coverage exactly -- never lag
+    // one event behind by omitting this event's own just-admitted counter.
+    expect(stored?.coverage).toEqual(delivered.meta.coverage);
+  });
+
   it("does not record coverage for a counter that failed to be admitted due to a genuine id collision", async () => {
     await resetRepositoryForTests(`data-007-collision-coverage-${crypto.randomUUID()}`);
     const group = await ensureGroup();

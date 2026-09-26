@@ -614,7 +614,14 @@
       .sort(eventSortKey)
       .at(-1);
     if (!event) return "Sync Status Unknown";
-    return isEventCoveredByEveryKnownDevice(group.events, event) ? "Everyone Has This" : "Not Yet On Every Known Device";
+    // DATA-007: never claim "Everyone Has This" from legacy vector-only
+    // evidence -- only from genuine durable-coverage proof. "unknown"
+    // (no coverage evidence from some known device at all) is shown
+    // distinctly rather than defaulting to either extreme.
+    const status = isEventCoveredByEveryKnownDevice(group.events, event);
+    if (status === "covered") return "Everyone Has This";
+    if (status === "not-covered") return "Not Yet On Every Known Device";
+    return "Coverage Unknown";
   }
 
   function rateSummary(rate: Financials["rate"]): string {

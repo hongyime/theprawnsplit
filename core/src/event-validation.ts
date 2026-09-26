@@ -13,6 +13,7 @@
 // invalid, not quarantined (only version skew earns quarantine, per
 // REQ-MON-12/REQ-SYN-22 — an unknown kind at a version we claim to support
 // is a real defect, not a forward-compat signal).
+import type { CoverageIntervals } from "./transport";
 import type { Event, Financials, HLC } from "./types";
 
 export type ParseEventResult =
@@ -67,12 +68,46 @@ function parseVv(value: unknown): Record<string, number> | undefined {
   return out;
 }
 
+// DATA-007: shape-only validation, matching parseVv's philosophy -- this
+// checks the WIRE SHAPE (a sorted-looking list of finite non-negative
+// [start, end] tuples with start <= end), not deeper producer-side
+// invariants like global sortedness/non-overlap across the whole list.
+// A malformed/adversarial peer sending overlapping or unsorted intervals
+// still yields CORRECT containment lookups in sync-coverage.ts (a linear
+// scan over the tuples), so rejecting only genuinely malformed shapes --
+// never re-deriving or trusting cross-tuple ordering -- is consistent
+// with how vv itself is validated.
+function parseCoverageIntervals(value: unknown): CoverageIntervals | undefined {
+  if (!Array.isArray(value)) return undefined;
+  const out: CoverageIntervals = [];
+  for (const tuple of value) {
+    if (!Array.isArray(tuple) || tuple.length !== 2) return undefined;
+    const [start, end] = tuple;
+    if (!isFiniteNonNegative(start) || !isFiniteNonNegative(end) || start > end) return undefined;
+    out.push([start, end]);
+  }
+  return out;
+}
+
+function parseCoverage(value: unknown): Record<string, CoverageIntervals> | undefined {
+  if (value === undefined) return undefined;
+  if (!isRecord(value)) return undefined; // treated as absent by callers; base fields are re-checked separately
+  const out: Record<string, CoverageIntervals> = {};
+  for (const [dev, intervals] of Object.entries(value)) {
+    const parsed = parseCoverageIntervals(intervals);
+    if (parsed === undefined) return undefined;
+    out[dev] = parsed;
+  }
+  return out;
+}
+
 interface BaseFields {
   v: number;
   id: string;
   hlc: HLC;
   dev: string;
   vv?: Record<string, number>;
+  coverage?: Record<string, CoverageIntervals>;
 }
 
 function parseBaseFields(value: Record<string, unknown>): BaseFields | null {
@@ -87,6 +122,11 @@ function parseBaseFields(value: Record<string, unknown>): BaseFields | null {
     const vv = parseVv(value.vv);
     if (vv === undefined) return null;
     base.vv = vv;
+  }
+  if (value.coverage !== undefined) {
+    const coverage = parseCoverage(value.coverage);
+    if (coverage === undefined) return null;
+    base.coverage = coverage;
   }
   return base;
 }

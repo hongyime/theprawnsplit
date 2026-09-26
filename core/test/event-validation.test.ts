@@ -36,6 +36,25 @@ describe("parseEvent — base fields and HLC", () => {
     }
   });
 
+  it("accepts a well-formed coverage field (DATA-007 durable-coverage snapshot, parallel to vv)", () => {
+    const withCoverage = { ...groupCreated, coverage: { [dev]: [[1, 3], [5, 5]] } };
+    expect(parseEvent(withCoverage, { supportedVersion })).toEqual({ kind: "known", event: withCoverage });
+  });
+
+  it("rejects a malformed coverage field instead of silently dropping or coercing it", () => {
+    for (const badCoverage of [
+      { [dev]: "not-an-array" },
+      { [dev]: [[1]] }, // wrong tuple length
+      { [dev]: [[3, 1]] }, // start > end
+      { [dev]: [[-1, 1]] }, // negative counter
+      { [dev]: [["1", 2]] }, // string masquerading as number
+      "not-a-record",
+      [1, 2, 3],
+    ]) {
+      expect(parseEvent({ ...groupCreated, coverage: badCoverage }, { supportedVersion })).toMatchObject({ kind: "invalid" });
+    }
+  });
+
   it("rejects HLC fields that are the wrong type, including values that pass typeof==='number' but are not finite/safe (NaN, Infinity, -Infinity)", () => {
     for (const badHlc of [
       { wall: Number.NaN, ctr: 1, dev },

@@ -1,5 +1,5 @@
 import { openDB, type DBSchema, type IDBPDatabase } from "idb";
-import { compareHlc, eventCounter, parseEvent, type Event, type HLC } from "@theprawnsplit/core";
+import { compareHlc, eventCounter, mergeCoverageCounter, parseEvent, type CoverageIntervals, type Event, type HLC } from "@theprawnsplit/core";
 import { bytesToHex } from "@/crypto/bytes";
 import { bigintReplacer, bigintReviver } from "@/lib/money";
 import { inferCurrency, newId } from "@/lib/ids";
@@ -66,52 +66,12 @@ export interface StoredIdentity {
   claimSkJwk: JsonWebKey;
 }
 
-// DATA-007: sorted, non-overlapping, inclusive [start, end] counter
-// ranges -- the "bounded" exact-coverage representation. A gap-free run
-// compresses to one interval; a hole (a skipped counter while later ones
-// were genuinely admitted) shows up as a separate interval rather than
-// being silently absorbed into a single running maximum.
-export type CoverageIntervals = [number, number][];
 
-// Inserts a single counter into a sorted, non-overlapping interval list,
-// merging with an adjacent/overlapping interval where possible. Pure and
-// side-effect-free; returns a NEW array (never mutates the input).
-export function mergeCoverageCounter(existing: CoverageIntervals, counter: number): CoverageIntervals {
-  const next: CoverageIntervals = [];
-  let inserted = false;
-  for (const [start, end] of existing) {
-    if (inserted || counter < start - 1) {
-      next.push([start, end]);
-      continue;
-    }
-    if (counter > end + 1) {
-      next.push([start, end]);
-      continue;
-    }
-    // counter is adjacent to or inside [start, end] -- merge, possibly
-    // extending into a NEXT interval too if this counter bridges them.
-    const mergedStart = Math.min(start, counter);
-    const mergedEnd = Math.max(end, counter);
-    next.push([mergedStart, mergedEnd]);
-    inserted = true;
-  }
-  if (!inserted) next.push([counter, counter]);
-  // A single bridging insertion can make two previously-separate
-  // intervals adjacent/overlapping (e.g. [1,2] and [4,5], insert 3) --
-  // coalesce the whole list once more to restore the non-overlapping
-  // invariant.
-  next.sort((a, b) => a[0] - b[0]);
-  const coalesced: CoverageIntervals = [];
-  for (const [start, end] of next) {
-    const last = coalesced[coalesced.length - 1];
-    if (last && start <= last[1] + 1) {
-      last[1] = Math.max(last[1], end);
-    } else {
-      coalesced.push([start, end]);
-    }
-  }
-  return coalesced;
-}
+// DATA-007: CoverageIntervals/mergeCoverageCounter live in core (see
+// core/src/transport.ts) since T43 made coverage part of the Event wire
+// format (BaseEvent.coverage) -- both the app's stamping (below) and its
+// consumption (src/lib/sync-coverage.ts) share this exact type/merge
+// semantics with core's own validator.
 
 export interface StoredMeta {
   groupId: string;
@@ -294,9 +254,15 @@ export function vectorFromEvents(events: Event[]): Record<string, number> {
   return vector;
 }
 
-function withVersionVector(event: Event, current: Record<string, number>): Event {
+function withVersionVector(event: Event, current: Record<string, number>, coverage?: Record<string, CoverageIntervals>): Event {
   const nextVector = { ...current, [event.dev]: Math.max(current[event.dev] ?? 0, counterFromEvents([event])) };
-  return { ...event, vv: nextVector } as Event;
+  // DATA-007: coverage is the STAMPING device's own exact durable-
+  // retention snapshot (never mere transport progress like nextVector),
+  // attached as an additional, optional, unsigned wire field so peers
+  // can tell genuine possession apart from mere observation. Omitted
+  // entirely (not set to undefined) when the caller has none to offer,
+  // matching exactOptionalPropertyTypes and vv's own optional pattern.
+  return { ...event, vv: nextVector, ...(coverage ? { coverage } : {}) } as Event;
 }
 
 async function ensureSecrets(group: Partial<StoredGroup> & Omit<StoredGroup, "secretB64" | "tagHex">): Promise<StoredGroup> {
@@ -614,15 +580,20 @@ export async function appendReservedEvents(groupId: string, commandId: string, e
       (await tx.objectStore("meta").get(groupId)) ??
       ({ groupId, versionVector: {}, discardVector: {}, cursors: {}, nostrSk: createNostrSecretHex() } satisfies StoredMeta);
     for (const event of events) {
-      const stamped = withVersionVector(event, meta.versionVector);
+      // DATA-007: compute the self-inclusive coverage snapshot BEFORE
+      // stamping/storing, so the outgoing event's own .coverage field
+      // already reflects this device's durable retention of THIS event
+      // (trivially true the instant it is admitted) rather than lagging
+      // one event behind. Only committed to meta.coverage AFTER the
+      // add() below actually succeeds -- never for a buffered/dropped/
+      // conflicted/rejected event, and never merely because a counter
+      // was reserved.
+      const nextCoverage = { ...meta.coverage, [event.dev]: mergeCoverageCounter(meta.coverage?.[event.dev] ?? [], eventCounter(event)) };
+      const stamped = withVersionVector(event, meta.versionVector, nextCoverage);
       await tx.objectStore("events").add({ groupId, eventId: stamped.id, eventJson: encodeEvent(stamped), syncState: "local" });
       meta.versionVector[stamped.dev] = Math.max(meta.versionVector[stamped.dev] ?? 0, counterFromEvents([stamped]));
       meta.unsyncedSince ??= Date.now();
-      // DATA-007: only an event that just genuinely landed in the events
-      // store (the add() above didn't throw) earns durable-coverage
-      // credit -- never a buffered/dropped/conflicted one, and never
-      // merely because a counter was reserved.
-      meta.coverage = { ...meta.coverage, [stamped.dev]: mergeCoverageCounter(meta.coverage?.[stamped.dev] ?? [], eventCounter(stamped)) };
+      meta.coverage = nextCoverage;
     }
     if (group.reservations && commandId in group.reservations) {
       const { [commandId]: _removed, ...rest } = group.reservations;

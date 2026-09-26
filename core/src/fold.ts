@@ -278,18 +278,25 @@ export function fold(events: Event[], opts: FoldOptions, ctx?: VerificationConte
       expenses.set(event.xid, next);
     }
     if (event.t === "SettlementRecorded" && !settlementVoids.has(event.sid)) {
+      // SEC-001/T45: a settlement is confirmed ONLY via an explicit,
+      // genuinely signed SettlementConfirmed event (verified below) --
+      // never merely because THIS event's own dev string happens to
+      // match one of the payee's authorised devices. That unsigned
+      // device-matching shortcut ("born confirmed") was this finding's
+      // exact vulnerability: anyone with group write access could set
+      // event.dev to manufacture a trusted-looking confirmed settlement
+      // with zero real signature from the payee.
       const payeeDevices = ctx ? authorisedDevices(supported, event.to, ctx) : new Set<string>();
-      const bornConfirmed = ctx ? payeeDevices.has(event.dev) && !contestedPids.has(event.to) : false;
       const cashUnconfirmable = ctx ? payeeDevices.size === 0 : false;
       settlements.set(event.sid, {
         sid: event.sid,
         from: event.from,
         to: event.to,
         minor: event.minor,
-        confirmed: bornConfirmed,
+        confirmed: false,
         disputed: false,
         contestedConfirmation: false,
-        pending: !bornConfirmed && !cashUnconfirmable,
+        pending: !cashUnconfirmable,
         cashUnconfirmable,
       });
     }

@@ -288,7 +288,7 @@ describe("REQ-MON-15/REQ-SYN-12 fold", () => {
     expect(state.anomalies.map((anomaly) => anomaly.code)).not.toContain("contested-settlement-confirmation");
   });
 
-  it("marks settlements recorded by an uncontested payee device born confirmed", () => {
+  it("SEC-001/T45: never marks a settlement confirmed merely because the recording event's dev string matches an authorised payee device -- unsigned attribution is not proof", () => {
     const state = fold(
       [
         claim("alice", "alice-phone", "alice-key"),
@@ -298,9 +298,40 @@ describe("REQ-MON-15/REQ-SYN-12 fold", () => {
       verifier,
     );
 
+    // The OLD bug: a SettlementRecorded event whose dev happens to match
+    // one of alice's authorised devices used to be treated as "born
+    // confirmed" -- with ZERO actual signature proving alice consented.
+    // This is exactly the unsigned-attribution vulnerability SEC-001
+    // describes. It must now show as pending/unconfirmed until a genuine
+    // signed SettlementConfirmed event exists.
+    expect(state.settlements.get("s1")?.confirmed).toBe(false);
+    expect(state.settlements.get("s1")?.pending).toBe(true);
+    expect(state.settlements.get("s1")?.cashUnconfirmable).toBe(false);
+  });
+
+  it("confirms a settlement only via a genuinely signed SettlementConfirmed event, never from the recording event's dev alone", () => {
+    const events = [
+      claim("alice", "alice-phone", "alice-key"),
+      base("SettlementRecorded", { sid: "s1", from: "bob", to: "alice", minor: 100n, dev: "alice-phone" } as never),
+    ];
+    const aliceConfirm = confirm("s1", "alice-key", "alice");
+    if (aliceConfirm.t !== "SettlementConfirmed") throw new Error("test helper returned wrong event type");
+
+    const state = fold([...events, aliceConfirm], { supportedVersion: 1 }, verifier);
+
     expect(state.settlements.get("s1")?.confirmed).toBe(true);
     expect(state.settlements.get("s1")?.pending).toBe(false);
-    expect(state.settlements.get("s1")?.cashUnconfirmable).toBe(false);
+  });
+
+  it("never confirms a settlement from a forged dev attribution when NO genuine SettlementConfirmed signature ever arrives, even across a re-fold of the identical events", () => {
+    const events = [
+      claim("alice", "alice-phone", "alice-key"),
+      base("SettlementRecorded", { sid: "s1", from: "bob", to: "alice", minor: 100n, dev: "attacker-forged-dev" } as never),
+    ];
+
+    const state = fold(events, { supportedVersion: 1 }, verifier);
+    expect(state.settlements.get("s1")?.confirmed).toBe(false);
+    expect(state.settlements.get("s1")?.pending).toBe(true);
   });
 
   it("marks settlements to shadow payees cash-unconfirmable without pending nag state", () => {

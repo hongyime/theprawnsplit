@@ -687,7 +687,25 @@
     const minor = parseMinor(amount);
     if (minor === null) return;
     if (!canRecordSettlement({ archived, allowSettlementActions: frozenPolicy.allowSettlementActions, from, to, minor })) return;
-    await commitReserved(1, (f) => [makeEvent(f, "SettlementRecorded", { sid: crypto.randomUUID(), from, to, minor })]);
+    const sid = crypto.randomUUID();
+    // SEC-001/T45: fold.ts no longer treats a matching recording device
+    // as proof of payee confirmation (the exact unsigned-attribution
+    // vulnerability this finding closed). When THIS device already holds
+    // the payee's own local claim identity and has no active claim
+    // anomaly, atomically pair the record with a GENUINELY signed
+    // SettlementConfirmed event instead -- reusing the same reserved
+    // counter pair pattern as archiveGroup/T38, never fabricating a
+    // signature for a payee this device does not actually hold.
+    const payeeIdentity = localIdentityForPid(to);
+    if (group && payeeIdentity && !hasActiveClaimAnomaly(anomalies, to)) {
+      const claimSig = await signClaim(payeeIdentity.claimSkJwk, payeeIdentity.alg, `${group.tagHex}:confirm:${sid}`);
+      await commitReserved(2, (f) => [
+        makeEvent(f, "SettlementRecorded", { sid, from, to, minor }),
+        makeEvent(f, "SettlementConfirmed", { sid, pid: to, claimSig }),
+      ]);
+    } else {
+      await commitReserved(1, (f) => [makeEvent(f, "SettlementRecorded", { sid, from, to, minor })]);
+    }
     settleAmount = "";
     showToast("Settlement Recorded.");
   }

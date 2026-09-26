@@ -2,20 +2,18 @@
 
 ## Last change — 2026-09-23
 
-T45 (SEC-001 — replace unsigned born-confirmation with signed
-confirmation) done at commit `b424b13` — 45/73 tasks + 3 NEW findings
-complete in the 02_EXECUTE cycle (see tasks.md/bugfix.md/
-execute_state.json). SEC-001 is now FULLY resolved: core/src/fold.ts no
-longer treats a matching event.dev string as settlement-confirmation
-proof (T44 fixed authorisedDevices's edge-validation half; this fixes
-fold.ts's unsigned-attribution half). A settlement is confirmed ONLY via
-an explicit signed SettlementConfirmed event; Trip.svelte's
-recordSettlement now atomically pairs a genuinely signed confirmation
-when the recording device holds the payee's own local identity. Legacy
-settlements previously born-confirmed now correctly show pending on
-re-fold, per the already-approved design.md legacy-confirmation policy.
-Full history of every completed task is in .agents/JOURNAL.md and in the
-git log on this branch. Next: T46.
+T46 (SEC-002 — resolve cancellation ownership and legacy reversals, docs-
+only) done — 46/73 tasks + 3 NEW findings complete in the 02_EXECUTE
+cycle (see tasks.md/bugfix.md/execute_state.json). No git commit needed
+(design.md/bugfix.md are untracked pipeline artifacts). Recorded the
+FULL B2 specification in design.md §B2 (signer = any pid with a non-
+empty authorisedKeys set, unrestricted to the settlement's own parties;
+domain-bound payload `${groupTag}:void-settlement:${sid}`; SettlementVoided
+gains REQUIRED pid+sig fields, event.dev never consulted for authorization
+again; legacy interpretation moot since already deleted, forward contract
+is validation-layer rejection of old-shaped events). T47 (implementation)
+unblocked. Full history of every completed task is in .agents/JOURNAL.md
+and in the git log on this branch. Next: T47.
 
 A separate, unrelated session fixed Dependabot PR #12 (trufflehog patch
 bump) on `main` by enabling Dependency Graph via the GitHub API — merged,
@@ -24,8 +22,8 @@ T-series cycle depends on.
 
 ## Status
 
-IN PROGRESS — 02_EXECUTE cycle, 45/73 tasks + 3 NEW findings complete.
-Next: T46.
+IN PROGRESS — 02_EXECUTE cycle, 46/73 tasks + 3 NEW findings complete.
+Next: T47.
 
 ## Active work context
 

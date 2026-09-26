@@ -64,20 +64,39 @@ const verifiesWithAny = (
 export function authorisedKeys(events: Event[], pid: string, ctx: VerificationContext): Set<string> {
   const voided = voidedEventIds(events);
   const ordered = [...events].filter((event) => !voided.has(event.id)).sort(eventSortKey);
-  const keys = new Map<string, "ed25519" | "ecdsa-p256">();
+  return new Set([...authorisedKeyEdges(ordered, pid, ctx).keys()].sort());
+}
+
+// SEC-001/T44: shared computation of validated key -> device edges, used
+// by BOTH authorisedKeys (keys only) and authorisedDevices (devices
+// only). A device is associated with a key ONLY at the exact point its
+// OWN DeviceLinked/ClaimReattested edge signature genuinely verifies
+// against a key that was ALREADY independently established -- never
+// merely because that key string happens to already be trusted via some
+// unrelated edge. (The previous authorisedDevices did a separate,
+// unvalidated pass checking only "does this event's key match an
+// already-authorised key", letting a forged edge with a copied/reused
+// key string associate an attacker-controlled device with zero valid
+// signature of its own.)
+function authorisedKeyEdges(
+  ordered: Event[],
+  pid: string,
+  ctx: VerificationContext,
+): Map<string, { alg: "ed25519" | "ecdsa-p256"; device: string }> {
+  const edges = new Map<string, { alg: "ed25519" | "ecdsa-p256"; device: string }>();
 
   const genesis = firstValidClaim(ordered, pid, ctx);
-  if (genesis) keys.set(genesis.claimPk, genesis.alg);
+  if (genesis) edges.set(genesis.claimPk, { alg: genesis.alg, device: genesis.deviceId });
 
   let changed = true;
   while (changed) {
     changed = false;
-    const current = [...keys.entries()].map(([publicKey, alg]) => ({ publicKey, alg }));
+    const current = [...edges.entries()].map(([publicKey, edge]) => ({ publicKey, alg: edge.alg }));
     for (const event of ordered) {
-      if (event.t === "DeviceLinked" && event.pid === pid && !keys.has(event.newClaimPk)) {
+      if (event.t === "DeviceLinked" && event.pid === pid && !edges.has(event.newClaimPk)) {
         const payload = `${ctx.groupTag}:link:${event.pid}:${event.newDevice}:${event.newClaimPk}:${event.nonce}`;
         if (verifiesWithAny(ctx, payload, event.sig, current)) {
-          keys.set(event.newClaimPk, event.alg);
+          edges.set(event.newClaimPk, { alg: event.alg, device: event.newDevice });
           changed = true;
         }
       }
@@ -88,7 +107,10 @@ export function authorisedKeys(events: Event[], pid: string, ctx: VerificationCo
     .filter((peerPid) => peerPid !== pid && authorisedKeysWithoutReattestation(ordered, peerPid, ctx).size > 0)
     .sort();
   const threshold = Math.max(1, Math.floor((claimedPeers.length - 1) / 2) + 1);
-  const reattestedTargets = new Map<string, { key: string; alg: "ed25519" | "ecdsa-p256"; attestors: Set<string> }>();
+  const reattestedTargets = new Map<
+    string,
+    { key: string; alg: "ed25519" | "ecdsa-p256"; device: string; attestors: Set<string> }
+  >();
 
   for (const event of ordered) {
     if (event.t !== "ClaimReattested" || event.pid !== pid) continue;
@@ -99,29 +121,39 @@ export function authorisedKeys(events: Event[], pid: string, ctx: VerificationCo
     const payload = `${ctx.groupTag}:reattest:${event.pid}:${event.newDevice}:${event.newClaimPk}`;
     if (verifiesWithAny(ctx, payload, event.sig, attestorKeys)) {
       const targetKey = `${event.newDevice}\0${event.newClaimPk}`;
-      const target = reattestedTargets.get(targetKey) ?? { key: event.newClaimPk, alg: event.alg, attestors: new Set<string>() };
+      const target =
+        reattestedTargets.get(targetKey) ?? { key: event.newClaimPk, alg: event.alg, device: event.newDevice, attestors: new Set<string>() };
       target.attestors.add(event.attestor);
       reattestedTargets.set(targetKey, target);
     }
   }
 
   for (const target of reattestedTargets.values()) {
-    if (target.attestors.size >= threshold) keys.set(target.key, target.alg);
+    if (target.attestors.size >= threshold) edges.set(target.key, { alg: target.alg, device: target.device });
   }
 
-  return new Set([...keys.keys()].sort());
+  return edges;
 }
 
 export function authorisedDevices(events: Event[], pid: string, ctx: VerificationContext): Set<string> {
   const voided = voidedEventIds(events);
   const ordered = [...events].filter((event) => !voided.has(event.id)).sort(eventSortKey);
-  const keys = authorisedKeys(ordered, pid, ctx);
+  const edges = authorisedKeyEdges(ordered, pid, ctx);
   const devices = new Set<string>();
 
+  for (const edge of edges.values()) devices.add(edge.device);
+
+  // Unlike DeviceLinked/ClaimReattested (where each edge inherently
+  // associates exactly one new device with one new key), MULTIPLE
+  // devices can legitimately share the SAME already-established key --
+  // e.g. reinstalling on a second device using the same held key. Each
+  // such claim is trusted only when it independently carries ITS OWN
+  // valid self-signature for that key, never merely because the key
+  // string happens to already be authorised via some unrelated edge.
   for (const event of ordered) {
-    if (event.t === "ParticipantClaimed" && event.pid === pid && keys.has(event.claimPk)) devices.add(event.deviceId);
-    if (event.t === "DeviceLinked" && event.pid === pid && keys.has(event.newClaimPk)) devices.add(event.newDevice);
-    if (event.t === "ClaimReattested" && event.pid === pid && keys.has(event.newClaimPk)) devices.add(event.newDevice);
+    if (event.t === "ParticipantClaimed" && event.pid === pid && edges.has(event.claimPk) && validSelfClaim(event, ctx)) {
+      devices.add(event.deviceId);
+    }
   }
 
   return new Set([...devices].sort());

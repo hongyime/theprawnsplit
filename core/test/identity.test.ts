@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { authorisedKeys, buildDSU, claimAnomalies, contestedClaimPids, matchesPayeeClaimSignature, verifyConfirmation } from "../src/identity";
+import { authorisedDevices, authorisedKeys, buildDSU, claimAnomalies, contestedClaimPids, matchesPayeeClaimSignature, verifyConfirmation } from "../src/identity";
 import { base, claim, confirm, groupTag, link, sig, verifier } from "./helpers";
 
 describe("REQ-ID-13/REQ-SEC-08 identity", () => {
@@ -208,6 +208,90 @@ describe("REQ-ID-13/REQ-SEC-08 identity", () => {
     expect(claimAnomalies(events, verifier).map((anomaly) => anomaly.code)).not.toContain("unverified-reclaim");
     if (recoveredConfirm.t !== "SettlementConfirmed") throw new Error("test helper returned wrong event type");
     expect(verifyConfirmation([...events, recoveredConfirm], "s1", recoveredConfirm.claimSig, verifier)).toBe(true);
+  });
+
+  // SEC-001/T44: authorisedDevices must re-validate EACH individual edge's
+  // own signature before associating a device with an authorised key --
+  // never merely because that key string already happens to be trusted
+  // via some OTHER, unrelated edge. Root cause of the bug this closes:
+  // the old authorisedDevices did a separate pass that only checked
+  // "does this event's claimPk/newClaimPk match an already-authorised
+  // key", without re-verifying THIS event's own signature at all.
+  it("never associates a device via a ParticipantClaimed event whose OWN signature is invalid, even when it reuses an already-authorised key string", () => {
+    const genuineClaim = claim("alice", "phone", "alice-key");
+    const forgedSecondClaim = base("ParticipantClaimed", {
+      pid: "alice",
+      deviceId: "attacker-device",
+      claimPk: "alice-key",
+      alg: "ed25519",
+      sig: "totally-not-a-valid-signature",
+    } as never);
+
+    const devices = authorisedDevices([genuineClaim, forgedSecondClaim], "alice", verifier);
+    expect(devices.has("attacker-device")).toBe(false);
+    expect(devices.has("phone")).toBe(true); // the genuine claim is unaffected
+  });
+
+  it("never associates a device via a DeviceLinked edge whose OWN signature is invalid, even when it copies an already-authorised key string", () => {
+    const genuineClaim = claim("alice", "phone", "alice-key");
+    const forgedLink = base("DeviceLinked", {
+      pid: "alice",
+      parentDevice: "phone",
+      newDevice: "attacker-device",
+      newClaimPk: "alice-key", // copied, not a genuinely new delegated key
+      alg: "ed25519",
+      nonce: "n1",
+      sig: "totally-not-a-valid-signature",
+    } as never);
+
+    const devices = authorisedDevices([genuineClaim, forgedLink], "alice", verifier);
+    expect(devices.has("attacker-device")).toBe(false);
+  });
+
+  it("never associates a device via a ClaimReattested edge whose OWN signature is invalid, even when it copies an already-authorised key string", () => {
+    const events = [
+      claim("alice", "phone", "alice-key"),
+      claim("peer-a", "a", "peer-a-key"),
+      claim("peer-b", "b", "peer-b-key"),
+      claim("peer-c", "c", "peer-c-key"),
+      base("ClaimReattested", {
+        pid: "alice",
+        newDevice: "attacker-device",
+        newClaimPk: "alice-key", // copied, not a genuinely reattested key
+        alg: "ed25519",
+        attestor: "peer-a",
+        sig: "totally-not-a-valid-signature",
+      } as never),
+    ];
+
+    const devices = authorisedDevices(events, "alice", verifier);
+    expect(devices.has("attacker-device")).toBe(false);
+  });
+
+  it("lets multiple devices legitimately share one already-established key, as long as EACH claim independently carries a valid self-signature", () => {
+    const events = [claim("alice", "phone", "alice-key"), claim("alice", "tablet-reinstall", "alice-key")];
+    const devices = authorisedDevices(events, "alice", verifier);
+    expect(devices).toEqual(new Set(["phone", "tablet-reinstall"]));
+  });
+
+  it("converges transitive DeviceLinked device authority under shuffled arrival, matching the equivalent key convergence", () => {
+    const genesis = claim("alice", "phone", "key-a");
+    const tablet = link("alice", "key-a", "tablet", "key-b", "n1");
+    const laptopPayload = `${groupTag}:link:alice:laptop:key-c:n2`;
+    const laptop = base("DeviceLinked", {
+      pid: "alice",
+      parentDevice: "tablet",
+      newDevice: "laptop",
+      newClaimPk: "key-c",
+      alg: "ed25519",
+      nonce: "n2",
+      sig: sig("key-b", laptopPayload),
+    } as never);
+    const expected = new Set(["phone", "tablet", "laptop"]);
+
+    expect(authorisedDevices([laptop, tablet, genesis], "alice", verifier)).toEqual(expected);
+    expect(authorisedDevices([genesis, tablet, laptop], "alice", verifier)).toEqual(expected);
+    expect(authorisedDevices([tablet, laptop, genesis], "alice", verifier)).toEqual(expected);
   });
 
   it("flags one device claiming two participants", () => {

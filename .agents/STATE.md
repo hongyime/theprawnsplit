@@ -2,15 +2,16 @@
 
 ## Last change — 2026-09-23
 
-T42 (DATA-007 — exact durable coverage tracking, metadata/type layer
-only) done at commit `59ba54c` — 42/73 tasks + 3 NEW findings complete
-in the 02_EXECUTE cycle (see tasks.md/bugfix.md/execute_state.json). New
-`StoredMeta.coverage` field + `mergeCoverageCounter` in `src/db/repo.ts`,
-wired into `appendReservedEvents`/`promoteLedger` so only durably-admitted
-events earn coverage credit. `resolveIncomingEventConflicts`,
-`sync-coverage.ts`, and the Trip.svelte label are unchanged until T43
-consumes this metadata. Full history of every completed task is in
-.agents/JOURNAL.md and in the git log on this branch. Next: T43.
+T43 (DATA-007 — publish and consume exact durable coverage evidence)
+done at commit `e34798b` — 43/73 tasks + 3 NEW findings complete in the
+02_EXECUTE cycle (see tasks.md/bugfix.md/execute_state.json). DATA-007 is
+now FULLY resolved: `BaseEvent.coverage` is part of the Event wire format
+(`core/src/types.ts`/`event-validation.ts`), `withVersionVector` stamps it
+on outgoing events, and `isEventCoveredByEveryKnownDevice` returns a tri-
+state (covered/not-covered/unknown) so the Trip.svelte label never claims
+"Everyone Has This" from legacy vector-only evidence again. Full history
+of every completed task is in .agents/JOURNAL.md and in the git log on
+this branch. Next: T44.
 
 A separate, unrelated session fixed Dependabot PR #12 (trufflehog patch
 bump) on `main` by enabling Dependency Graph via the GitHub API — merged,
@@ -19,8 +20,8 @@ T-series cycle depends on.
 
 ## Status
 
-IN PROGRESS — 02_EXECUTE cycle, 42/73 tasks + 3 NEW findings complete.
-Next: T43.
+IN PROGRESS — 02_EXECUTE cycle, 43/73 tasks + 3 NEW findings complete.
+Next: T44.
 
 ## Active work context
 

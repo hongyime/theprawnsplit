@@ -6,17 +6,16 @@
 
 ## Last change — 2026-09-23
 
-T47 (SEC-002 — enforce the approved signed cancellation contract) done at
-commit `fd99203` — 47/73 tasks + 3 NEW findings complete in the
-02_EXECUTE cycle (see tasks.md/bugfix.md/execute_state.json). SEC-002 is
-now FULLY resolved: `SettlementVoided` requires signed `pid`+`sig` fields
-verified against `authorisedKeys` (any current group member, per design.md
-§B2), replacing the removed unsigned `event.dev===settlement.dev` check.
-Also fixed a MORE SEVERE bug found during implementation: a generic
-unsigned `EventVoided` could make a settlement vanish from state entirely
-via the main fold loop's `voided` skip -- now exempted for all settlement-
-domain event types. Full history of every completed task is in
-.agents/JOURNAL.md and in the git log on this branch. Next: T48.
+T48 (LOGIC-001 — discharge balances when recording settlement) done at
+commit `4bee66b` — 48/73 tasks + 3 NEW findings complete in the
+02_EXECUTE cycle (see tasks.md/bugfix.md/execute_state.json). LOGIC-001 is
+now FULLY resolved: `core/src/fold.ts`'s settlement balance application
+had `from`/`to` signs reversed, DOUBLING the remaining debt instead of
+discharging it -- swapped so the payer gains toward zero and the payee
+loses toward zero. Also corrected `PRD.md` §7.3's REQ-SET-05/REQ-SET-08,
+which had drifted stale from this session's own earlier T44/T45/T47
+security fixes. Full history of every completed task is in
+.agents/JOURNAL.md and in the git log on this branch. Next: T49.
 
 A separate, unrelated session fixed Dependabot PR #12 (trufflehog patch
 bump) on `main` by enabling Dependency Graph via the GitHub API — merged,
@@ -25,8 +24,8 @@ T-series cycle depends on.
 
 ## Status
 
-IN PROGRESS — 02_EXECUTE cycle, 47/73 tasks + 3 NEW findings complete.
-Next: T48.
+IN PROGRESS — 02_EXECUTE cycle, 48/73 tasks + 3 NEW findings complete.
+Next: T49.
 
 ## Active work context
 

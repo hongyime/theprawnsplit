@@ -1,19 +1,22 @@
+## Portability maintenance - 2026-09-27
+
+- Replaced POSIX-only inline ANALYZE assignment with a Node launcher preserving arguments, environment and exit status. Stub Vite contracts passed on Windows and Linux; no application build ran.
+
 # Project State
 
 ## Last change — 2026-09-23
 
-T46 (SEC-002 — resolve cancellation ownership and legacy reversals, docs-
-only) done — 46/73 tasks + 3 NEW findings complete in the 02_EXECUTE
-cycle (see tasks.md/bugfix.md/execute_state.json). No git commit needed
-(design.md/bugfix.md are untracked pipeline artifacts). Recorded the
-FULL B2 specification in design.md §B2 (signer = any pid with a non-
-empty authorisedKeys set, unrestricted to the settlement's own parties;
-domain-bound payload `${groupTag}:void-settlement:${sid}`; SettlementVoided
-gains REQUIRED pid+sig fields, event.dev never consulted for authorization
-again; legacy interpretation moot since already deleted, forward contract
-is validation-layer rejection of old-shaped events). T47 (implementation)
-unblocked. Full history of every completed task is in .agents/JOURNAL.md
-and in the git log on this branch. Next: T47.
+T47 (SEC-002 — enforce the approved signed cancellation contract) done at
+commit `fd99203` — 47/73 tasks + 3 NEW findings complete in the
+02_EXECUTE cycle (see tasks.md/bugfix.md/execute_state.json). SEC-002 is
+now FULLY resolved: `SettlementVoided` requires signed `pid`+`sig` fields
+verified against `authorisedKeys` (any current group member, per design.md
+§B2), replacing the removed unsigned `event.dev===settlement.dev` check.
+Also fixed a MORE SEVERE bug found during implementation: a generic
+unsigned `EventVoided` could make a settlement vanish from state entirely
+via the main fold loop's `voided` skip -- now exempted for all settlement-
+domain event types. Full history of every completed task is in
+.agents/JOURNAL.md and in the git log on this branch. Next: T48.
 
 A separate, unrelated session fixed Dependabot PR #12 (trufflehog patch
 bump) on `main` by enabling Dependency Graph via the GitHub API — merged,
@@ -22,8 +25,8 @@ T-series cycle depends on.
 
 ## Status
 
-IN PROGRESS — 02_EXECUTE cycle, 46/73 tasks + 3 NEW findings complete.
-Next: T47.
+IN PROGRESS — 02_EXECUTE cycle, 47/73 tasks + 3 NEW findings complete.
+Next: T48.
 
 ## Active work context
 
@@ -40,7 +43,7 @@ concurrently — always `git fetch` and check `git log --oneline -5` on both
 ## Auto State
 
 - Updated: 2026-09-25 09:40:34 +08:00
-- Machine: PRAWN-E14
+- Machine: dev-host-2.example
 - Harness: claude
 - Event: stop
 - Branch: maintenance/prawn-ui-20260916
@@ -48,3 +51,5 @@ concurrently — always `git fetch` and check `git log --oneline -5` on both
 - Dirty files: 6
 - Resume hint: Read .agents/STATE.md, then the latest file in .agents/handoffs/ if present.
 <!-- MOLT_AUTO_END -->
+
+Machine-specific values in this document use privacy placeholders.

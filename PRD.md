@@ -272,12 +272,12 @@ The Phase column is scope planning (§15), not delivery status — STATUS.md own
 |---|---|---|
 | REQ-SET-01 | Settlement uses greedy net-balance matching, guaranteeing ≤ n−1 transfers | 1 |
 | REQ-SET-02 | The app MUST NOT initiate, process, or hold money | 1 |
-| REQ-SET-03 | `SettlementRecorded` moves the balance immediately | 1 |
-| REQ-SET-04 | Settlements are marked pending until confirmed by a device claiming the payee participant | 4 |
-| REQ-SET-05 | A settlement recorded by a device claiming the payee is born confirmed — **only if that claim is uncontested** (see REQ-SET-09) | 4 |
+| REQ-SET-03 | `SettlementRecorded` moves the balance immediately: the payer (`from`, a debtor) balance MUST increase by `minor` and the payee (`to`, a creditor) balance MUST decrease by `minor` -- this DISCHARGES the debt rather than doubling it. **Worked example:** Alice pays 100 for lunch split evenly with Bob, so `balance[alice] = +50` (owed) and `balance[bob] = -50` (owing). Bob then records `SettlementRecorded{from: bob, to: alice, minor: 50}` for the suggested transfer amount. Applying it: `balance[bob] += 50 -> 0`, `balance[alice] -= 50 -> 0`. Both land at zero, matching REQ-MON-15's zero-sum invariant. A partial payment of only 20 instead reduces the debt to `balance[bob] = -30`, `balance[alice] = +30` -- neither zeroed nor doubled | 1 |
+| REQ-SET-04 | Settlements are marked pending until confirmed by a device holding the payee's own claim identity | 4 |
+| REQ-SET-05 | `SettlementConfirmed` is honoured ONLY from a genuinely signed confirmation by the payee's own claim identity (see REQ-SET-09) -- there is no unsigned "born confirmed" shortcut from a merely-matching device string; that was SEC-001's exact vulnerability, closed at T44/T45 | 4 |
 | REQ-SET-06 | Settlements to shadow payees are marked `cash-unconfirmable` and MUST NOT nag | 4 |
 | REQ-SET-07 | Disputes MUST NOT auto-reverse a balance. Both claims are displayed side by side | 4 |
-| REQ-SET-08 | Reversal requires the original payer to void their own settlement event | 4 |
+| REQ-SET-08 | Reversal requires a signed `SettlementVoided` (`pid`+`sig`, domain payload `groupTag:void-settlement:sid`) authorized by ANY current group member -- not the original payer specifically, not signer-only, not admin-only (owner decision B2, enforced at T47). A generic `EventVoided` or a forged/unauthorised signature never clears a protected settlement | 4 |
 | REQ-SET-09 | `SettlementConfirmed` is honoured only from a device whose claim on the payee is uncontested, i.e. that participant has no active claim anomaly under REQ-ID-07. A confirmation arriving from a contested claim MUST be displayed as contested and MUST NOT clear the pending flag | 4 |
  
 ### 7.4 Sync and relay

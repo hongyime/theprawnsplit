@@ -407,8 +407,16 @@ export function fold(events: Event[], opts: FoldOptions, ctx?: VerificationConte
   }
 
   for (const settlement of settlements.values()) {
-    add(balances, canonical(settlement.to), settlement.minor);
-    add(balances, canonical(settlement.from), -settlement.minor);
+    // LOGIC-001/T48: a settlement DISCHARGES debt, it does not create a
+    // NEW one -- the payer (from, a debtor with a NEGATIVE balance) gains
+    // toward zero, and the payee (to, a creditor with a POSITIVE balance)
+    // loses toward zero. The previous code had these reversed (to gained,
+    // from lost), which DOUBLED the remaining debt instead of settling it:
+    // e.g. bob owes alice 100 (bob=-100, alice=+100); bob pays alice 100;
+    // the old code produced bob=-200, alice=+200 instead of both landing
+    // at zero.
+    add(balances, canonical(settlement.from), settlement.minor);
+    add(balances, canonical(settlement.to), -settlement.minor);
   }
 
   const balanceSum = [...balances.values()].reduce((a, b) => a + b, 0n);

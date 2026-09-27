@@ -127,6 +127,10 @@ npm run dev
 
 ## Checks
 
+`npm run analyze` is available on Windows and Linux. Its Node launcher sets
+`ANALYZE=1` for Vite without shell-specific environment assignment syntax,
+forwards extra Vite arguments, and preserves the build's exit status.
+
 ```bash
 npm run test:core     # property + unit suite for core/
 npm run test:sync     # sync and integration tests

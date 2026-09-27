@@ -256,3 +256,7 @@ and wrong on the arithmetic — both facts mattered and both belonged in the rep
 **Definition of done for this project.** STATUS.md is only as true as its weakest
 evidence class. It is finished when every row is Built on evidence that has been seen
 to fail — not when every row says Built.
+
+### CR-018 maintenance verification follow-through
+
+Portable analysis launcher and optional-identity maintenance are prepared; see `.agents/cr-018-report.md`. Keep CR-018 open until the exact direct-main publication passes the existing Prawn Split Release Check and production verification is recorded. Local protected-template assertions and the broad-run schema startup timeout remain documented gaps; scoped rechecks do not close the full-protocol gate. Preserve all CR-017 and existing backlog items.

@@ -37,3 +37,9 @@ were disabled at the repo level, so the dependency-review action couldn't
 execute at all - not an actual vulnerability finding. Enabled Dependency Graph
 via GitHub API, re-ran the check (passed), merged PR #12. Ended because: task
 complete.
+
+## Reviewed workspace maintenance - 2026-09-27
+
+Publish the reviewed portability and privacy maintenance from the current default branch, preserving concurrent upstream work and original workspace changes. Validation is limited to the documented offline fixtures and hosted checks; no live data job or deployment command was executed locally.
+
+CR-018 portability/privacy maintenance is prepared for direct-main publication; see `.agents/cr-018-report.md`. Launcher fixtures and independent mutation checks pass; core, Svelte, money lint, focused in-memory schema tests and standalone Vite bundling pass. Full local root/build commands remain failed because the protected environment template is excluded and a broad-run schema hook timed out before passing unchanged alone. Exact-head hosted protocol and production verification remain pending; CR-018 is not complete. CR-017 remains unchanged.

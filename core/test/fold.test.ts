@@ -363,36 +363,96 @@ describe("REQ-MON-15/REQ-SYN-12 fold", () => {
     expect(state.balances.get("bob")).toBe(-100n);
   });
 
-  it("allows the recording device to void its own settlement", () => {
+  it("voids a settlement via a genuinely signed SettlementVoided from ANY current group member, not just the original recorder (SEC-002/T47 B2 policy)", () => {
+    const voidPayload = `${groupTag}:void-settlement:s1`;
     const state = fold(
       [
-        base("ParticipantAdded", { pid: "alice", name: "Alice" } as never),
-        base("ParticipantAdded", { pid: "bob", name: "Bob" } as never),
+        claim("alice", "alice-phone", "alice-key"),
+        claim("bob", "bob-phone", "bob-key"),
+        claim("carol", "carol-phone", "carol-key"),
         base("SettlementRecorded", { id: "settle-1", sid: "s1", from: "bob", to: "alice", minor: 100n, dev: "bob-phone" } as never),
-        base("SettlementVoided", { sid: "s1", dev: "bob-phone" } as never),
+        // carol is neither the payer nor the payee nor the recording
+        // device -- exactly the "any current group member" case B2
+        // approved and this task's acceptance criterion requires an
+        // explicit outcome for.
+        base("SettlementVoided", { sid: "s1", pid: "carol", sig: sig("carol-key", voidPayload) } as never),
       ],
       { supportedVersion: 1 },
+      verifier,
     );
 
     expect(state.settlements.has("s1")).toBe(false);
     expect([...state.balances.values()].reduce((a, b) => a + b, 0n)).toBe(0n);
   });
 
-  it("rejects settlement voids from another device", () => {
+  it("rejects a SettlementVoided with a forged signature, regardless of which pid it claims to be from", () => {
     const state = fold(
       [
-        base("ParticipantAdded", { pid: "alice", name: "Alice" } as never),
-        base("ParticipantAdded", { pid: "bob", name: "Bob" } as never),
+        claim("alice", "alice-phone", "alice-key"),
+        claim("bob", "bob-phone", "bob-key"),
         base("SettlementRecorded", { id: "settle-1", sid: "s1", from: "bob", to: "alice", minor: 100n, dev: "bob-phone" } as never),
-        base("SettlementVoided", { id: "void-1", sid: "s1", dev: "alice-phone" } as never),
+        base("SettlementVoided", { id: "void-1", sid: "s1", pid: "bob", sig: "totally-not-a-valid-signature" } as never),
       ],
       { supportedVersion: 1 },
+      verifier,
     );
 
     expect(state.settlements.has("s1")).toBe(true);
     expect(state.anomalies.find((anomaly) => anomaly.code === "unauthorized-settlement-void")?.relatedEventId).toBe("settle-1");
     expect(state.balances.get("alice")).toBe(100n);
     expect(state.balances.get("bob")).toBe(-100n);
+  });
+
+  it("rejects a SettlementVoided from a pid with a contested claim, even with an otherwise valid signature", () => {
+    const state = fold(
+      [
+        claim("alice", "alice-phone", "alice-key"),
+        claim("bob", "bob-phone", "bob-key"),
+        claim("bob", "bob-tablet", "bob-tablet-key"), // unpaired second claim -- contested
+        base("SettlementRecorded", { id: "settle-1", sid: "s1", from: "bob", to: "alice", minor: 100n, dev: "bob-phone" } as never),
+        base("SettlementVoided", { sid: "s1", pid: "bob", sig: sig("bob-key", `${groupTag}:void-settlement:s1`) } as never),
+      ],
+      { supportedVersion: 1 },
+      verifier,
+    );
+
+    expect(state.settlements.has("s1")).toBe(true);
+  });
+
+  it("never voids a settlement when no verification context is available to check the signature at all", () => {
+    const state = fold(
+      [
+        claim("alice", "alice-phone", "alice-key"),
+        claim("bob", "bob-phone", "bob-key"),
+        base("SettlementRecorded", { id: "settle-1", sid: "s1", from: "bob", to: "alice", minor: 100n, dev: "bob-phone" } as never),
+        base("SettlementVoided", { sid: "s1", pid: "bob", sig: sig("bob-key", `${groupTag}:void-settlement:s1`) } as never),
+      ],
+      { supportedVersion: 1 },
+      // no ctx passed -- a signature can never be checked without one.
+    );
+
+    expect(state.settlements.has("s1")).toBe(true);
+  });
+
+  it("flags a generic EventVoided targeting a SettlementRecorded event as a distinct anomaly, never silently cancelling its economic effect (SEC-002/T47)", () => {
+    const state = fold(
+      [
+        claim("alice", "alice-phone", "alice-key"),
+        claim("bob", "bob-phone", "bob-key"),
+        base("SettlementRecorded", { id: "settle-1", sid: "s1", from: "bob", to: "alice", minor: 100n, dev: "bob-phone" } as never),
+        base("EventVoided", { targetId: "settle-1" } as never),
+      ],
+      { supportedVersion: 1 },
+      verifier,
+    );
+
+    // The settlement's economic effect and derived state are UNCHANGED --
+    // a generic void never cancels it, only the signed SettlementVoided
+    // contract can.
+    expect(state.settlements.has("s1")).toBe(true);
+    expect(state.balances.get("alice")).toBe(100n);
+    expect(state.balances.get("bob")).toBe(-100n);
+    expect(state.anomalies.find((anomaly) => anomaly.code === "generic-void-of-settlement-event")?.relatedEventId).toBe("settle-1");
   });
 
   it("surfaces duplicate participant names unless marked distinct", () => {

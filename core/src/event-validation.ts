@@ -299,7 +299,10 @@ const variantParsers: Record<string, VariantParser> = {
     return event;
   },
 
-  SettlementVoided: (v, base) => (isNonEmptyString(v.sid) ? { ...base, t: "SettlementVoided", sid: v.sid } : null),
+  SettlementVoided: (v, base) =>
+    isNonEmptyString(v.sid) && isNonEmptyString(v.pid) && isNonEmptyString(v.sig)
+      ? { ...base, t: "SettlementVoided", sid: v.sid, pid: v.pid, sig: v.sig }
+      : null,
 
   GroupArchived: (v, base) => {
     const outstanding = parseOutstandingRows(v.outstanding);

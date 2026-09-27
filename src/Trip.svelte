@@ -71,7 +71,7 @@
   import { normalizeRelaySettings, parseNostrRelayText, relaySettingsTargetCount, type RelaySettings } from "@/lib/relay-settings";
   import { reattestationStatus } from "@/lib/reattestation";
   import { canConfirmSettlement, canRecordSettlement, hasActiveClaimAnomaly } from "@/lib/settlement-command";
-  import { canVoidRecordedSettlement, settlementClaimView } from "@/lib/settlement-history";
+  import { canVoidRecordedSettlement, settlementClaimView, usableVoidAuthorityPid } from "@/lib/settlement-history";
   import { preserveSplitInputs } from "@/lib/split-preservation";
   import { applySubgroupSelection, deleteSubgroupPreset, upsertSubgroupPreset } from "@/lib/subgroups";
   import { isEventCoveredByEveryKnownDevice } from "@/lib/sync-coverage";
@@ -744,8 +744,18 @@
   }
 
   async function voidSettlement(sid: string): Promise<void> {
-    if (!group || archived || !frozenPolicy.allowSettlementActions || !canVoidRecordedSettlement(group.events, sid, group.deviceId)) return;
-    await commitReserved(1, (f) => [makeEvent(f, "SettlementVoided", { sid })]);
+    if (!group || archived || !frozenPolicy.allowSettlementActions || !verificationContext) return;
+    const localPids = group.identities.map((identity) => identity.pid);
+    if (!canVoidRecordedSettlement(group.events, sid, localPids, verificationContext)) return;
+    // SEC-002/T47: reversal authority belongs to ANY current group member
+    // (design.md §B2 point 1); sign with whichever local claim identity
+    // canVoidRecordedSettlement above already confirmed is usable -- never
+    // fabricate a device-string attribution.
+    const votingPid = usableVoidAuthorityPid(group.events, localPids, verificationContext);
+    const identity = votingPid ? localIdentityForPid(votingPid) : undefined;
+    if (!votingPid || !identity) return;
+    const claimSig = await signClaim(identity.claimSkJwk, identity.alg, `${group.tagHex}:void-settlement:${sid}`);
+    await commitReserved(1, (f) => [makeEvent(f, "SettlementVoided", { sid, pid: votingPid, sig: claimSig })]);
   }
 
   function downloadExport(reason?: ExportPromptReason, sourceGroup = group): void {
@@ -1743,7 +1753,7 @@
                   {#if !settlement.disputed}
                     <button type="button" class="secondary" disabled={archived} on:click={() => disputeSettlement(settlement.sid)}>Dispute</button>
                   {/if}
-                  {#if canVoidRecordedSettlement(group.events, settlement.sid, group.deviceId)}
+                  {#if verificationContext && canVoidRecordedSettlement(group.events, settlement.sid, group.identities.map((identity) => identity.pid), verificationContext)}
                     <button type="button" class="secondary danger-action" disabled={archived} on:click={() => voidSettlement(settlement.sid)}>Void</button>
                   {/if}
                 </span>

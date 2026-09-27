@@ -193,6 +193,21 @@ export function verifyConfirmation(events: Event[], sid: string, claimSig: strin
   return verifiesWithAny(ctx, `${ctx.groupTag}:confirm:${sid}`, claimSig, keyAlgs);
 }
 
+// SEC-002/T47: any current group member -- explicitly unrestricted to the
+// settlement's own from/to parties (per the approved B2 decision,
+// design.md §B2 point 1) -- may authorize a settlement reversal via a
+// domain-bound signature distinct from every other purpose (point 2),
+// verified against their OWN currently-authorised keys, never against
+// the settlement's own unsigned dev attribution.
+export function verifySettlementVoid(events: Event[], sid: string, pid: string, sig: string, ctx: VerificationContext): boolean {
+  const settlement = events.find((event) => event.t === "SettlementRecorded" && event.sid === sid);
+  if (!settlement || settlement.t !== "SettlementRecorded") return false;
+  if (contestedClaimPids(events, ctx).has(pid)) return false;
+  const keySet = authorisedKeys(events, pid, ctx);
+  const keyAlgs = keyAlgsFor(events, keySet);
+  return verifiesWithAny(ctx, `${ctx.groupTag}:void-settlement:${sid}`, sig, keyAlgs);
+}
+
 export function matchesPayeeClaimSignature(events: Event[], sid: string, claimSig: string, ctx: VerificationContext, claimedPid?: string): boolean {
   const settlement = events.find((event) => event.t === "SettlementRecorded" && event.sid === sid);
   if (!settlement || settlement.t !== "SettlementRecorded") return false;

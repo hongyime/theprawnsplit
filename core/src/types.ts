@@ -87,7 +87,7 @@ export type Event =
   | (BaseEvent & { t: "SettlementRecorded"; sid: string; from: string; to: string; minor: Money })
   | (BaseEvent & { t: "SettlementConfirmed"; sid: string; pid: string; claimSig: string })
   | (BaseEvent & { t: "SettlementDisputed"; sid: string; note?: string })
-  | (BaseEvent & { t: "SettlementVoided"; sid: string })
+  | (BaseEvent & { t: "SettlementVoided"; sid: string; pid: string; sig: string })
   | (BaseEvent & { t: "GroupArchived"; outstanding: { from: string; to: string; minor: Money }[] })
   | (BaseEvent & { t: "GroupUnarchived" })
   | (BaseEvent & { t: "EventVoided"; targetId: string });

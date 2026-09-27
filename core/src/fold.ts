@@ -5,6 +5,7 @@ import {
   contestedClaimPids,
   matchesPayeeClaimSignature,
   verifyConfirmation,
+  verifySettlementVoid,
   voidedEventIds,
 } from "./identity";
 import type {
@@ -97,7 +98,7 @@ function mergePath(
   return [];
 }
 
-function settlementVoidDecisions(events: Event[]): { voided: Set<string>; anomalies: Anomaly[] } {
+function settlementVoidDecisions(events: Event[], ctx?: VerificationContext): { voided: Set<string>; anomalies: Anomaly[] } {
   const settlementBySid = new Map<string, Extract<Event, { t: "SettlementRecorded" }>>();
   const voided = new Set<string>();
   const anomalies: Anomaly[] = [];
@@ -109,7 +110,12 @@ function settlementVoidDecisions(events: Event[]): { voided: Set<string>; anomal
     if (event.t !== "SettlementVoided") continue;
     const settlement = settlementBySid.get(event.sid);
     if (!settlement) continue;
-    if (event.dev === settlement.dev) {
+    // SEC-002/T47: authorization is a genuine signature from ANY current
+    // group member (design.md §B2), verified via verifySettlementVoid --
+    // the event's own dev string (an unsigned, forgeable attribution) is
+    // NEVER consulted, closing the exact same vulnerability pattern this
+    // finding shares with SEC-001's removed bornConfirmed shortcut.
+    if (ctx && verifySettlementVoid(events, event.sid, event.pid, event.sig, ctx)) {
       voided.add(event.sid);
     } else {
       anomalies.push({
@@ -117,7 +123,7 @@ function settlementVoidDecisions(events: Event[]): { voided: Set<string>; anomal
         sid: event.sid,
         eventId: event.id,
         relatedEventId: settlement.id,
-        message: "SettlementVoided must be emitted by the device that recorded the settlement",
+        message: "SettlementVoided requires a valid signature from a current group member",
       });
     }
   }
@@ -170,7 +176,7 @@ export function fold(events: Event[], opts: FoldOptions, ctx?: VerificationConte
   const contestedPids = ctx ? contestedClaimPids(supported, ctx) : new Set<string>();
   const mergeEdges = activeMergeEdges(supported);
   const markedDistinct = new Map<string, { eventId: string; a: string; b: string }>();
-  const settlementVoidDecision = settlementVoidDecisions(supported);
+  const settlementVoidDecision = settlementVoidDecisions(supported, ctx);
   anomalies.push(...settlementVoidDecision.anomalies);
   const expenseVoids = new Set<string>();
   const settlementVoids = settlementVoidDecision.voided;
@@ -180,6 +186,24 @@ export function fold(events: Event[], opts: FoldOptions, ctx?: VerificationConte
       const target = supported.find((candidate) => candidate.id === event.targetId);
       if (target?.t === "EventVoided") {
         anomalies.push({ code: "voids-void", eventId: event.id, relatedEventId: target.id, message: "EventVoided cannot be voided" });
+      }
+      // SEC-002/T47: a generic EventVoided must never be usable to clear a
+      // settlement's economic effect -- only the domain-specific signed
+      // SettlementVoided contract (verified above) can do that. This was
+      // already incidentally true (settlementVoidDecisions only ever
+      // consults its own sid-scoped set, never the generic voided set
+      // this loop is building), but that non-effect was an accident of
+      // control flow, not a documented, tested invariant. Flag it
+      // explicitly so a generic void of a settlement-related event id is
+      // always a visible anomaly, never a silent no-op someone could
+      // mistake for a successful cancellation.
+      if (target?.t === "SettlementRecorded" || target?.t === "SettlementConfirmed") {
+        anomalies.push({
+          code: "generic-void-of-settlement-event",
+          eventId: event.id,
+          relatedEventId: target.id,
+          message: "EventVoided cannot cancel a settlement's economic effect -- use a signed SettlementVoided instead",
+        });
       }
     }
     if (event.t === "ParticipantsMarkedDistinct" && !voided.has(event.id)) {
@@ -231,7 +255,18 @@ export function fold(events: Event[], opts: FoldOptions, ctx?: VerificationConte
   }
 
   for (const event of supported) {
-    if (voided.has(event.id)) continue;
+    // SEC-002/T47: SettlementRecorded/SettlementConfirmed/SettlementDisputed
+    // must NEVER be skipped via the generic EventVoided/voided set -- only
+    // the domain-specific signed SettlementVoided contract (verified
+    // separately via settlementVoidDecisions, above) may affect a
+    // settlement's derived state. Without this exemption a bare, unsigned
+    // EventVoided targeting a SettlementRecorded event's own id would make
+    // the settlement vanish from state entirely (never even added to
+    // state.settlements), a MORE severe bypass than the flagged
+    // generic-void-of-settlement-event anomaly alone would prevent.
+    const isSettlementDomainEvent =
+      event.t === "SettlementRecorded" || event.t === "SettlementConfirmed" || event.t === "SettlementDisputed";
+    if (voided.has(event.id) && !isSettlementDomainEvent) continue;
     if (event.t === "ParticipantRenamed") {
       const root = canonical(event.pid);
       const existing = participants.get(root);

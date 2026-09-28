@@ -675,11 +675,12 @@
     if (minor === null) return;
     await commitReserved(1, (f) => {
       const id = `${f.deviceId}:${f.nextCounter}`;
+      const financials = editFinancialsForTotal({ current: expense.financials, nextMinor: minor, eventId: id });
       return [makeEvent(f, "ExpenseEdited", {
         xid,
-        financials: editFinancialsForTotal({ current: expense.financials, nextMinor: minor, eventId: id }),
+        financials,
         meta: { desc: desc.trim() || expense.desc },
-      })];
+      }, financials.rate ? 2 : 1)];
     });
   }
 

@@ -6,16 +6,18 @@
 
 ## Last change — 2026-09-23
 
-T48 (LOGIC-001 — discharge balances when recording settlement) done at
-commit `4bee66b` — 48/73 tasks + 3 NEW findings complete in the
-02_EXECUTE cycle (see tasks.md/bugfix.md/execute_state.json). LOGIC-001 is
-now FULLY resolved: `core/src/fold.ts`'s settlement balance application
-had `from`/`to` signs reversed, DOUBLING the remaining debt instead of
-discharging it -- swapped so the payer gains toward zero and the payee
-loses toward zero. Also corrected `PRD.md` §7.3's REQ-SET-05/REQ-SET-08,
-which had drifted stale from this session's own earlier T44/T45/T47
-security fixes. Full history of every completed task is in
-.agents/JOURNAL.md and in the git log on this branch. Next: T49.
+T49 (LOGIC-003 — emit the correct schema version for rate-bearing
+corrections) done at commit `ff8c3d6` — 49/73 tasks + 3 NEW findings
+complete in the 02_EXECUTE cycle (see tasks.md/bugfix.md/execute_state.json).
+LOGIC-003 is now FULLY resolved: `src/Trip.svelte`'s `editExpense` always
+called `makeEvent` without a version argument, so its `version = 1` default
+was used even when the retained financials still carried a `rate` field --
+quarantining the edit on the same device that just created it. Fixed by
+mirroring `addExpense`'s already-correct convention: pass
+`financials.rate ? 2 : 1` as the version argument. `core/src/fold.ts` needed
+no change -- its v>=2-for-rate validation was already correct and tested.
+Full history of every completed task is in
+.agents/JOURNAL.md and in the git log on this branch. Next: T50.
 
 A separate, unrelated session fixed Dependabot PR #12 (trufflehog patch
 bump) on `main` by enabling Dependency Graph via the GitHub API — merged,
@@ -24,8 +26,8 @@ T-series cycle depends on.
 
 ## Status
 
-IN PROGRESS — 02_EXECUTE cycle, 48/73 tasks + 3 NEW findings complete.
-Next: T49.
+IN PROGRESS — 02_EXECUTE cycle, 49/73 tasks + 3 NEW findings complete.
+Next: T50.
 
 ## Active work context
 
@@ -41,13 +43,13 @@ concurrently — always `git fetch` and check `git log --oneline -5` on both
 <!-- MOLT_AUTO_START -->
 ## Auto State
 
-- Updated: 2026-09-25 09:40:34 +08:00
-- Machine: dev-host-2.example
+- Updated: 2026-09-27 22:43:35 +08:00
+- Machine: PRAWN-E14
 - Harness: claude
 - Event: stop
 - Branch: maintenance/prawn-ui-20260916
-- HEAD: a341d30
-- Dirty files: 6
+- HEAD: 359c324
+- Dirty files: 12
 - Resume hint: Read .agents/STATE.md, then the latest file in .agents/handoffs/ if present.
 <!-- MOLT_AUTO_END -->
 

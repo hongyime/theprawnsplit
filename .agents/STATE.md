@@ -6,18 +6,21 @@
 
 ## Last change — 2026-09-23
 
-T49 (LOGIC-003 — emit the correct schema version for rate-bearing
-corrections) done at commit `ff8c3d6` — 49/73 tasks + 3 NEW findings
-complete in the 02_EXECUTE cycle (see tasks.md/bugfix.md/execute_state.json).
-LOGIC-003 is now FULLY resolved: `src/Trip.svelte`'s `editExpense` always
-called `makeEvent` without a version argument, so its `version = 1` default
-was used even when the retained financials still carried a `rate` field --
-quarantining the edit on the same device that just created it. Fixed by
-mirroring `addExpense`'s already-correct convention: pass
-`financials.rate ? 2 : 1` as the version argument. `core/src/fold.ts` needed
-no change -- its v>=2-for-rate validation was already correct and tested.
-Full history of every completed task is in
-.agents/JOURNAL.md and in the git log on this branch. Next: T50.
+T50 (REL-001 — bound operated relay pages by bytes) done at commit
+`7c31ad4` — 50/73 tasks + 3 NEW findings complete in the 02_EXECUTE cycle
+(see tasks.md/bugfix.md/execute_state.json). REL-001 is now FULLY resolved:
+`api/relay.ts`'s GET handler fetched up to `limit` rows via Redis `xrange`
+(count-bounded) then serialized ALL of them into one JSON response with no
+byte-size check -- a page of legally-sized blobs could still serialize past
+HttpRelay's own `boundedText` transfer ceiling (2.1MB), causing the client's
+fetch to throw before the cursor ever advanced, an empty-progress stall that
+repeated the same oversized page forever. Fixed via new exported
+`boundEntriesByBytes(entries, maxBytes)`: always keeps at least the first
+entry (no-stall guarantee) and drops trailing entries once the running
+serialized total would exceed `MAX_PAGE_BYTES` (new, default 1.5MB); dropped
+entries are never lost since the client's own cursor advancement naturally
+resumes at the first omitted row. Full history of every completed task is in
+.agents/JOURNAL.md and in the git log on this branch. Next: T51.
 
 A separate, unrelated session fixed Dependabot PR #12 (trufflehog patch
 bump) on `main` by enabling Dependency Graph via the GitHub API — merged,
@@ -26,8 +29,8 @@ T-series cycle depends on.
 
 ## Status
 
-IN PROGRESS — 02_EXECUTE cycle, 49/73 tasks + 3 NEW findings complete.
-Next: T50.
+IN PROGRESS — 02_EXECUTE cycle, 50/73 tasks + 3 NEW findings complete.
+Next: T51.
 
 ## Active work context
 
@@ -43,13 +46,13 @@ concurrently — always `git fetch` and check `git log --oneline -5` on both
 <!-- MOLT_AUTO_START -->
 ## Auto State
 
-- Updated: 2026-09-27 22:43:35 +08:00
+- Updated: 2026-09-28 11:20:53 +08:00
 - Machine: PRAWN-E14
 - Harness: claude
 - Event: stop
 - Branch: maintenance/prawn-ui-20260916
-- HEAD: 359c324
-- Dirty files: 12
+- HEAD: 66624d6
+- Dirty files: 10
 - Resume hint: Read .agents/STATE.md, then the latest file in .agents/handoffs/ if present.
 <!-- MOLT_AUTO_END -->
 

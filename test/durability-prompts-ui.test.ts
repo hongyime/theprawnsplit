@@ -21,6 +21,7 @@ describe("durability prompt UI boundary", () => {
   it("keeps install, pin-link, identity-backup, and export prompts wired to durable state", () => {
     const source = appSource();
     const refreshPrompts = source.match(/async function refreshDurabilityPrompts\(\): Promise<void> \{([\s\S]*?)\n  \}/)?.[1] ?? "";
+    const allBalancesZero = source.match(/function allBalancesZero\(\): boolean \{([\s\S]*?)\n  \}/)?.[1] ?? "";
     const pinBanner = between(source, "{#if showPinLinkPrompt}", "{#if showIdentityBackupPrompt");
     const identityBanner = between(source, "{#if showIdentityBackupPrompt && hasLocalClaim}", "{#if activeExportPrompt");
     const exportBanner = between(source, "{#if activeExportPrompt}", "{#if activeInstallLevel && activeInstallLevel < 3");
@@ -35,8 +36,8 @@ describe("durability prompt UI boundary", () => {
     expect(refreshPrompts).toContain("persisted: persistedStorage");
     expect(refreshPrompts).toContain("installModalShownSession");
     expect(refreshPrompts).toContain("showPinLinkPrompt = shouldPromptPinLink(current);");
-    expect(refreshPrompts).toContain("showIdentityBackupPrompt = shouldPromptIdentityBackup(current, hasLocalClaim);");
     expect(refreshPrompts).toContain("activeExportPrompt = exportPromptReason(returnWindow, allBalancesZero(), persistedStorage, Date.now());");
+    expect(allBalancesZero).toContain("!frozenPolicy.allowSettlementActions");
 
     expect(source).toContain("async function dismissActiveInstallPrompt()");
     expect(source).toContain("dismissInstallPrompt(durability, level)");

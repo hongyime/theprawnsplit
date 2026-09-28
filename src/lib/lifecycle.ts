@@ -26,8 +26,8 @@ export interface PollingDecisionInput {
   pollIdleMs: number;
 }
 
-export function isSettledViewPredicate(balances: Map<string, Money>, archived: boolean): boolean {
-  return !archived && [...balances.values()].every((minor) => minor === 0n);
+export function isSettledViewPredicate(balances: Map<string, Money>, archived: boolean, frozen: boolean): boolean {
+  return !archived && !frozen && [...balances.values()].every((minor) => minor === 0n);
 }
 
 export function canEditGroupProfile(archived: boolean): boolean {

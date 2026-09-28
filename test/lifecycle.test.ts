@@ -64,9 +64,10 @@ describe("lifecycle copy", () => {
   });
 
   it("derives settled only for active groups whose canonical balances are zero", () => {
-    expect(isSettledViewPredicate(new Map([["p_alice", 0n], ["p_bob", 0n]]), false)).toBe(true);
-    expect(isSettledViewPredicate(new Map([["p_alice", 1n], ["p_bob", -1n]]), false)).toBe(false);
-    expect(isSettledViewPredicate(new Map([["p_alice", 0n], ["p_bob", 0n]]), true)).toBe(false);
+    expect(isSettledViewPredicate(new Map([["p_alice", 0n], ["p_bob", 0n]]), false, false)).toBe(true);
+    expect(isSettledViewPredicate(new Map([["p_alice", 1n], ["p_bob", -1n]]), false, false)).toBe(false);
+    expect(isSettledViewPredicate(new Map([["p_alice", 0n], ["p_bob", 0n]]), true, false)).toBe(false);
+    expect(isSettledViewPredicate(new Map([["p_alice", 0n], ["p_bob", 0n]]), false, true)).toBe(false);
   });
 
   it("locks profile edits while the group is archived", () => {

@@ -196,7 +196,7 @@
   $: protectionCopy = [isStandalone ? "Installed" : "Browser Tab", properCase(storageLabel), properCase(syncLabels.protection)];
   $: archived = isGroupArchived();
   $: groupProfileEditable = canEditGroupProfile(archived);
-  $: settledView = state ? isSettledViewPredicate(state.balances, archived) : false;
+  $: settledView = state ? isSettledViewPredicate(state.balances, archived, state.frozen) : false;
   $: archiveSummary = group ? latestArchiveEvent(group.events) : undefined;
   $: frozenPolicy = frozenViewPolicy(state);
   $: clockSkewWarning = group ? peerClockSkewWarning({ events: group.events, localDeviceId: group.deviceId, now: nowMs }) : undefined;
@@ -826,7 +826,7 @@
   }
 
   async function archiveGroup(): Promise<void> {
-    if (!group || archived) return;
+    if (!group || archived || !frozenPolicy.allowSettlementActions) return;
     const plan = createArchiveTransitionPlan(suggestedSettlements);
     const outstandingLabels = plan.outstanding.map((transfer) => `${participantLabel(transfer.from)} Pays ${participantLabel(transfer.to)} ${formatMinor(transfer.minor, group!.currency)}`);
     const ok = window.confirm(archiveConfirmationText(outstandingLabels));
@@ -1113,6 +1113,7 @@
   }
 
   function allBalancesZero(): boolean {
+    if (!frozenPolicy.allowSettlementActions) return false;
     return balances.length > 0 && balances.every(([, minor]) => minor === 0n);
   }
 

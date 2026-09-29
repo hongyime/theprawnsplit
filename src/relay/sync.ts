@@ -24,6 +24,7 @@ import { eventFingerprint } from "@/lib/event-fingerprint";
 import { HttpRelay } from "./http";
 import { NostrRelay } from "./nostr";
 import { classifyRelayIssue, isDuplicateRelayAck } from "./diagnostics";
+import { applyDiagnosticToPolicy, isEndpointAvailable, markEndpointSuccess, resetEndpointPolicy, type EndpointPolicyMap } from "./endpoint-policy";
 import { BATCH_SAFETY_MARGIN_BYTES, fitCountWithinLimit, projectBatchSize, resolveMessageLimit } from "./batch-limits";
 import { fetchMaxMessageLength } from "./nip11";
 import type { Relay, SyncResult } from "./types";
@@ -50,6 +51,20 @@ export function publishQuorumReached(ackCount: number, ackQuorum = config.ackQuo
   return ackCount >= ackQuorum;
 }
 
+// REL-002: a reset is explicit -- never triggered automatically by the mere
+// passage of time, a later successful-looking retry, or a relay-settings
+// change. Clears a demoted/backed-off endpoint's accumulated policy back to
+// a clean slate WITHOUT touching the user-configured endpoint list itself;
+// pass no endpointKey to reset every tracked endpoint for this group at once.
+export async function resetRelayEndpoint(groupId: string, endpointKey?: string): Promise<void> {
+  await updateMeta(groupId, (meta) => {
+    if (!endpointKey) return { ...meta, relayPolicy: {} };
+    const relayPolicy = { ...(meta.relayPolicy ?? {}) };
+    relayPolicy[endpointKey] = resetEndpointPolicy();
+    return { ...meta, relayPolicy };
+  });
+}
+
 export function relayFetchPlans(group: GroupRecord, relayName: string): RelayFetchPlan[] {
   if (group.events.length === 0) {
     return [{ cursorKey: `${relayName}:topic`, opts: { limit: FETCH_LIMIT } }];
@@ -62,20 +77,69 @@ export function relayFetchPlans(group: GroupRecord, relayName: string): RelayFet
   return [{ cursorKey, opts: fetchOpts(group.meta.cursors[cursorKey]) }];
 }
 
-export function createRelays(group: GroupRecord): Relay[] {
+export function createRelays(group: GroupRecord, now = Date.now()): Relay[] {
   const relaySettings = normalizeRelaySettings(group.meta.relaySettings, {
     operatedEndpoint: config.relayEndpoint,
     nostrRelays: config.nostrRelays,
   });
   group.meta.relaySettings = relaySettings;
+  const policy = group.meta.relayPolicy ?? {};
   const relays: Relay[] = [];
-  if (relaySettings.useOperated) relays.push(new HttpRelay(relaySettings.operatedEndpoint));
+  // REL-002: a backed-off/dropped operated endpoint is simply not
+  // instantiated this cycle -- exactly like the existing useOperated=false
+  // toggle already causes -- so every downstream quorum computation (which
+  // already derives its expectations purely from relays.length) adapts
+  // correctly with zero changes to that logic.
+  if (relaySettings.useOperated && isEndpointAvailable(policy["operated"], now)) {
+    relays.push(new HttpRelay(relaySettings.operatedEndpoint));
+  }
   if (relaySettings.nostrRelays.length > 0) {
     const nostr = new NostrRelay(group.meta.nostrSk, relaySettings.nostrRelays);
     group.meta.nostrSk = nostr.secretHex();
+    // Individual URLs are skipped INSIDE NostrRelay itself (see nostr.ts) so
+    // one bad Nostr endpoint never suppresses the others sharing this adapter.
+    nostr.policy = policy;
     relays.push(nostr);
   }
   return relays;
+}
+
+// REL-002: folds ack outcomes from ONE publish attempt into an updated
+// per-endpoint policy map. "operated" is keyed directly by HttpRelay's own
+// adapter name (there is exactly one operated endpoint); Nostr endpoints are
+// keyed by their OWN individual URL via the NostrRelay instance's
+// lastOutcomes(), so one bad Nostr endpoint's diagnostic never touches the
+// policy entry for any other URL sharing the same adapter.
+function updatePolicyFromAcks(
+  relays: Relay[],
+  acks: ({ relay: string; ack: Awaited<ReturnType<Relay["publish"]>> } | { relay: string; reason: unknown })[],
+  policy: EndpointPolicyMap,
+  operation: "publish" | "snapshot",
+  now: number,
+): EndpointPolicyMap {
+  let updated = policy;
+  for (const ack of acks) {
+    if (ack.relay === "operated") {
+      if ("ack" in ack && (ack.ack.ok || isDuplicateRelayAck(ack.ack.reason))) {
+        updated = { ...updated, operated: markEndpointSuccess(updated.operated) };
+      } else {
+        const reason = "reason" in ack
+          ? (ack.reason instanceof Error ? ack.reason.message : String(ack.reason))
+          : ack.ack.reason ?? "unknown";
+        const diagnostic = classifyRelayIssue({ relay: "operated", operation, reason });
+        updated = { ...updated, operated: applyDiagnosticToPolicy(updated.operated, diagnostic, now) };
+      }
+    } else if (ack.relay === "nostr") {
+      const nostrRelay = relays.find((relay): relay is NostrRelay => relay instanceof NostrRelay);
+      if (!nostrRelay) continue;
+      for (const [url, outcome] of nostrRelay.lastOutcomes()) {
+        updated = outcome.ok
+          ? { ...updated, [url]: markEndpointSuccess(updated[url]) }
+          : { ...updated, [url]: applyDiagnosticToPolicy(updated[url], classifyRelayIssue({ relay: url, operation, reason: outcome.reason ?? "unknown" }), now) };
+      }
+    }
+  }
+  return updated;
 }
 
 export interface SyncOnceOptions {
@@ -112,6 +176,7 @@ async function runSyncCycle(groupId: string, relayOverride: Relay[] | undefined,
     return result;
   }
   const relays = relayOverride ?? createRelays(group);
+  let relayPolicy: EndpointPolicyMap = group.meta.relayPolicy ?? {};
   const deadline = syncNetworkBudget(opts.networkBudgetMs);
   try {
     if (!relayOverride) await updateMeta(groupId, (meta) => ({ ...meta, nostrSk: group.meta.nostrSk,
@@ -191,6 +256,8 @@ async function runSyncCycle(groupId: string, relayOverride: Relay[] | undefined,
           if (diagnostic.severity !== "info") result.errors.push(ack.ack.reason);
         }
       }
+      relayPolicy = updatePolicyFromAcks(relays, acks, relayPolicy, "publish", Date.now());
+      if (!relayOverride) await updateMeta(groupId, (meta) => ({ ...meta, relayPolicy }));
       // Exclude relays that are definitively unconfigured (e.g. operated relay without
       // Upstash credentials) from the effective quorum. Those relays cannot store data
       // regardless of event content, so requiring their ACK would leave events permanently
@@ -216,6 +283,7 @@ async function runSyncCycle(groupId: string, relayOverride: Relay[] | undefined,
           if (deadline.signal.aborted) break;
           const singleBlob = await publishBlob([row.event]);
           const singleAcks = await collectAcks(singleBlob);
+          relayPolicy = updatePolicyFromAcks(relays, singleAcks, relayPolicy, "publish", Date.now());
           if (publishQuorumReached(countOk(singleAcks), ackQuorum)) {
             await markEvents(groupId, [row.event.id], "published");
             confirmationEligible.add(row.event.id);
@@ -223,7 +291,7 @@ async function runSyncCycle(groupId: string, relayOverride: Relay[] | undefined,
           }
           if (!deadline.signal.aborted) {
             const nextRow = fallbackRows[(index + 1) % fallbackRows.length];
-            if (nextRow) await updateMeta(groupId, (meta) => ({ ...meta, syncFallbackNextId: nextRow.event.id }));
+            if (nextRow) await updateMeta(groupId, (meta) => ({ ...meta, syncFallbackNextId: nextRow.event.id, ...(!relayOverride ? { relayPolicy } : {}) }));
           }
         }
         if (fallbackPublished === 0) {
@@ -376,6 +444,8 @@ async function runSyncCycle(groupId: string, relayOverride: Relay[] | undefined,
           if (diagnostic.severity !== "info") result.errors.push(ack.ack.reason);
         }
       }
+      relayPolicy = updatePolicyFromAcks(relays, acks, relayPolicy, "snapshot", Date.now());
+      if (!relayOverride) await updateMeta(groupId, (meta) => ({ ...meta, relayPolicy }));
       if (publishQuorumReached(ok, Math.max(1, Math.min(relays.length, config.ackQuorum)))) {
         await markSnapshotPublished(groupId, snapshotSeq);
         result.snapshotsPublished = 1;

@@ -9,6 +9,7 @@ import { emptyDurabilityPromptState, normalizeDurabilityPromptState, type Durabi
 import { validateIdentityKeypair } from "@/lib/identity-backup-validation";
 import { eventFingerprint } from "@/lib/event-fingerprint";
 import type { RelaySettings } from "@/lib/relay-settings";
+import type { EndpointPolicyMap } from "@/relay/endpoint-policy";
 import type { SubgroupPreset } from "@/lib/subgroups";
 import { config } from "@/config";
 
@@ -86,6 +87,7 @@ export interface StoredMeta {
   syncFallbackNextId?: string;
   unsyncedSince?: number;
   relaySettings?: RelaySettings;
+  relayPolicy?: EndpointPolicyMap;
   subgroups?: SubgroupPreset[];
   // LOGIC-002: the highest HLC ever admitted for this group (local commits
   // AND remote syncs, but never future-buffered/dropped events). Advanced

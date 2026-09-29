@@ -6,21 +6,21 @@
 
 ## Last change — 2026-09-23
 
-T50 (REL-001 — bound operated relay pages by bytes) done at commit
-`7c31ad4` — 50/73 tasks + 3 NEW findings complete in the 02_EXECUTE cycle
-(see tasks.md/bugfix.md/execute_state.json). REL-001 is now FULLY resolved:
-`api/relay.ts`'s GET handler fetched up to `limit` rows via Redis `xrange`
-(count-bounded) then serialized ALL of them into one JSON response with no
-byte-size check -- a page of legally-sized blobs could still serialize past
-HttpRelay's own `boundedText` transfer ceiling (2.1MB), causing the client's
-fetch to throw before the cursor ever advanced, an empty-progress stall that
-repeated the same oversized page forever. Fixed via new exported
-`boundEntriesByBytes(entries, maxBytes)`: always keeps at least the first
-entry (no-stall guarantee) and drops trailing entries once the running
-serialized total would exceed `MAX_PAGE_BYTES` (new, default 1.5MB); dropped
-entries are never lost since the client's own cursor advancement naturally
-resumes at the first omitted row. Full history of every completed task is in
-.agents/JOURNAL.md and in the git log on this branch. Next: T51.
+T51 (FE-005 — gate settled/archive claims on an unfrozen projection) done
+at commit `50c77f2` — 51/73 tasks + 3 NEW findings complete in the
+02_EXECUTE cycle (see tasks.md/bugfix.md/execute_state.json). FE-005 is now
+FULLY resolved: `isSettledViewPredicate`, `allBalancesZero()` and
+`archiveGroup()` all derived settled/first-zero/archive-summary claims from
+`state.balances` without checking `state.frozen` -- a partial
+(quarantine-truncated) projection could present as settled or get baked into
+a permanent `GroupArchived.outstanding` summary even though the true balance
+might not be zero once the excluded event folds. Fixed by threading frozen
+state into all three, reusing the existing `frozenPolicy.allowSettlementActions`
+derived var (matching the exact guard idiom already used for settlement
+actions elsewhere in `src/Trip.svelte`). `downloadExport()` needed no change
+-- already unconditional, satisfying "retain manual raw export." Full
+history of every completed task is in .agents/JOURNAL.md and in the git log
+on this branch. Next: T52.
 
 A separate, unrelated session fixed Dependabot PR #12 (trufflehog patch
 bump) on `main` by enabling Dependency Graph via the GitHub API — merged,
@@ -29,8 +29,8 @@ T-series cycle depends on.
 
 ## Status
 
-IN PROGRESS — 02_EXECUTE cycle, 50/73 tasks + 3 NEW findings complete.
-Next: T51.
+IN PROGRESS — 02_EXECUTE cycle, 51/73 tasks + 3 NEW findings complete.
+Next: T52.
 
 ## Active work context
 

@@ -416,6 +416,7 @@ describe("REQ-SYN-12 property convergence", () => {
             capKnownAuthor: 1000,
             capGroupTotal: 10_000,
             bufferMaxEvents: 500,
+            existingBufferedCount: 0,
           });
           const expectedAdmitted = [...throwaway.slice(0, cap), ...peers];
           const actualState = canonicalStateBytes(fold([...participants, ...result.admitted], { supportedVersion: 1 }));
@@ -466,6 +467,7 @@ describe("REQ-SYN-12 property convergence", () => {
             capKnownAuthor: 1000,
             capGroupTotal: 10_000,
             bufferMaxEvents: 500,
+            existingBufferedCount: 0,
           });
           const state = fold([...current, ...admitted.admitted], { supportedVersion: 1 });
 
@@ -509,6 +511,7 @@ describe("REQ-SYN-12 property convergence", () => {
             capKnownAuthor: 1000,
             capGroupTotal: 10_000,
             bufferMaxEvents: 500,
+            existingBufferedCount: 0,
           };
 
           const buffered = admitTransportEvents([future], [], {}, { ...opts, now });
@@ -562,6 +565,7 @@ describe("REQ-SYN-12 property convergence", () => {
             capKnownAuthor: 1000,
             capGroupTotal: 10_000,
             bufferMaxEvents: 500,
+            existingBufferedCount: 0,
           };
 
           // Replica A hears about the event before its retry time: the verdict is buffer-and-retry.

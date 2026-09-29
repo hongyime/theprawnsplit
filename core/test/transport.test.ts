@@ -37,6 +37,7 @@ describe("REQ-SYN-19/24/27 transport admission", () => {
       capKnownAuthor: 1000,
       capGroupTotal: 10_000,
       bufferMaxEvents: 500,
+      existingBufferedCount: 0,
     });
 
     expect(result.admitted.map((e) => e.id)).toEqual(["throwaway:1", "throwaway:2", "peer:1"]);
@@ -54,6 +55,7 @@ describe("REQ-SYN-19/24/27 transport admission", () => {
       capKnownAuthor: 1000,
       capGroupTotal: 10_000,
       bufferMaxEvents: 500,
+      existingBufferedCount: 0,
     });
     expect(first.admitted).toHaveLength(0);
     expect(first.buffered).toEqual([{ event: future, retryAt: 180_000 }]);
@@ -67,6 +69,7 @@ describe("REQ-SYN-19/24/27 transport admission", () => {
       capKnownAuthor: 1000,
       capGroupTotal: 10_000,
       bufferMaxEvents: 500,
+      existingBufferedCount: 0,
     });
     expect(second.admitted.map((e) => e.id)).toEqual(["fast:1"]);
   });
@@ -81,10 +84,54 @@ describe("REQ-SYN-19/24/27 transport admission", () => {
       capKnownAuthor: 1000,
       capGroupTotal: 10_000,
       bufferMaxEvents: 500,
+      existingBufferedCount: 0,
     });
     expect(result.buffered.map((held) => held.event.id)).toEqual(["fast:1"]);
     expect(result.dropped.map((drop) => drop.event.id)).toEqual(["fast:2"]);
     expect(result.discardVector).toEqual({ fast: 2 });
+  });
+
+  it("PERF-001: accounts for rows already retained from earlier cycles, not just what this call buffers", () => {
+    // 2 rows are already sitting in the persistent buffer from a PRIOR cycle
+    // (existingBufferedCount: 2) with a cap of 3 total. Without the fix, this
+    // call's own buffered.length would start back at 0 every time, letting
+    // ALL 3 new future events fit (0 < 3, 1 < 3, 2 < 3) -- growing the TRUE
+    // total to 2 existing + 3 new = 5, past the configured cap of 3.
+    const incoming = [event("fast", 1, 300_000), event("fast", 2, 300_001), event("fast", 3, 300_002)];
+    const result = admitTransportEvents(incoming, [], {}, {
+      now: 0,
+      supportedVersion: 1,
+      maxFutureDriftMs: 120_000,
+      capUnknownAuthor: 50,
+      capKnownAuthor: 1000,
+      capGroupTotal: 10_000,
+      bufferMaxEvents: 3,
+      existingBufferedCount: 2,
+    });
+    // Only 1 more fits (2 existing + 1 new = 3, exactly at the cap); the
+    // other 2 are dropped with reason "buffer-cap" -- proving the SAME cap
+    // now spans across cycles instead of resetting to zero each call.
+    expect(result.buffered.map((held) => held.event.id)).toEqual(["fast:1"]);
+    expect(result.dropped.map((drop) => [drop.event.id, drop.reason])).toEqual([
+      ["fast:2", "buffer-cap"],
+      ["fast:3", "buffer-cap"],
+    ]);
+  });
+
+  it("PERF-001: an existing buffer already AT or OVER the cap defers all new surplus without evicting anything (existing rows are never this function's concern -- it only ever ADDS, never removes)", () => {
+    const incoming = [event("fast", 1, 300_000)];
+    const result = admitTransportEvents(incoming, [], {}, {
+      now: 0,
+      supportedVersion: 1,
+      maxFutureDriftMs: 120_000,
+      capUnknownAuthor: 50,
+      capKnownAuthor: 1000,
+      capGroupTotal: 10_000,
+      bufferMaxEvents: 3,
+      existingBufferedCount: 5,
+    });
+    expect(result.buffered).toEqual([]);
+    expect(result.dropped.map((drop) => [drop.event.id, drop.reason])).toEqual([["fast:1", "buffer-cap"]]);
   });
 
   it("drops surplus over the group-total admission cap without blocking existing events", () => {
@@ -98,6 +145,7 @@ describe("REQ-SYN-19/24/27 transport admission", () => {
       capKnownAuthor: 1000,
       capGroupTotal: 3,
       bufferMaxEvents: 500,
+      existingBufferedCount: 0,
     });
 
     expect(result.admitted.map((e) => e.id)).toEqual(["peer-c:1"]);
@@ -122,6 +170,7 @@ describe("REQ-SYN-19/24/27 transport admission", () => {
       capKnownAuthor: 1000,
       capGroupTotal: 10_000,
       bufferMaxEvents: 500,
+      existingBufferedCount: 0,
     });
 
     expect(result.dropped.map((drop) => [drop.event.dev, drop.reason])).toEqual([
@@ -145,6 +194,7 @@ describe("DATA-004 batch-context author classification", () => {
       capKnownAuthor: 1000,
       capGroupTotal: 10_000,
       bufferMaxEvents: 500,
+      existingBufferedCount: 0,
     });
     // Without the fix, only 2 events (capUnknownAuthor) would fit before the
     // 3rd overflows it, even though this author's own marker (proving they
@@ -166,6 +216,7 @@ describe("DATA-004 batch-context author classification", () => {
       capKnownAuthor: 1000,
       capGroupTotal: 10_000,
       bufferMaxEvents: 500,
+      existingBufferedCount: 0,
     });
     // The malformed marker itself is dropped; the remaining well-formed
     // events must still be judged under capUnknownAuthor, not

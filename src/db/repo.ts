@@ -941,6 +941,18 @@ export async function dueBufferedEvents(groupId: string, now = Date.now()): Prom
   return rows.filter((row) => row.retryAt <= now).map((row) => decodeEvent(row.eventJson));
 }
 
+// PERF-001: every buffer row's event id for this group, due or not -- used
+// by callers to (a) derive existingBufferedCount (this set's size MINUS
+// however many of those ids they are about to pull out and re-evaluate via
+// dueBufferedEvents, since those are being re-processed, not still held),
+// and (b) exclude a re-delivered not-yet-due id from `incoming` so a
+// redundant re-buffer of the SAME row never double-counts against the cap.
+export async function bufferedEventIds(groupId: string): Promise<Set<string>> {
+  const database = await db();
+  const rows = await database.getAllFromIndex("buffer", "byGroup", groupId);
+  return new Set(rows.map((row) => row.eventId));
+}
+
 export async function putBufferedEvents(groupId: string, events: { event: Event; retryAt: number }[]): Promise<void> {
   if (events.length === 0) return;
   const database = await db();

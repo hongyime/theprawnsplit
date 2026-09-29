@@ -3,6 +3,7 @@ import { admitTransportEvents, canonicalState, fold } from "@theprawnsplit/core"
 import { config } from "@/config";
 import {
   dueBufferedEvents,
+  bufferedEventIds,
   getGroupCrypto,
   confirmedEvents,
   markSnapshotPublished,
@@ -287,16 +288,27 @@ async function runSyncCycle(groupId: string, relayOverride: Relay[] | undefined,
     if (bestSnapshot && group.events.length === 0) {
       await updateTransportVectors(groupId, bestSnapshot.vv, group.meta.discardVector);
     }
+    const allBufferedIds = await bufferedEventIds(groupId);
     const dueBuffered = await dueBufferedEvents(groupId);
+    const dueBufferedIds = new Set(dueBuffered.map((event) => event.id));
     // Relay pages and a legacy-cursor replay can repeat already stored events.
     // Count each new event once; duplicate delivery must not exhaust admission
     // budgets and cause a later, genuinely new event to be discarded.
     const seenIds = new Set(group.events.map((event) => event.id));
     const incoming = [...dueBuffered, ...remoteEvents].filter((event) => {
       if (seenIds.has(event.id)) return false;
+      // PERF-001: a not-yet-due row already sitting in the buffer must not be
+      // re-evaluated as if it were new -- it is already correctly counted via
+      // existingBufferedCount below; re-processing it here would double-count
+      // the same held row against the buffer cap.
+      if (allBufferedIds.has(event.id) && !dueBufferedIds.has(event.id)) return false;
       seenIds.add(event.id);
       return true;
     });
+    // PERF-001: without this, the buffer cap only ever measured what THIS
+    // call buffers, resetting to zero every batch -- repeated future pages
+    // could grow held-event storage past bufferMaxEvents indefinitely.
+    const existingBufferedCount = Math.max(0, allBufferedIds.size - dueBufferedIds.size);
     const transport = admitTransportEvents(incoming, group.events, group.meta.discardVector, {
       now: Date.now(),
       supportedVersion: config.schemaVersion,
@@ -305,6 +317,7 @@ async function runSyncCycle(groupId: string, relayOverride: Relay[] | undefined,
       capKnownAuthor: config.capKnownAuthor,
       capGroupTotal: config.capGroupTotal,
       bufferMaxEvents: config.driftBufferMax,
+      existingBufferedCount,
     });
     const toInsert = await resolveIncomingEventConflicts(groupId, transport.admitted);
     result.buffered = transport.buffered.length;

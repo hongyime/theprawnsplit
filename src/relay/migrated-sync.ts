@@ -2,7 +2,7 @@ import { admitTransportEvents, canonicalState, fold, type Event } from "@thepraw
 import { config } from "@/config";
 import { decryptEnvelope, encryptEnvelope, encryptEvents, type SnapshotEnvelope } from "@/crypto/envelope";
 import { relayWriteProof } from "@/crypto/group";
-import { confirmedEvents, dueBufferedEvents, getGroupCrypto, markEvents, markSnapshotPublished,
+import { confirmedEvents, dueBufferedEvents, bufferedEventIds, getGroupCrypto, markEvents, markSnapshotPublished,
   pendingOutboundEventRows, promoteLedger, readGroup, resolveIncomingEventConflicts, updateMeta,
   vectorFromEvents, type GroupRecord } from "@/db/repo";
 import { eventFingerprint } from "@/lib/event-fingerprint";
@@ -91,15 +91,28 @@ export async function syncMigrated(groupId: string, operated: Pick<HttpRelay, "f
         result.errors.push("Unreadable recovered history; local history and checkpoint retained");
       }
     }
+    const allBufferedIds = await bufferedEventIds(groupId);
+    const dueBuffered = await dueBufferedEvents(groupId);
+    const dueBufferedIds = new Set(dueBuffered.map((event) => event.id));
     const seen = new Set(known.keys());
-    const incoming = [...await dueBufferedEvents(groupId), ...decoded.values()].filter((event) => {
+    const incoming = [...dueBuffered, ...decoded.values()].filter((event) => {
       if (seen.has(event.id)) return false;
+      // PERF-001: a not-yet-due row already sitting in the buffer must not be
+      // re-evaluated as if it were new -- it is already correctly counted via
+      // existingBufferedCount below; re-processing it here would double-count
+      // the same held row against the buffer cap.
+      if (allBufferedIds.has(event.id) && !dueBufferedIds.has(event.id)) return false;
       seen.add(event.id); return true;
     });
+    // PERF-001: without this, the buffer cap only ever measured what THIS
+    // call buffers, resetting to zero every batch -- repeated future pages
+    // could grow held-event storage past bufferMaxEvents indefinitely.
+    const existingBufferedCount = Math.max(0, allBufferedIds.size - dueBufferedIds.size);
     const transport = admitTransportEvents(incoming, group.events, group.meta.discardVector, {
       now: Date.now(), supportedVersion: config.schemaVersion, maxFutureDriftMs: config.maxFutureDriftMs,
       capUnknownAuthor: config.capUnknownAuthor, capKnownAuthor: config.capKnownAuthor,
       capGroupTotal: config.capGroupTotal, bufferMaxEvents: config.driftBufferMax,
+      existingBufferedCount,
     });
     // A local admission limit/rejection never silently advances past unseen history.
     if (transport.dropped.length) {

@@ -1,6 +1,6 @@
 import "fake-indexeddb/auto";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { dueBufferedEvents, ensureGroup, promoteLedger, putBufferedEvents, readGroup, resetRepositoryForTests } from "@/db/repo";
+import { dueBufferedEvents, bufferedEventIds, ensureGroup, promoteLedger, putBufferedEvents, removeBufferedEvents, readGroup, resetRepositoryForTests } from "@/db/repo";
 import { makeEvent } from "@/lib/events";
 
 // INTR-001: removeBufferedEvents previously committed in its OWN separate
@@ -152,5 +152,57 @@ describe("INTR-001 atomic ledger promotion", () => {
 
     const after = await readGroup(group.groupId);
     expect(after.meta.coverage?.["remote-peer"]).toBeUndefined();
+  });
+});
+
+describe("PERF-001 bufferedEventIds (retained-row accounting across cycles)", () => {
+  it("returns every retained row's id regardless of due status, unlike dueBufferedEvents", async () => {
+    await resetRepositoryForTests(`perf-001-ids-${crypto.randomUUID()}`);
+    const group = await ensureGroup();
+    const due = makeEvent({ deviceId: "remote-peer", nextCounter: 1 }, "ParticipantAdded", { pid: "p1", name: "Due" });
+    const notDue = makeEvent({ deviceId: "remote-peer", nextCounter: 2 }, "ParticipantAdded", { pid: "p2", name: "NotDue" });
+    await putBufferedEvents(group.groupId, [{ event: due, retryAt: 0 }, { event: notDue, retryAt: Date.now() + 60_000 }]);
+
+    const dueOnly = await dueBufferedEvents(group.groupId);
+    expect(dueOnly.map((e) => e.id)).toEqual([due.id]);
+
+    // bufferedEventIds must see BOTH -- the whole point is accounting for rows
+    // still legitimately held (not-yet-due) that dueBufferedEvents deliberately
+    // excludes, so a caller can derive existingBufferedCount = allIds.size -
+    // dueBuffered.length without missing the still-held ones.
+    const allIds = await bufferedEventIds(group.groupId);
+    expect(allIds).toEqual(new Set([due.id, notDue.id]));
+  });
+
+  it("reflects removals -- a promoted/removed row no longer counts toward the retained total", async () => {
+    await resetRepositoryForTests(`perf-001-ids-removed-${crypto.randomUUID()}`);
+    const group = await ensureGroup();
+    const event = makeEvent({ deviceId: "remote-peer", nextCounter: 1 }, "ParticipantAdded", { pid: "p1", name: "Remote" });
+    await putBufferedEvents(group.groupId, [{ event, retryAt: Date.now() + 60_000 }]);
+    expect(await bufferedEventIds(group.groupId)).toEqual(new Set([event.id]));
+
+    await removeBufferedEvents(group.groupId, [event.id]);
+    expect(await bufferedEventIds(group.groupId)).toEqual(new Set());
+  });
+
+  it("lets a caller derive existingBufferedCount that correctly excludes rows about to be re-evaluated as due", async () => {
+    await resetRepositoryForTests(`perf-001-existing-count-${crypto.randomUUID()}`);
+    const group = await ensureGroup();
+    const due = makeEvent({ deviceId: "remote-peer", nextCounter: 1 }, "ParticipantAdded", { pid: "p1", name: "Due" });
+    const stillHeld1 = makeEvent({ deviceId: "remote-peer", nextCounter: 2 }, "ParticipantAdded", { pid: "p2", name: "Held1" });
+    const stillHeld2 = makeEvent({ deviceId: "remote-peer", nextCounter: 3 }, "ParticipantAdded", { pid: "p3", name: "Held2" });
+    await putBufferedEvents(group.groupId, [
+      { event: due, retryAt: 0 },
+      { event: stillHeld1, retryAt: Date.now() + 60_000 },
+      { event: stillHeld2, retryAt: Date.now() + 60_000 },
+    ]);
+
+    // Mirrors exactly what src/relay/sync.ts and migrated-sync.ts compute.
+    const allIds = await bufferedEventIds(group.groupId);
+    const dueBuffered = await dueBufferedEvents(group.groupId);
+    const existingBufferedCount = Math.max(0, allIds.size - dueBuffered.length);
+
+    expect(dueBuffered.map((e) => e.id)).toEqual([due.id]);
+    expect(existingBufferedCount).toBe(2); // stillHeld1 + stillHeld2, NOT due
   });
 });

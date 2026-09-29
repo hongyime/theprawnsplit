@@ -9,6 +9,13 @@ export interface TransportAdmissionOptions {
   capKnownAuthor: number;
   capGroupTotal: number;
   bufferMaxEvents: number;
+  // PERF-001: total buffered rows ALREADY retained in persistent storage from
+  // earlier cycles for this group, EXCLUDING any row being re-evaluated this
+  // call (i.e. excluding whatever the caller pulled out as "due" and passed
+  // in via `incoming`). Without this, the buffer cap only ever measured what
+  // THIS call buffers, resetting to zero every batch and letting repeated
+  // future pages grow held-event storage past bufferMaxEvents indefinitely.
+  existingBufferedCount: number;
 }
 
 export interface BufferedEvent {
@@ -160,7 +167,7 @@ export function admitTransportEvents(
 
     const gate = admissionGate(event, opts.now, opts.maxFutureDriftMs);
     if (!gate.ok) {
-      if (buffered.length >= opts.bufferMaxEvents) {
+      if (opts.existingBufferedCount + buffered.length >= opts.bufferMaxEvents) {
         dropped.push({ event, reason: "buffer-cap" });
         bump(discardVector, event);
       } else {

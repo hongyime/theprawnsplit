@@ -17,6 +17,7 @@ export interface PollingDecisionInput {
   hasGroup: boolean;
   documentHidden: boolean;
   archived: boolean;
+  hasPendingOutbox: boolean;
   now: number;
   lastActivityAt: number;
   lastSyncAt?: number | undefined;
@@ -35,7 +36,8 @@ export function canEditGroupProfile(archived: boolean): boolean {
 }
 
 export function shouldPollGroup(input: PollingDecisionInput): boolean {
-  if (!input.hasGroup || input.documentHidden || input.archived) return false;
+  if (!input.hasGroup || input.documentHidden) return false;
+  if (input.archived && !input.hasPendingOutbox) return false;
   const inactiveFor = Math.max(0, input.now - input.lastActivityAt);
   let cadence = input.pollIdleMs;
   if (inactiveFor <= input.pollActiveMs) cadence = input.pollActiveMs;

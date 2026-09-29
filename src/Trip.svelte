@@ -1221,6 +1221,7 @@
           hasGroup: Boolean(group),
           documentHidden: document.hidden,
           archived: isGroupArchived(),
+          hasPendingOutbox: unconfirmedCount > 0,
           now,
           lastActivityAt,
           lastSyncAt: group?.meta.lastSyncAt,

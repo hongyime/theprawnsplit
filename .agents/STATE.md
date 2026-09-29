@@ -6,21 +6,22 @@
 
 ## Last change — 2026-09-23
 
-T52 (PERF-001 — account for the entire retained future buffer) done at
-commit `55f41c6` — 52/73 tasks + 3 NEW findings complete in the
-02_EXECUTE cycle (see tasks.md/bugfix.md/execute_state.json). PERF-001 is now
-FULLY resolved: `admitTransportEvents`'s buffer-cap check only ever measured
-what THIS call buffers (a local array starting empty every time), with zero
-knowledge of rows already retained from earlier cycles -- repeated future
-pages could grow held-event storage past `bufferMaxEvents` indefinitely.
-Fixed via a new required `existingBufferedCount` option (buffer-cap check is
-now `opts.existingBufferedCount + buffered.length >= opts.bufferMaxEvents`);
-new `src/db/repo.ts`'s `bufferedEventIds()` lets both sync callers derive it
-from what's still legitimately held (excluding whatever is being
-re-evaluated this cycle) and exclude re-delivered not-yet-due duplicates.
-`admitTransportEvents` never evicts -- only defers new surplus. Full
+T53 (REL-002 — apply endpoint-specific backoff and demotion) done at
+commit `e860ac8` — 53/73 tasks + 3 NEW findings complete in the
+02_EXECUTE cycle (see tasks.md/bugfix.md/execute_state.json). REL-002 is now
+FULLY resolved: diagnostic actions (backoff-relay/drop-relay/retry-relay)
+were already correctly classified but never fed back into scheduling -- a
+failed or blocked endpoint kept consuming attempts at the ordinary cadence
+forever. New `src/relay/endpoint-policy.ts` tracks bounded per-ENDPOINT (not
+per-adapter) policy -- HttpRelay's single endpoint keyed `"operated"`, each
+Nostr URL keyed by its own literal string so one bad Nostr endpoint never
+suppresses the others. `NostrRelay` now skips backed-off/dropped URLs
+internally before contacting `nostr-tools`; `createRelays()` simply omits a
+backed-off operated HttpRelay, matching the existing `useOperated=false`
+toggle -- zero changes needed to `sync.ts`'s adapter-level quorum counting.
+New exported `resetRelayEndpoint()` is the sole explicit reset path. Full
 history of every completed task is in .agents/JOURNAL.md and in the git log
-on this branch. Next: T53.
+on this branch. Next: T54.
 
 A separate, unrelated session fixed Dependabot PR #12 (trufflehog patch
 bump) on `main` by enabling Dependency Graph via the GitHub API — merged,
@@ -29,8 +30,8 @@ T-series cycle depends on.
 
 ## Status
 
-IN PROGRESS — 02_EXECUTE cycle, 52/73 tasks + 3 NEW findings complete.
-Next: T53.
+IN PROGRESS — 02_EXECUTE cycle, 53/73 tasks + 3 NEW findings complete.
+Next: T54.
 
 ## Active work context
 

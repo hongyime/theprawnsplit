@@ -4,24 +4,28 @@
 
 # Project State
 
-## Last change — 2026-09-23
+## Last change — 2026-09-30
 
-T53 (REL-002 — apply endpoint-specific backoff and demotion) done at
-commit `e860ac8` — 53/73 tasks + 3 NEW findings complete in the
-02_EXECUTE cycle (see tasks.md/bugfix.md/execute_state.json). REL-002 is now
-FULLY resolved: diagnostic actions (backoff-relay/drop-relay/retry-relay)
-were already correctly classified but never fed back into scheduling -- a
-failed or blocked endpoint kept consuming attempts at the ordinary cadence
-forever. New `src/relay/endpoint-policy.ts` tracks bounded per-ENDPOINT (not
-per-adapter) policy -- HttpRelay's single endpoint keyed `"operated"`, each
-Nostr URL keyed by its own literal string so one bad Nostr endpoint never
-suppresses the others. `NostrRelay` now skips backed-off/dropped URLs
-internally before contacting `nostr-tools`; `createRelays()` simply omits a
-backed-off operated HttpRelay, matching the existing `useOperated=false`
-toggle -- zero changes needed to `sync.ts`'s adapter-level quorum counting.
-New exported `resetRelayEndpoint()` is the sole explicit reset path. Full
-history of every completed task is in .agents/JOURNAL.md and in the git log
-on this branch. Next: T54.
+T54 (LOGIC-006 — drain archived pending work without reopening editing) done at
+commit `d2f9124` — 54/73 tasks + 3 NEW findings complete in the
+02_EXECUTE cycle (see tasks.md/bugfix.md/execute_state.json). LOGIC-006 is now
+FULLY resolved: `shouldPollGroup` (src/lib/lifecycle.ts) stopped polling the
+instant a group was archived, even with unpublished/unconfirmed local events
+(including the archive event itself) still pending -- they could sit forever
+without reaching peers. New required `PollingDecisionInput.hasPendingOutbox`
+field; the archived short-circuit now only fires once the group is ALSO
+drained (`!hasPendingOutbox`), so the timer keeps draining on the normal
+active/backoff/idle cadence until confirmed, then stops again exactly as
+before. `src/Trip.svelte`'s `startPolling()` supplies
+`hasPendingOutbox: unconfirmedCount > 0` (the existing
+`counts.local + counts.published` topbar signal -- no new state needed).
+`src/relay/sync.ts` required zero changes: `syncOnce`/`runSyncCycle` never
+gated on `archived` in the first place, so letting the timer fire is
+sufficient; existing DATA-005 dedup already makes repeat drain attempts
+effect-free. Every pre-existing `if (archived) return;` edit-control guard
+elsewhere in Trip.svelte is untouched, so archived editing stays fully
+disabled. Full history of every completed task is in .agents/JOURNAL.md and
+in the git log on this branch. Next: T55.
 
 A separate, unrelated session fixed Dependabot PR #12 (trufflehog patch
 bump) on `main` by enabling Dependency Graph via the GitHub API — merged,
@@ -30,8 +34,8 @@ T-series cycle depends on.
 
 ## Status
 
-IN PROGRESS — 02_EXECUTE cycle, 53/73 tasks + 3 NEW findings complete.
-Next: T54.
+IN PROGRESS — 02_EXECUTE cycle, 54/73 tasks + 3 NEW findings complete.
+Next: T55.
 
 ## Active work context
 
@@ -47,12 +51,12 @@ concurrently — always `git fetch` and check `git log --oneline -5` on both
 <!-- MOLT_AUTO_START -->
 ## Auto State
 
-- Updated: 2026-09-28 11:20:53 +08:00
+- Updated: 2026-09-30 07:58:14 +08:00
 - Machine: PRAWN-E14
 - Harness: claude
 - Event: stop
 - Branch: maintenance/prawn-ui-20260916
-- HEAD: 66624d6
+- HEAD: d2f9124
 - Dirty files: 10
 - Resume hint: Read .agents/STATE.md, then the latest file in .agents/handoffs/ if present.
 <!-- MOLT_AUTO_END -->

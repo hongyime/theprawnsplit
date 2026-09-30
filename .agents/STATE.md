@@ -6,36 +6,21 @@
 
 ## Last change — 2026-09-30
 
-T54 (LOGIC-006 — drain archived pending work without reopening editing) done at
-commit `d2f9124` — 54/73 tasks + 3 NEW findings complete in the
-02_EXECUTE cycle (see tasks.md/bugfix.md/execute_state.json). LOGIC-006 is now
-FULLY resolved: `shouldPollGroup` (src/lib/lifecycle.ts) stopped polling the
-instant a group was archived, even with unpublished/unconfirmed local events
-(including the archive event itself) still pending -- they could sit forever
-without reaching peers. New required `PollingDecisionInput.hasPendingOutbox`
-field; the archived short-circuit now only fires once the group is ALSO
-drained (`!hasPendingOutbox`), so the timer keeps draining on the normal
-active/backoff/idle cadence until confirmed, then stops again exactly as
-before. `src/Trip.svelte`'s `startPolling()` supplies
-`hasPendingOutbox: unconfirmedCount > 0` (the existing
-`counts.local + counts.published` topbar signal -- no new state needed).
-`src/relay/sync.ts` required zero changes: `syncOnce`/`runSyncCycle` never
-gated on `archived` in the first place, so letting the timer fire is
-sufficient; existing DATA-005 dedup already makes repeat drain attempts
-effect-free. Every pre-existing `if (archived) return;` edit-control guard
-elsewhere in Trip.svelte is untouched, so archived editing stays fully
-disabled. Full history of every completed task is in .agents/JOURNAL.md and
-in the git log on this branch. Next: T55.
-
-A separate, unrelated session fixed Dependabot PR #12 (trufflehog patch
-bump) on `main` by enabling Dependency Graph via the GitHub API — merged,
-done, no action needed here. That work never touched any file this
-T-series cycle depends on.
+T55 (LOGIC-005 — tie draft allocation to one actual reserved event ID) done
+at commit `1b6ec1b` — 55/73 tasks + 3 NEW findings complete. Preview allocator
+was hardcoded to the literal `"preview"` string as its tie-break salt — every
+tied expense in a trip favoured the same participant. Fix: new `draftXid`
+UUID state (reset after each successful `addExpense`) threaded through
+`buildSharePreview` as `salt`, and reused as the `ExpenseAdded` `xid` on
+commit. Cancellation drops the UUID with zero repo effect. `sharePreview.shares`
+was already the source of truth for the commit path via `makeExpenseFinancials`,
+so no re-allocation on commit was needed. Full history in .agents/JOURNAL.md
+and the git log on this branch. Next: T56.
 
 ## Status
 
-IN PROGRESS — 02_EXECUTE cycle, 54/73 tasks + 3 NEW findings complete.
-Next: T55.
+IN PROGRESS — 02_EXECUTE cycle, 55/73 tasks + 3 NEW findings complete.
+Next: T56.
 
 ## Active work context
 

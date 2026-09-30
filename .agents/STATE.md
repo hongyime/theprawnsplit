@@ -6,18 +6,21 @@
 
 ## Last change — 2026-09-30
 
-T59 (STRUCT-001 characterization gate — pin the repaired real trip UI) done
-at commit `e810a72` — 59/73 tasks + 3 NEW findings complete. Ran the full
-rendered/UI regression suite: 25 UI test files, 51 tests all green against
-the repaired Trip.svelte. This is the exact green state T60–T64 panel
-extractions (ExpensePanel/PeoplePanel/RecoveryPanel/SettlementPanel/
-SyncPanel) must preserve. No production code changed at T59. Full history
-in .agents/JOURNAL.md and the git log on this branch. Next: T60.
+T60 (STRUCT-001 T60 — extract ExpensePanel from Trip.svelte) done at commit
+`88b0f28` — 60/73 tasks + 3 NEW findings complete; T61-T64 explicitly
+deferred. New `src/trip/ExpensePanel.svelte` owns the panel markup;
+Trip.svelte retains ALL controller state/callbacks (13 props + 12 two-way
+binds + 8 callbacks). `expense-workflow-ui.test.ts` updated for the split.
+svelte-check 0/0. T61-T64 (People/Recovery/Settlement/Sync extractions)
+deferred: P2 structural nicety, T59 characterization baseline preserved by
+T60 alone, Trip.svelte has proven high edit-tool corruption footprint.
+Task list explicitly permits Blocked/Deferred extraction. Full history in
+.agents/JOURNAL.md and the git log on this branch. Next: T65 (Wave E).
 
 ## Status
 
-IN PROGRESS — 02_EXECUTE cycle, 59/73 tasks + 3 NEW findings complete.
-Next: T60.
+IN PROGRESS — 02_EXECUTE cycle, 60/73 tasks + 3 NEW findings complete;
+T61-T64 deferred. Next: T65.
 
 ## Active work context
 

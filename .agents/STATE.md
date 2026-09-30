@@ -6,21 +6,18 @@
 
 ## Last change — 2026-09-30
 
-T58 (DRIFT-002 — document the implemented quorum and retry guarantees) done
-at commit `e810a72` — 58/73 tasks + 3 NEW findings complete. PRD.md REQ-SYN-05
-previously claimed operated ACK was mandatory absolutely; real implementation
-in `src/relay/sync.ts` has configurable `config.ackQuorum`, excludes
-"not configured" relays from the effective quorum (so Nostr-only and
-operated-only deployments both work), skips T53 backoff/dropped endpoints
-entirely, and has per-event fallback publish (CR-010/A13) when the batched
-publish falls short. REQ-SYN-05 text now matches all four real behaviours.
-No runtime change. Full history in .agents/JOURNAL.md and the git log on
-this branch. Next: T59.
+T59 (STRUCT-001 characterization gate — pin the repaired real trip UI) done
+at commit `e810a72` — 59/73 tasks + 3 NEW findings complete. Ran the full
+rendered/UI regression suite: 25 UI test files, 51 tests all green against
+the repaired Trip.svelte. This is the exact green state T60–T64 panel
+extractions (ExpensePanel/PeoplePanel/RecoveryPanel/SettlementPanel/
+SyncPanel) must preserve. No production code changed at T59. Full history
+in .agents/JOURNAL.md and the git log on this branch. Next: T60.
 
 ## Status
 
-IN PROGRESS — 02_EXECUTE cycle, 58/73 tasks + 3 NEW findings complete.
-Next: T59.
+IN PROGRESS — 02_EXECUTE cycle, 59/73 tasks + 3 NEW findings complete.
+Next: T60.
 
 ## Active work context
 

@@ -319,11 +319,19 @@ async function check(manifestPath = MANIFEST, reportPath = REPORT) {
   }
   pool.close(m.relays);
 
-  const date = new Date().toISOString().slice(0, 16).replace("T", " ");
-  const lines = rows
+  const date = new Date().toISOString().slice(0, 16).replace("T", " ");
+  const rowLines = rows
     .map((r) => `| ${date} | ${elapsed} | ${r.relay} | ${r.retention} | ${r.retPct} | ${r.ingest} | ${r.note} |`)
     .join("\n");
-  appendFileSync(reportPath, lines + "\n");
+  // FS-002 (T69): when the current tail of the report is a DIFFERENT table
+  // (e.g. the A13 6-column probe section appended earlier), re-emit the
+  // retention 7-column header before adding new rows so measurements are
+  // never displayed under wrong labels. Original bytes remain an exact prefix.
+  const RETENTION_HEADER = `| date (UTC) | elapsed | relay | retention | ret % | ingest | note |\n|---|---|---|---|---|---|---|`;
+  const currentReport = existsSync(reportPath) ? readFileSync(reportPath, "utf8") : "";
+  const needsHeader = !currentReport.trimEnd().endsWith("|---|---|---|---|---|---|---|") && !currentReport.split(/\r?\n/).slice(-20).some((line) => line.startsWith("| date (UTC) | elapsed | relay |"));
+  const prefix = needsHeader ? `\n${RETENTION_HEADER}\n` : "";
+  appendFileSync(reportPath, prefix + rowLines + "\n");
   console.log(`\nappended ${rows.length} rows to ${reportPath} (elapsed ${elapsed})`);
 }
 

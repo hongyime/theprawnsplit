@@ -6,24 +6,21 @@
 
 ## Last change — 2026-09-30
 
-T57 (DRIFT-001 — reconcile technical documentation with final behavioral
-outcomes) done at commit `cb6e90e` — 57/73 tasks + 3 NEW findings complete.
-TDD.md §5 (core module signatures) and §6 (IndexedDB schema) were pre-T44/
-T45/T47/T27/T30/T31/T38/T42/T43/T53 stale. Fixed: added required
-`ctx: VerificationContext` params on `authorisedKeys`/`verifyConfirmation`;
-added `authorisedDevices`, `verifySettlementVoid` (SEC-002), `matchesPayee
-ClaimSignature`, `claimAnomalies`, `contestedClaimPids`; added the
-`VerificationContext` interface; added `void-settlement` and `reattest`
-signed-payload rows; replaced non-existent `src/db/schema.ts` reference with
-actual `src/db/repo.ts` schema at DB_VERSION=2 with the `linked`/
-`sourceTagHex`/`reservations`/`relayPolicy`/`observedHlc`/`coverage` fields;
-removed spurious `byDevCtr` index. No code changed. Full history in
-.agents/JOURNAL.md and the git log on this branch. Next: T58.
+T58 (DRIFT-002 — document the implemented quorum and retry guarantees) done
+at commit `e810a72` — 58/73 tasks + 3 NEW findings complete. PRD.md REQ-SYN-05
+previously claimed operated ACK was mandatory absolutely; real implementation
+in `src/relay/sync.ts` has configurable `config.ackQuorum`, excludes
+"not configured" relays from the effective quorum (so Nostr-only and
+operated-only deployments both work), skips T53 backoff/dropped endpoints
+entirely, and has per-event fallback publish (CR-010/A13) when the batched
+publish falls short. REQ-SYN-05 text now matches all four real behaviours.
+No runtime change. Full history in .agents/JOURNAL.md and the git log on
+this branch. Next: T59.
 
 ## Status
 
-IN PROGRESS — 02_EXECUTE cycle, 57/73 tasks + 3 NEW findings complete.
-Next: T58.
+IN PROGRESS — 02_EXECUTE cycle, 58/73 tasks + 3 NEW findings complete.
+Next: T59.
 
 ## Active work context
 

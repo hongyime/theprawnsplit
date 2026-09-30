@@ -6,21 +6,22 @@
 
 ## Last change — 2026-09-30
 
-T55 (LOGIC-005 — tie draft allocation to one actual reserved event ID) done
-at commit `1b6ec1b` — 55/73 tasks + 3 NEW findings complete. Preview allocator
-was hardcoded to the literal `"preview"` string as its tie-break salt — every
-tied expense in a trip favoured the same participant. Fix: new `draftXid`
-UUID state (reset after each successful `addExpense`) threaded through
-`buildSharePreview` as `salt`, and reused as the `ExpenseAdded` `xid` on
-commit. Cancellation drops the UUID with zero repo effect. `sharePreview.shares`
-was already the source of truth for the commit path via `makeExpenseFinancials`,
-so no re-allocation on commit was needed. Full history in .agents/JOURNAL.md
-and the git log on this branch. Next: T56.
+T56 (PERF-002 — reuse immutable signature checks without stale authority)
+done at commit `0ea6c26` — 56/73 tasks + 3 NEW findings complete.
+`buildVerificationContext` re-ran `verifyClaim` for every signature on every
+refresh. Fix: module-level bounded LRU (`SIGNATURE_CACHE_MAX = 10_000`) keyed
+by `(groupTag, alg, publicKey, payload, signature)` — all immutable per event.
+Cross-group reuse impossible (groupTag part of key). Authority state (voids/
+revocations) still recomputed by the fold on every refresh so those changes
+take effect immediately. Bounded LRU eviction via Map insertion-order.
+Test-only `resetSignatureCache()` seam. Switched verifyClaim call to module-
+namespace import so vitest spy can intercept. Full history in .agents/JOURNAL.md
+and the git log on this branch. Next: T57.
 
 ## Status
 
-IN PROGRESS — 02_EXECUTE cycle, 55/73 tasks + 3 NEW findings complete.
-Next: T56.
+IN PROGRESS — 02_EXECUTE cycle, 56/73 tasks + 3 NEW findings complete.
+Next: T57.
 
 ## Active work context
 

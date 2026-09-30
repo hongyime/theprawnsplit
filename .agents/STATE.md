@@ -6,22 +6,24 @@
 
 ## Last change — 2026-09-30
 
-T56 (PERF-002 — reuse immutable signature checks without stale authority)
-done at commit `0ea6c26` — 56/73 tasks + 3 NEW findings complete.
-`buildVerificationContext` re-ran `verifyClaim` for every signature on every
-refresh. Fix: module-level bounded LRU (`SIGNATURE_CACHE_MAX = 10_000`) keyed
-by `(groupTag, alg, publicKey, payload, signature)` — all immutable per event.
-Cross-group reuse impossible (groupTag part of key). Authority state (voids/
-revocations) still recomputed by the fold on every refresh so those changes
-take effect immediately. Bounded LRU eviction via Map insertion-order.
-Test-only `resetSignatureCache()` seam. Switched verifyClaim call to module-
-namespace import so vitest spy can intercept. Full history in .agents/JOURNAL.md
-and the git log on this branch. Next: T57.
+T57 (DRIFT-001 — reconcile technical documentation with final behavioral
+outcomes) done at commit `cb6e90e` — 57/73 tasks + 3 NEW findings complete.
+TDD.md §5 (core module signatures) and §6 (IndexedDB schema) were pre-T44/
+T45/T47/T27/T30/T31/T38/T42/T43/T53 stale. Fixed: added required
+`ctx: VerificationContext` params on `authorisedKeys`/`verifyConfirmation`;
+added `authorisedDevices`, `verifySettlementVoid` (SEC-002), `matchesPayee
+ClaimSignature`, `claimAnomalies`, `contestedClaimPids`; added the
+`VerificationContext` interface; added `void-settlement` and `reattest`
+signed-payload rows; replaced non-existent `src/db/schema.ts` reference with
+actual `src/db/repo.ts` schema at DB_VERSION=2 with the `linked`/
+`sourceTagHex`/`reservations`/`relayPolicy`/`observedHlc`/`coverage` fields;
+removed spurious `byDevCtr` index. No code changed. Full history in
+.agents/JOURNAL.md and the git log on this branch. Next: T58.
 
 ## Status
 
-IN PROGRESS — 02_EXECUTE cycle, 56/73 tasks + 3 NEW findings complete.
-Next: T57.
+IN PROGRESS — 02_EXECUTE cycle, 57/73 tasks + 3 NEW findings complete.
+Next: T58.
 
 ## Active work context
 

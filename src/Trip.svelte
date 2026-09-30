@@ -104,6 +104,12 @@
   let payerMode: PayerMode = "single";
   let payerAmounts: Record<string, string> = {};
   let expenseDesc = "";
+  // LOGIC-005 (T55): stable draft identifier reused across every preview call
+  // for one draft AND used as the ExpenseAdded xid on commit — so preview
+  // allocation matches committed shares AND tied remainders rotate across
+  // separate drafts instead of always favouring the same participant. Reset
+  // to a fresh UUID after each successful addExpense.
+  let draftXid = crypto.randomUUID();
   let expenseTotal = "";
   let expenseCurrency = "";
   let exchangeRate = "";
@@ -164,7 +170,7 @@
     baseCurrency: currency,
     rateText: exchangeRate,
   });
-  $: sharePreview = buildSharePreview(amountPreview, participants, selectedPids, splitMode, exactShares, shareWeights, percentages);
+  $: sharePreview = buildSharePreview(amountPreview, participants, selectedPids, splitMode, exactShares, shareWeights, percentages, draftXid);
   $: payerPreview = buildPayerPreview(amountPreview.ok ? amountPreview.baseMinor : null, payerMode, payerPid, payerAmounts, participantPids);
   $: localClaimPids = new Set(group?.identities.map((identity) => identity.pid) ?? []);
   $: hasLocalClaim = localClaimPids.size > 0;
@@ -545,13 +551,14 @@
     currentExactShares: Record<string, string>,
     currentShareWeights: Record<string, string>,
     currentPercentages: Record<string, string>,
+    salt: string,
   ): { ok: true; shares: { pid: string; minor: bigint }[]; remainderPid?: string } | { ok: false; message: string } {
     if (!amount.ok) return { ok: false, message: amount.message };
     const total = amount.baseMinor;
     const pids = currentParticipants.filter((participant) => currentSelectedPids[participant.pid]).map((participant) => participant.pid);
     if (pids.length === 0) return { ok: false, message: "Select At Least One Participant." };
     if (currentSplitMode === "equal") {
-      const result = allocatedShares(total, pids.map(() => 1n), "preview", pids);
+      const result = allocatedShares(total, pids.map(() => 1n), salt, pids);
       return result.remainderPid ? { ok: true, shares: result.shares, remainderPid: result.remainderPid } : { ok: true, shares: result.shares };
     }
     if (currentSplitMode === "exact") {
@@ -565,13 +572,13 @@
       const weights = pids.map((pid) => parseShareWeight(currentShareWeights[pid] ?? "0") ?? -1n);
       if (weights.some((weight) => weight < 0n)) return { ok: false, message: "Share Weights Must Be Whole Numbers." };
       if (weights.every((weight) => weight === 0n)) return { ok: false, message: "Enter At Least One Share Weight." };
-      const result = allocatedShares(total, weights, "preview", pids);
+      const result = allocatedShares(total, weights, salt, pids);
       return result.remainderPid ? { ok: true, shares: result.shares, remainderPid: result.remainderPid } : { ok: true, shares: result.shares };
     }
     const weights = pids.map((pid) => parsePercentageBasisPoints(currentPercentages[pid] ?? "0") ?? -1n);
     if (weights.some((weight) => weight < 0n)) return { ok: false, message: "Percentages Must Be Valid." };
     if (weights.reduce((a, b) => a + b, 0n) !== 10_000n) return { ok: false, message: "Percentages Must Total 100%." };
-    const result = allocatedShares(total, weights, "preview", pids);
+    const result = allocatedShares(total, weights, salt, pids);
     return result.remainderPid ? { ok: true, shares: result.shares, remainderPid: result.remainderPid } : { ok: true, shares: result.shares };
   }
 
@@ -641,7 +648,7 @@
     const financials = makeExpenseFinancials(amountPreview.baseMinor, payerPreview.payers, sharePreview.shares);
     if (amountPreview.rate) financials.rate = amountPreview.rate;
     await commitReserved(1, (f) => [makeEvent(f, "ExpenseAdded", {
-      xid: crypto.randomUUID(),
+      xid: draftXid,
       financials,
       desc: expenseDesc.trim(),
       ...dates,
@@ -654,6 +661,7 @@
     expenseTotal = "";
     exchangeRate = "";
     payerAmounts = {};
+    draftXid = crypto.randomUUID();
     showExpenseHint = false;
     showToast("Expense Saved.");
   }

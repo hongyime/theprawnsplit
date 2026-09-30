@@ -1250,7 +1250,7 @@ from `groupSecret`, while preserving the relay's inability to decrypt ledger con
 | ~~Q9~~ | 2 | **CLOSED.** Transport version vector advances; semantic ledger freezes. REQ-SYN-22. |
 | ~~Q7~~ | 3 | **CLOSED.** Current resolution is transport admission gating: future-dated events are held outside the admitted log until local time catches up. REQ-SYN-24, §9.12, D-20. |
 | ~~Q10~~ | 3 | **CLOSED.** Claim keys: settlement confirmation is signed, additional devices are cryptographically delegated. REQ-SEC-01→07, D-15/D-16. **The v1.2 `mode` field is removed.** |
-| ~~Q11~~ | 3 | **CLOSED.** Active conflict surfacing with Keep/Revert. **Refinement:** "Revert" MUST emit a new `ExpenseEdited`, never un-apply — void is terminal (D-13). |
+| ~~Q11~~ | 3 | **CLOSED.** Financials edits appear as a passive, labelled correction history under each expense (REQ-MON-17). Explicit "Keep" / "Revert" reapply controls are NOT implemented — users edit via the ordinary `editExpense` command, which emits a new `ExpenseEdited`; there is no one-click revert-to-earlier-history action. Void remains terminal (D-13).
 | ~~Q12~~ | 3 | **CLOSED.** Snapshots embed `VV_snap`; receiver initialises to it. **Added:** background raw-history reconciliation, since a malicious snapshot could otherwise advance a vector past events it omitted. REQ-SYN-25/26. |
  
 ### 14.2 Resolved in round 4

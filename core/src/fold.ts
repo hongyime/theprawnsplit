@@ -270,8 +270,12 @@ export function fold(events: Event[], opts: FoldOptions, ctx?: VerificationConte
     if (event.t === "ParticipantRenamed") {
       const root = canonical(event.pid);
       const existing = participants.get(root);
-      const shouldReplace = !existing || !("renameHlc" in existing) || true;
-      if (shouldReplace) participants.set(root, { ...(existing ?? { pid: root, canonicalPid: root, devices: [], deactivated: false }), name: event.name });
+      // DEAD-001 (T71): events are sorted by eventSortKey before the fold
+      // loop, so the last ParticipantRenamed always wins. The prior
+      // `!existing || !("renameHlc" in existing) || true` predicate was
+      // unconditionally true and referenced a nonexistent `renameHlc`
+      // property; removed here so the code communicates what it does.
+      participants.set(root, { ...(existing ?? { pid: root, canonicalPid: root, devices: [], deactivated: false }), name: event.name });
     }
     if (event.t === "ParticipantDeactivated") {
       const root = canonical(event.pid);

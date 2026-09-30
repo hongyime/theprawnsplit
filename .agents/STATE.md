@@ -6,21 +6,42 @@
 
 ## Last change — 2026-09-30
 
-T60 (STRUCT-001 T60 — extract ExpensePanel from Trip.svelte) done at commit
-`88b0f28` — 60/73 tasks + 3 NEW findings complete; T61-T64 explicitly
-deferred. New `src/trip/ExpensePanel.svelte` owns the panel markup;
-Trip.svelte retains ALL controller state/callbacks (13 props + 12 two-way
-binds + 8 callbacks). `expense-workflow-ui.test.ts` updated for the split.
-svelte-check 0/0. T61-T64 (People/Recovery/Settlement/Sync extractions)
-deferred: P2 structural nicety, T59 characterization baseline preserved by
-T60 alone, Trip.svelte has proven high edit-tool corruption footprint.
-Task list explicitly permits Blocked/Deferred extraction. Full history in
-.agents/JOURNAL.md and the git log on this branch. Next: T65 (Wave E).
+**02_EXECUTE cycle COMPLETE.** 68/73 tasks Fixed (T01–T60, T65–T72),
+4 tasks Deferred (T61–T64 STRUCT-001 panel extractions — P2 structural
+nicety, T59 characterization baseline preserved by T60 alone, deferred to
+a future dedicated cycle), 1 task consumed by predecessor (T28 by T27),
+3 NEW findings Fixed (NEW-001, NEW-002, NEW-003).
+
+Final closeout commits: T65 (`d54e0cb` DRIFT-003 README source-archive doc),
+T66+T68 (`2baec9d` DRIFT-004+FS-001 SECURITY.md scanner claims + BEL fix),
+T67 (`10eb11e` DRIFT-006 PRD Q11 Keep/Revert wording), T69 (`00665a2` FS-002
+retention formatter section transition), T71 (`2dcfa74` DEAD-001 inert
+rename predicate removal).
+
+Final verification: core 136/136 pass, svelte-check 0/0. All commits
+recorded in execute_state.json.commits and per-task Result paragraphs in
+tasks.md. All P2/P3 dispositions recorded in bugfix.md.
+
+**Residual manual actions (user):** (1) open PR to `main` via
+https://github.com/hongyime/theprawnsplit/compare/main...maintenance/prawn-ui-20260916?expand=1
+— the github_create_pull_request MCP still fails on token scope; (2)
+rotate/revoke Supabase PAT (see execute_state.json.verification.policy_gates_resolution.B4 note about the exposed PAT)
+— was told to do this during T25/B4 resolution; still unconfirmed.
+
+**Residual risks flagged for a future session (NOT this cycle's scope):**
+(1) 2 high-severity Dependabot vulnerabilities on `main` — flagged by GitHub
+on every push, unrelated to this queue; (2) pre-existing
+`test/config.test.ts` CR-013 duplicate-content-lines assertion fails on one
+duplicate MOLT_AUTO_HOOK JOURNAL.md line at head=`b7ee0d5` (2026-09-21,
+unrelated to this cycle); (3) T61–T64 panel extractions await a dedicated
+Wave-D cycle.
+
+Full per-task history in .agents/JOURNAL.md and the git log on this branch.
 
 ## Status
 
-IN PROGRESS — 02_EXECUTE cycle, 60/73 tasks + 3 NEW findings complete;
-T61-T64 deferred. Next: T65.
+COMPLETE — 02_EXECUTE cycle done; 68/73 Fixed, 4 Deferred, 1 subsumed,
+3 NEW findings Fixed. Awaiting manual PR-to-main and Supabase PAT rotation.
 
 ## Active work context
 

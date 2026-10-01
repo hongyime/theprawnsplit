@@ -6,11 +6,22 @@
 
 ## Last change — 2026-09-30
 
-**02_EXECUTE cycle COMPLETE.** 68/73 tasks Fixed (T01–T60, T65–T72),
-4 tasks Deferred (T61–T64 STRUCT-001 panel extractions — P2 structural
-nicety, T59 characterization baseline preserved by T60 alone, deferred to
-a future dedicated cycle), 1 task consumed by predecessor (T28 by T27),
-3 NEW findings Fixed (NEW-001, NEW-002, NEW-003).
+**02_EXECUTE cycle COMPLETE — Wave D now finished too.** 71/73 tasks Fixed
+(T01–T61, T63–T72), 1 task subsumed by design (T62 RecoveryPanel — recovery/
+import surface is inseparable from controller recovery-mode state), 1 task
+consumed by predecessor (T28 by T27), 3 NEW findings Fixed.
+
+**Wave D complete at `53e4d06`:** `src/trip/` now holds ExpensePanel,
+PeoplePanel, SettlementPanel and LedgerPanel. Trip.svelte dropped 1819 →
+~1490 lines. Dependency graph verified: every panel imports ONLY `@/lib/*`
+and `@theprawnsplit/core` types — zero `@/db/repo`, `@/relay/*` or
+`Trip.svelte` imports, so no controller cycle and no panel opens its own
+database or relay. Trip.svelte stays the single group-lifetime owner of
+polling, transports, persistence and signing.
+
+**Dependabot: all 7 alerts cleared.** `undici` fixed transitively and
+`sharp` bumped 0.33.5 → 0.35.5 (dev-only, `scripts/gen-icons.mjs`).
+`npm audit` now reports 0 vulnerabilities.
 
 Final closeout commits: T65 (`d54e0cb` DRIFT-003 README source-archive doc),
 T66+T68 (`2baec9d` DRIFT-004+FS-001 SECURITY.md scanner claims + BEL fix),
@@ -57,13 +68,13 @@ concurrently — always `git fetch` and check `git log --oneline -5` on both
 <!-- MOLT_AUTO_START -->
 ## Auto State
 
-- Updated: 2026-09-30 07:58:14 +08:00
+- Updated: 2026-10-01 02:11:55 +08:00
 - Machine: PRAWN-E14
 - Harness: claude
 - Event: stop
 - Branch: maintenance/prawn-ui-20260916
-- HEAD: d2f9124
-- Dirty files: 10
+- HEAD: b0e46df
+- Dirty files: 9
 - Resume hint: Read .agents/STATE.md, then the latest file in .agents/handoffs/ if present.
 <!-- MOLT_AUTO_END -->
 

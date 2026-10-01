@@ -1,7 +1,17 @@
 <script lang="ts">
-  let { children, onclick, class: className = '', type = 'button' as 'button' | 'submit' | 'reset', ...rest } = $props();
+  // svelte.config.js sets compilerOptions.runes = false, so this component is
+  // compiled in legacy mode. `$props()`/`{@render}` are runes-only: in legacy
+  // mode a `$`-prefixed identifier is read as a store auto-read of a variable
+  // named `props`, producing a runtime `ReferenceError: props is not defined`
+  // that crashed the whole app on boot. Legacy `export let` + <slot> is the
+  // equivalent that actually works under this project's compiler settings.
+  export let onclick: ((event: MouseEvent) => void) | undefined = undefined;
+  let className = "";
+  export { className as class };
+  export let type: "button" | "submit" | "reset" = "button";
+  export let disabled = false;
 </script>
-<button {type} class="neo-btn {className}" {onclick} {...rest}>{@render children()}</button>
+<button {type} class="neo-btn {className}" {disabled} on:click={onclick}><slot /></button>
 <style>
   .neo-btn {
     border: 2px solid var(--neo-border);

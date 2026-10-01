@@ -15,24 +15,24 @@ You will receive a response within 48 hours. Please allow reasonable time to pat
 
 ## Automated Security
 
-- **TruffleHog** scans every push and PR for accidentally committed secrets, with the same fixture-scoped exclusions the local test suite uses (see `test/maintenance/scanner-exit.test.mjs`).
-- **Dependabot** opens PRs for dependency updates daily. Non-admin merges route through the checked auto-merge pipeline described below; bypassing branch protection is limited to the specific bot categories listed in `Auto-merge Pattern`.
+- **TruffleHog** scans every push and PR for accidentally committed secrets
+- **Dependabot** opens PRs for dependency updates daily (auto-merged)
 
 ## GH_PAT Security Model
 
 ### Scope
 
 The GH_PAT (GitHub Personal Access Token) requires:
-- `repo` — full control of private repositories
-- `workflow` — update GitHub Actions workflows
-- `admin:repo_hook` — manage repository hooks
+- epo — full control of private repositories
+- workflow — update GitHub Actions workflows
+- dmin:repo_hook — manage repository hooks
 
 ### Blast Radius
 
-The `sync-repo-settings.yml` workflow **propagates GH_PAT to every owned non-archived repository** as a repository secret. This means:
+The sync-repo-settings.yml workflow **propagates GH_PAT to every owned non-archived repository** as a repository secret. This means:
 
-- If the PAT is compromised, an attacker has write access to ALL repositories in scope of the sync workflow.
-- Only bot auto-merges of dependency-manifest-only PRs run the branch-protection bypass path; regular PRs and human commits still require the ordinary checked review + status flow.
+- If the PAT is compromised, an attacker has write access to ALL repositories
+- The PAT is used with --admin flag in bot auto-merge workflows, bypassing all branch protection
 
 ### Mitigation
 
@@ -41,11 +41,10 @@ The `sync-repo-settings.yml` workflow **propagates GH_PAT to every owned non-arc
 - PAT should be rotated quarterly (recommended)
 - Consider using a fine-grained PAT with minimal scope when GitHub supports it for all required operations
 
-### Auto-merge Pattern
+### Auto-merge --admin Pattern
 
-Bot PRs (Dependabot, Snyk, Sourcery, DeepSource, Copilot SWE) are auto-merged only after the Build Check workflow reports success. This is acceptable because:
+Bot PRs (Dependabot, Snyk, Sourcery, DeepSource, Copilot SWE) are merged with --admin to bypass branch protection. This is acceptable because:
 
-1. These bots only modify dependency manifests and lockfiles.
-2. TruffleHog and CodeQL scan every commit regardless of merge method.
-3. The Build Check workflow validates the build before the auto-merge is triggered; a failing build blocks the merge.
-4. External propagation of security posture beyond this repository's own sync targets is not claimed here; downstream consumers must run their own scanners.
+1. These bots only modify dependency manifests and lockfiles
+2. TruffleHog and CodeQL scan every commit regardless of merge method
+3. The Build Check workflow validates the build before --admin merge is triggered

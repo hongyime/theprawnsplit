@@ -3,7 +3,7 @@ import * as claimModule from "@/crypto/claim";
 import type { GroupRecord } from "@/db/repo";
 
 // PERF-002 (T56): module-level bounded LRU for immutable signature results.
-// The key includes groupTag so cross-group reuse is impossible. All inputs
+// The key includes groupTag so reuse across different trips is impossible.
 // are immutable per event, so cached `true`/`false` never goes stale —
 // authority state (voids/revocations) is recomputed by the fold on every
 // refresh, not stored here.

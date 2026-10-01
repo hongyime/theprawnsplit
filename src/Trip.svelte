@@ -79,6 +79,9 @@
   import { buildVerificationContext } from "@/lib/verification";
   import type { SyncResult } from "@/relay/types";
   import ExpensePanel from "@/trip/ExpensePanel.svelte";
+  import PeoplePanel from "@/trip/PeoplePanel.svelte";
+  import SettlementPanel from "@/trip/SettlementPanel.svelte";
+  import LedgerPanel from "@/trip/LedgerPanel.svelte";
 
   export let initialGroup: GroupRecord;
   export let showTripList: () => void;
@@ -1535,98 +1538,31 @@
 
     {#if !needsSetup}
     <section class="grid">
-      <article class="panel roster">
-        <h2><Icon name="users" size={18} /> People</h2>
-        {#if participants.length === 0}
-          <div class="empty">
-            {#if recoveryActive}
-              <p>Waiting For Recovered Trip Data.</p>
-              <button type="button" disabled={syncing} on:click={runSync}><Icon name="refresh-ccw" size={17} /> Retry Sync</button>
-            {:else}
-              <p>Add People To Start A Trip Ledger.</p>
-              <div class="empty-actions">
-                <button type="button" on:click={() => participantNameInput?.focus()}><Icon name="users" size={17} /> Add People</button>
-                <button type="button" on:click={() => downloadExport()}><Icon name="download" size={17} /> Share Trip File</button>
-              </div>
-            {/if}
-          </div>
-        {:else}
-          {#if participantClaimGroups.unclaimed.length}
-            <div class="claim-section primary-claim">
-              <h3>Unclaimed</h3>
-              <ul class="people-list">
-                {#each participantClaimGroups.unclaimed as participant}
-                  {@const hiddenEvent = activeDeactivationEvent(participant.pid)}
-                  <li class:inactive-person={participant.deactivated}>
-                    <label>
-                      <input type="checkbox" bind:checked={selectedPids[participant.pid]} disabled={archived} />
-                      <span>
-                        <strong>{participant.name}</strong>
-                        <small>{participantStatusText(participant.pid)}</small>
-                      </span>
-                    </label>
-                    <span class="person-actions">
-                      {participant.deactivated ? "Hidden" : "Shadow"}
-                      {#if !archived}
-                        <button type="button" on:click={() => requestClaimParticipant(participant.pid)} title="Claim Participant"><Icon name="key-round" size={15} /> Claim</button>
-                        {#if hiddenEvent}
-                          <button type="button" class="secondary" on:click={() => voidEvent(hiddenEvent.id)} title="Restore Default Splits">Restore</button>
-                        {:else}
-                          <button type="button" class="secondary" on:click={() => deactivateParticipant(participant.pid)} title="Hide From Default Splits">Hide</button>
-                        {/if}
-                      {/if}
-                    </span>
-                  </li>
-                {/each}
-              </ul>
-            </div>
-          {/if}
-          {#if participantClaimGroups.claimed.length}
-            <details class="claim-section claimed-section">
-              <summary>Claimed People ({participantClaimGroups.claimed.length})</summary>
-              <ul class="people-list">
-                {#each participantClaimGroups.claimed as participant}
-                  {@const hiddenEvent = activeDeactivationEvent(participant.pid)}
-                  <li class:inactive-person={participant.deactivated}>
-                    <label>
-                      <input type="checkbox" bind:checked={selectedPids[participant.pid]} disabled={archived} />
-                      <span>
-                        <strong>{participant.name}</strong>
-                        <small>{participant.deactivated ? participantStatusText(participant.pid) : participantClaimAttribution(participant.pid)}</small>
-                      </span>
-                    </label>
-                    <span class="person-actions">
-                      {participant.deactivated ? "Hidden" : `${participant.devices.length} Device`}
-                      {#if localClaimPids.has(participant.pid)}
-                        <span>you</span>
-                      {:else if !archived}
-                        <button type="button" class="secondary" on:click={() => requestDeviceLink(participant.pid)} title="Request Device Link"><Icon name="link" size={15} /> Link</button>
-                      {/if}
-                      {#if !archived}
-                        {#if !localClaimPids.has(participant.pid)}
-                          <button type="button" class="secondary danger-action" on:click={() => voidParticipantClaim(participant.pid)} title="Void Disputed Claim">Void Claim</button>
-                        {/if}
-                        {#if hiddenEvent}
-                          <button type="button" class="secondary" on:click={() => voidEvent(hiddenEvent.id)} title="Restore Default Splits">Restore</button>
-                        {:else}
-                          <button type="button" class="secondary" on:click={() => deactivateParticipant(participant.pid)} title="Hide From Default Splits">Hide</button>
-                        {/if}
-                      {/if}
-                    </span>
-                  </li>
-                {/each}
-              </ul>
-            </details>
-          {/if}
-        {/if}
-        <form class="row create-person" on:submit|preventDefault={addParticipant}>
-          <input bind:this={participantNameInput} bind:value={participantName} placeholder="Add Shadow Participant" disabled={archived} />
-          <button type="submit" disabled={joinBlocked || archived}><Icon name="plus" size={17} /> Add</button>
-        </form>
-        {#if participantNameMatch}
-          <p class="hint duplicate-hint">{matchText(participantNameMatch)} Select The Existing Person Before Creating A New One.</p>
-        {/if}
-      </article>
+      <PeoplePanel
+        {participants}
+        {participantClaimGroups}
+        {localClaimPids}
+        {archived}
+        {joinBlocked}
+        {recoveryActive}
+        {syncing}
+        {participantNameMatch}
+        bind:participantName
+        bind:selectedPids
+        bind:participantNameInput
+        {addParticipant}
+        {requestClaimParticipant}
+        {requestDeviceLink}
+        {voidParticipantClaim}
+        {deactivateParticipant}
+        {voidEvent}
+        {activeDeactivationEvent}
+        {participantStatusText}
+        {participantClaimAttribution}
+        {matchText}
+        {runSync}
+        {downloadExport}
+      />
 
       <article class="panel balances">
         <h2><Icon name="wallet" size={18} /> Balances</h2>
@@ -1677,91 +1613,38 @@
         {splitModeLabel}
       />
 
-      <article class="panel settlements">
-        <h2><Icon name="refresh-ccw" size={18} /> Settle</h2>
-        {#if !frozenPolicy.allowSettlementActions}
-          <p class="warning compact-warning">Settlement Is Frozen Until The Newer Retained Event Can Be Folded.</p>
-        {:else}
-          {#each suggestedSettlements as transfer}
-            <button type="button" class="settle-suggestion" disabled={archived} on:click={() => recordSettlement(transfer.from, transfer.to, formatMinorInput(transfer.minor))}>
-              {participantLabel(transfer.from)} Pays {participantLabel(transfer.to)} {formatMinor(transfer.minor, currency)}
-            </button>
-          {/each}
-          <div class="form-grid">
-            <select bind:value={settleFrom} disabled={archived}><option value="">From</option>{#each participants as p}<option value={p.pid}>{p.name}</option>{/each}</select>
-            <select bind:value={settleTo} disabled={archived}><option value="">To</option>{#each participants as p}<option value={p.pid}>{p.name}</option>{/each}</select>
-            <input bind:value={settleAmount} inputmode="decimal" placeholder="Amount" disabled={archived} />
-            <button type="button" disabled={!canRecordManualSettlement} on:click={() => recordSettlement(settleFrom, settleTo, settleAmount)}>Record</button>
-          </div>
-        {/if}
-        {#if settlements.length && frozenPolicy.allowSettlementActions}
-          <div class="settlement-list">
-            {#each settlements as settlement}
-              {@const claims = settlementClaimView(group.events, settlement.sid)}
-              <div class="settlement-row">
-                <span class="settlement-claims">
-                  <strong>{participantLabel(settlement.from)} Paid {participantLabel(settlement.to)} {formatMinor(settlement.minor, currency)}</strong>
-                  {#if claims.dispute}
-                    <span>Dispute: {claims.dispute.note || "Payment Disputed"}</span>
-                  {/if}
-                </span>
-                <span class="settlement-state">
-                  <strong class:positive={settlement.confirmed} class:negative={settlement.disputed || settlement.contestedConfirmation}>
-                    {settlement.disputed ? "Disputed" : settlement.contestedConfirmation ? "Contested" : settlement.confirmed ? "Confirmed" : settlement.cashUnconfirmable ? "Cash" : "Pending"}
-                  </strong>
-                  {#if canConfirmSettlement({
-                    archived,
-                    allowSettlementActions: frozenPolicy.allowSettlementActions,
-                    pending: settlement.pending,
-                    hasLocalPayeeIdentity: Boolean(localIdentityForPid(settlement.to)),
-                    payeeHasActiveClaimAnomaly: hasActiveClaimAnomaly(anomalies, settlement.to),
-                  })}
-                    <button type="button" disabled={archived} on:click={() => confirmSettlement(settlement.sid)}>Confirm</button>
-                  {/if}
-                  {#if !settlement.disputed}
-                    <button type="button" class="secondary" disabled={archived} on:click={() => disputeSettlement(settlement.sid)}>Dispute</button>
-                  {/if}
-                  {#if verificationContext && canVoidRecordedSettlement(group.events, settlement.sid, group.identities.map((identity) => identity.pid), verificationContext)}
-                    <button type="button" class="secondary danger-action" disabled={archived} on:click={() => voidSettlement(settlement.sid)}>Void</button>
-                  {/if}
-                </span>
-              </div>
-            {/each}
-          </div>
-        {/if}
-      </article>
+      <SettlementPanel
+        {archived}
+        {currency}
+        {participants}
+        {suggestedSettlements}
+        {settlements}
+        {frozenPolicy}
+        {group}
+        {anomalies}
+        {verificationContext}
+        {canRecordManualSettlement}
+        bind:settleFrom
+        bind:settleTo
+        bind:settleAmount
+        {recordSettlement}
+        {confirmSettlement}
+        {disputeSettlement}
+        {voidSettlement}
+        {participantLabel}
+        {localIdentityForPid}
+      />
 
-      <section class="panel ledger">
-        <h2>Ledger</h2>
-        {#each expenses as expense}
-          {@const coverage = expenseCoverageLabel(expense.xid)}
-          <div class="ledger-row">
-            <div>
-              <strong>{expense.desc}</strong>
-              <span>{expense.date}</span>
-              <span class="sync-coverage" class:ok-coverage={coverage === "Everyone Has This"}>{coverage}</span>
-              <span class="payer-summary">{payerSummary(expense.financials.payers)}</span>
-              {#if expense.financials.rate}<span class="payer-summary">{rateSummary(expense.financials.rate)}</span>{/if}
-              {#if expense.financialHistory.length > 1}
-                <details class="expense-history">
-                  <summary>{expense.financialHistory.length - 1} Correction{expense.financialHistory.length === 2 ? "" : "s"}</summary>
-                  {#each expenseHistoryRows(expense) as row}
-                    <span class:active-history={row.active}>
-                      {row.label}: {formatMinor(row.financials.minor, currency)}{row.active ? " Active" : ""}
-                    </span>
-                  {/each}
-                </details>
-              {/if}
-            </div>
-            <div>
-              <strong>{formatMinor(expense.financials.minor, currency)}</strong>
-              <button type="button" disabled={archived} on:click={() => editExpense(expense.xid)} title="Edit Expense"><Icon name="receipt-text" size={16} /></button>
-              <button type="button" disabled={archived} on:click={() => voidExpense(expense.xid)} title="Void Expense"><Icon name="trash" size={16} /></button>
-            </div>
-          </div>
-        {/each}
-        {#if expenses.length === 0}<p class="hint">No Expenses Yet.</p>{/if}
-      </section>
+      <LedgerPanel
+        {expenses}
+        {archived}
+        {currency}
+        {expenseCoverageLabel}
+        {payerSummary}
+        {rateSummary}
+        {editExpense}
+        {voidExpense}
+      />
     </section>
 
     {/if}

@@ -17,6 +17,13 @@ function appSource(): string {
   return readFileSync(join(process.cwd(), "src", "Trip.svelte"), "utf8");
 }
 
+function settlementPanelSource(): string {
+  // T63 (STRUCT-001): the rendered Void action moved to
+  // src/trip/SettlementPanel.svelte. Trip.svelte still owns voidSettlement's
+  // signing path asserted in the first test below.
+  return readFileSync(join(process.cwd(), "src", "trip", "SettlementPanel.svelte"), "utf8");
+}
+
 describe("SEC-002/T47 settlement void authority UI boundary", () => {
   it("signs SettlementVoided with a genuinely usable local identity's own claim key, never a bare device-string attribution", () => {
     const source = appSource();
@@ -35,7 +42,7 @@ describe("SEC-002/T47 settlement void authority UI boundary", () => {
   });
 
   it("gates the rendered Void action on the SAME any-current-group-member authority the signing path uses", () => {
-    const source = appSource();
+    const source = settlementPanelSource();
     expect(source).toContain(
       "{#if verificationContext && canVoidRecordedSettlement(group.events, settlement.sid, group.identities.map((identity) => identity.pid), verificationContext)}",
     );

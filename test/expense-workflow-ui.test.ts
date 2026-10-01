@@ -10,18 +10,18 @@ function appSource(): string {
   return readFileSync(join(process.cwd(), "src", "Trip.svelte"), "utf8");
 }
 
-function expensePanelSource(): string {
-  // T60 (STRUCT-001): the <article class="panel expense"> markup lives in
-  // src/trip/ExpensePanel.svelte after extraction. Trip.svelte still owns the
-  // controller callbacks (changeSplitMode, changePayerMode, addExpense, etc.).
-  return readFileSync(join(process.cwd(), "src", "trip", "ExpensePanel.svelte"), "utf8");
+function panelSource(name: string): string {
+  // T60/T64 (STRUCT-001): panel markup lives under src/trip/*.svelte after
+  // extraction. Trip.svelte still owns every controller callback
+  // (changeSplitMode, changePayerMode, addExpense, editExpense, voidExpense).
+  return readFileSync(join(process.cwd(), "src", "trip", name), "utf8");
 }
 
 describe("expense workflow UI boundary", () => {
   it("keeps money entry wired to preserved splits, multi-payer rows, stored dates, and append-only corrections", () => {
     const source = appSource();
-    const expensePanel = expensePanelSource().match(/<article class="panel expense">([\s\S]*?)<\/article>/)?.[1] ?? "";
-    const ledgerPanel = source.match(/<section class="panel ledger">([\s\S]*?)<\/section>/)?.[1] ?? "";
+    const expensePanel = panelSource("ExpensePanel.svelte").match(/<article class="panel expense">([\s\S]*?)<\/article>/)?.[1] ?? "";
+    const ledgerPanel = panelSource("LedgerPanel.svelte").match(/<section class="panel ledger">([\s\S]*?)<\/section>/)?.[1] ?? "";
     const changeSplitMode = source.match(/function changeSplitMode\(nextMode: SplitMode\): void \{([\s\S]*?)\n  \}/)?.[1] ?? "";
     const changePayerMode = source.match(/function changePayerMode\(nextMode: PayerMode\): void \{([\s\S]*?)\n  \}/)?.[1] ?? "";
     const addExpense = source.match(/async function addExpense\(\): Promise<void> \{([\s\S]*?)\n  \}/)?.[1] ?? "";

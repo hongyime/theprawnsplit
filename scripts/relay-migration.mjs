@@ -2,6 +2,7 @@
 import { constants, createCipheriv, createDecipheriv, createHash, createPublicKey, privateDecrypt,
   publicEncrypt, randomBytes } from 'node:crypto';
 import { readFile, writeFile } from 'node:fs/promises';
+import { publishArtifactAtomically } from './atomic-artifact.mjs';
 import { pathToFileURL } from 'node:url';
 
 const TAG = /^[0-9a-f]{64}$/;
@@ -94,7 +95,11 @@ function entry(raw) {
 }
 
 export async function exportSnapshot(read, progress = () => {}) {
-  const initialKeys = await keys(read);
+  // SEC-003/B1: admission-tracking keys (ad: prefix) are purely operational
+  // rate/enrollment/storage-budget state, not user records — they are never
+  // part of an export and must not make an otherwise-stable export look
+  // unstable just because live traffic is still touching them.
+  const initialKeys = (await keys(read)).filter(key => !key.startsWith('ad:'));
   const topics = new Map();
   const auxiliary = [];
   let bytes = 0;
@@ -148,7 +153,7 @@ export async function exportSnapshot(read, progress = () => {}) {
     }
   }
   progress({ stage: 'optimistic_consistency_check', key_count: initialKeys.length, stream_rows: rowsRead, source_bytes: bytes });
-  let stable = JSON.stringify(initialKeys) === JSON.stringify(await keys(read));
+  let stable = JSON.stringify(initialKeys) === JSON.stringify((await keys(read)).filter(key => !key.startsWith('ad:')));
   for (const topic of topics.values()) {
     if (topic.source.count !== undefined) {
       stable &&= topic.rows.length === topic.source.count && await read(['XLEN', `ts:${topic.tag}`]) === topic.source.count;
@@ -280,7 +285,7 @@ async function main() {
     const publicKey = prepared.publicKey;
     const sealed = JSON.stringify(sealSnapshot(snapshot, publicKey));
     stage = 'write_encrypted_artifact';
-    await writeFile(filename, sealed + '\n', { flag: 'wx', mode: 0o600 });
+    await publishArtifactAtomically(filename, sealed + '\n');
     const result = { status: snapshot.stable ? 'ready_for_private_review' : 'source_changed_repeat_required',
       ...snapshotSummary(snapshot), artifact_sha256: createHash('sha256').update(sealed + '\n').digest('hex') };
     console.log(JSON.stringify(result));

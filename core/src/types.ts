@@ -1,3 +1,5 @@
+import type { CoverageIntervals } from "./transport";
+
 export type Money = bigint;
 
 export interface HLC {
@@ -12,6 +14,16 @@ export interface BaseEvent {
   hlc: HLC;
   dev: string;
   vv?: Record<string, number>;
+  // DATA-007: a snapshot of the STAMPING device's own exact durable
+  // coverage (core/src/transport.ts's CoverageIntervals, keyed by author
+  // device id) at the moment this event was created -- distinct from vv,
+  // which only reflects transport/observed progress and can include
+  // counters that were later buffered/dropped/conflicted and never
+  // actually durably retained. Optional and unsigned/advisory, exactly
+  // like vv: an old event or an old-format client simply omits it, and
+  // consumers (src/lib/sync-coverage.ts) must treat its absence as
+  // "unknown", never as proof of either possession or its lack.
+  coverage?: Record<string, CoverageIntervals>;
 }
 
 export interface Financials {
@@ -23,6 +35,7 @@ export interface Financials {
 
 export type Event =
   | (BaseEvent & { t: "GroupCreated"; name: string; currency: string })
+  | (BaseEvent & { t: "BaseCurrencyEstablished"; currency: string })
   | (BaseEvent & { t: "ParticipantAdded"; pid: string; name: string })
   | (BaseEvent & { t: "ParticipantRenamed"; pid: string; name: string })
   | (BaseEvent & {
@@ -74,7 +87,7 @@ export type Event =
   | (BaseEvent & { t: "SettlementRecorded"; sid: string; from: string; to: string; minor: Money })
   | (BaseEvent & { t: "SettlementConfirmed"; sid: string; pid: string; claimSig: string })
   | (BaseEvent & { t: "SettlementDisputed"; sid: string; note?: string })
-  | (BaseEvent & { t: "SettlementVoided"; sid: string })
+  | (BaseEvent & { t: "SettlementVoided"; sid: string; pid: string; sig: string })
   | (BaseEvent & { t: "GroupArchived"; outstanding: { from: string; to: string; minor: Money }[] })
   | (BaseEvent & { t: "GroupUnarchived" })
   | (BaseEvent & { t: "EventVoided"; targetId: string });
@@ -126,6 +139,7 @@ export interface State {
   balances: Map<string, Money>;
   anomalies: Anomaly[];
   quarantined: string[];
+  currency: string;
   frozen: boolean;
 }
 

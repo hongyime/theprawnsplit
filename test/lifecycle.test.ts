@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import type { Event } from "@theprawnsplit/core";
 import {
   archiveConfirmationText,
@@ -64,9 +66,10 @@ describe("lifecycle copy", () => {
   });
 
   it("derives settled only for active groups whose canonical balances are zero", () => {
-    expect(isSettledViewPredicate(new Map([["p_alice", 0n], ["p_bob", 0n]]), false)).toBe(true);
-    expect(isSettledViewPredicate(new Map([["p_alice", 1n], ["p_bob", -1n]]), false)).toBe(false);
-    expect(isSettledViewPredicate(new Map([["p_alice", 0n], ["p_bob", 0n]]), true)).toBe(false);
+    expect(isSettledViewPredicate(new Map([["p_alice", 0n], ["p_bob", 0n]]), false, false)).toBe(true);
+    expect(isSettledViewPredicate(new Map([["p_alice", 1n], ["p_bob", -1n]]), false, false)).toBe(false);
+    expect(isSettledViewPredicate(new Map([["p_alice", 0n], ["p_bob", 0n]]), true, false)).toBe(false);
+    expect(isSettledViewPredicate(new Map([["p_alice", 0n], ["p_bob", 0n]]), false, true)).toBe(false);
   });
 
   it("locks profile edits while the group is archived", () => {
@@ -79,6 +82,7 @@ describe("lifecycle copy", () => {
       hasGroup: true,
       documentHidden: false,
       archived: false,
+      hasPendingOutbox: false,
       now: 180_000,
       lastActivityAt: 175_000,
       lastSyncAt: 171_000,
@@ -89,7 +93,11 @@ describe("lifecycle copy", () => {
     };
 
     expect(shouldPollGroup({ ...base, archived: true })).toBe(false);
+    expect(shouldPollGroup({ ...base, archived: true, hasPendingOutbox: false })).toBe(false);
+    expect(shouldPollGroup({ ...base, archived: true, hasPendingOutbox: true })).toBe(false);
+    expect(shouldPollGroup({ ...base, archived: true, hasPendingOutbox: true, lastSyncAt: 169_000 })).toBe(true);
     expect(shouldPollGroup({ ...base, documentHidden: true })).toBe(false);
+    expect(shouldPollGroup({ ...base, documentHidden: true, hasPendingOutbox: true })).toBe(false);
     expect(shouldPollGroup(base)).toBe(false);
     expect(shouldPollGroup({ ...base, lastSyncAt: 169_000 })).toBe(true);
 
@@ -105,6 +113,7 @@ describe("lifecycle copy", () => {
       hasGroup: true,
       documentHidden: false,
       archived: false,
+      hasPendingOutbox: false,
       now: 200_000,
       lastActivityAt: 190_000,
       lastSyncAt: 190_001,
@@ -135,5 +144,13 @@ describe("lifecycle copy", () => {
     expect(latestArchiveEvent([first])?.id).toBe("e_archive_1");
     expect(latestArchiveEvent([first, unarchive])).toBeUndefined();
     expect(latestArchiveEvent([second, first, unarchive])?.id).toBe("e_archive_3");
+  });
+
+  it("wires the polling timer's archived eligibility to real pending outbox state (source-shape)", () => {
+    const appSource = readFileSync(join(process.cwd(), "src", "Trip.svelte"), "utf8");
+    const startPolling = appSource.match(/function startPolling\(\): void \{([\s\S]*?)\n  \}/)?.[1] ?? "";
+
+    expect(startPolling).toContain("archived: isGroupArchived()");
+    expect(startPolling).toContain("hasPendingOutbox: unconfirmedCount > 0");
   });
 });

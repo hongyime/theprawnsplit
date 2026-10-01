@@ -1,4 +1,4 @@
-import { formatMinorInput, formatPercentageInput, type SplitMode } from "./money";
+import { allocatePercentageBasisPoints, formatBasisPoints, formatMinorInput, type SplitMode } from "./money";
 
 export interface SplitPreview {
   shares: { pid: string; minor: bigint }[];
@@ -20,11 +20,13 @@ export function preserveSplitInputs(input: {
   const previewByPid = new Map(input.preview.shares.map((share) => [share.pid, share.minor]));
   const shareFor = (pid: string): bigint => previewByPid.get(pid) ?? 0n;
 
+  const basisPoints = allocatePercentageBasisPoints(input.selectedPids.map(shareFor), input.total);
+
   return {
     exactShares: Object.fromEntries(input.selectedPids.map((pid) => [pid, formatMinorInput(shareFor(pid))])),
     shareWeights: Object.fromEntries(
       input.selectedPids.map((pid) => [pid, input.fromMode === "equal" && input.toMode === "shares" ? "1" : shareFor(pid) > 0n ? shareFor(pid).toString() : "0"]),
     ),
-    percentages: Object.fromEntries(input.selectedPids.map((pid) => [pid, formatPercentageInput(shareFor(pid), input.total)])),
+    percentages: Object.fromEntries(input.selectedPids.map((pid, index) => [pid, formatBasisPoints(basisPoints[index] ?? 0n)])),
   };
 }

@@ -12,8 +12,11 @@
 // Uses throwaway keys and tags. It cannot touch real user data.
 
 import { readFileSync, writeFileSync, existsSync, appendFileSync, mkdirSync } from "node:fs";
+import { unlink } from "node:fs/promises";
 import { webcrypto } from "node:crypto";
 import { finalizeEvent, generateSecretKey, getPublicKey, SimplePool } from "nostr-tools";
+import { publishArtifactAtomically, checkpointArtifactAtomically } from "./atomic-artifact.mjs";
+import { pathToFileURL } from "node:url";
 
 // NOTE: this list is FROZEN to match scripts/task0-manifest.json. It intentionally
 // still contains relay.damus.io even though CR-007 dropped it from the app defaults.
@@ -51,49 +54,103 @@ function readCurrentRelays() {
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-async function publish() {
-  if (existsSync(MANIFEST)) {
-    console.error(`${MANIFEST} exists. Refusing to republish — that would reset the clock.`);
-    console.error("Delete it deliberately only if you intend to start a new series.");
-    process.exit(1);
+/**
+ * REL-003: matches the real client's wire shape exactly (src/crypto/envelope.ts
+ * encryptJson + src/relay/nostr.ts nostrEventTemplate/publish) — a 12-byte
+ * random IV followed by AES-GCM ciphertext, base64-encoded, carried as ONE
+ * signed event's `content`. `events` here is a plain JSON-serializable array
+ * (the probe never touches real ledger event types); `key` is a raw
+ * webcrypto AES-GCM CryptoKey generated locally for this measurement only.
+ */
+export async function encryptEventBatch(key, events) {
+  const iv = webcrypto.getRandomValues(new Uint8Array(12));
+  const plaintext = Buffer.from(JSON.stringify(events), "utf8");
+  const encrypted = new Uint8Array(await webcrypto.subtle.encrypt({ name: "AES-GCM", iv }, key, plaintext));
+  const out = new Uint8Array(iv.length + encrypted.length);
+  out.set(iv);
+  out.set(encrypted, iv.length);
+  return Buffer.from(out).toString("base64");
+}
+
+export async function decryptEventBatch(key, blob) {
+  const bytes = Buffer.from(blob, "base64");
+  const iv = bytes.subarray(0, 12);
+  const ciphertext = bytes.subarray(12);
+  const plaintext = await webcrypto.subtle.decrypt({ name: "AES-GCM", iv }, key, ciphertext);
+  return JSON.parse(Buffer.from(plaintext).toString("utf8"));
+}
+
+/**
+ * Builds exactly ONE production-shaped signed event carrying an encrypted
+ * `events` batch as its content — the actual client batching contract.
+ * Previously `batch50` instead built `["EVENT", e0, e1, ..., e49]`: a
+ * multi-event array that is not even a valid NIP-01 client message, so any
+ * relay-acceptance/size conclusions drawn from it did not measure what the
+ * real client sends. This function performs no network I/O.
+ */
+export async function buildProductionBatchEvent({ tag, sk, kind, key, events }) {
+  const content = await encryptEventBatch(key, events);
+  return finalizeEvent({ kind, created_at: Math.floor(Date.now() / 1000), tags: [["t", tag]], content }, sk);
+}
+
+/**
+ * INTR-002: pre-signs `eventCount` events for a fresh cohort and durably
+ * journals their public wire objects (id/pubkey/tag/sig — never the private
+ * key) BEFORE any publish attempt starts, then checkpoints progress after
+ * every attempt. If `journalPath` already exists from an interrupted prior
+ * run, RESUMES from its last checkpoint using the exact same pre-signed
+ * events (no new signing key needed) instead of starting an unrelated new
+ * cohort or refusing outright — as long as the journal's relays/eventCount/
+ * payloadBytes match what is being requested; a mismatched or malformed
+ * journal is rejected rather than guessed at.
+ *
+ * `publishOne(event, index, acks)` must mutate `acks` in place (matching the
+ * Promise.allSettled shape each caller already uses) and does the actual
+ * relay I/O; this function only owns pre-signing, journaling and ordering.
+ */
+export async function runJournaledCohort({ journalPath, relays, eventCount, payloadBytes, spacingMs, publishOne, onProgress }) {
+  let pk, tag, events, acks, resumeFrom;
+
+  if (existsSync(journalPath)) {
+    const journal = JSON.parse(readFileSync(journalPath, "utf8"));
+    const compatible = journal && typeof journal === "object"
+      && journal.kind === KIND
+      && typeof journal.pubkey === "string" && typeof journal.tag === "string"
+      && Array.isArray(journal.relays) && journal.relays.length === relays.length && journal.relays.every((r, i) => r === relays[i])
+      && journal.eventCount === eventCount && journal.payloadBytes === payloadBytes
+      && Array.isArray(journal.events) && journal.events.length === eventCount
+      && typeof journal.ackedThrough === "number" && journal.ackedThrough >= -1 && journal.ackedThrough < eventCount
+      && journal.acks && typeof journal.acks === "object";
+    if (!compatible) {
+      throw new Error(`${journalPath} exists but its schema/identity does not match this cohort's expected relays/eventCount/payloadBytes; refusing to guess. Move or delete it deliberately to start a new cohort.`);
+    }
+    pk = journal.pubkey; tag = journal.tag; events = journal.events; acks = journal.acks;
+    resumeFrom = journal.ackedThrough + 1;
+    console.log(`Resuming journaled cohort tag=${tag.slice(0, 12)}… from event ${resumeFrom}/${eventCount} (no new signing key needed).`);
+  } else {
+    const sk = generateSecretKey();
+    pk = getPublicKey(sk);
+    const seed = webcrypto.getRandomValues(new Uint8Array(32));
+    const digest = await webcrypto.subtle.digest("SHA-256", seed);
+    tag = Buffer.from(digest).toString("hex");
+    events = [];
+    for (let i = 0; i < eventCount; i++) {
+      const content = Buffer.from(webcrypto.getRandomValues(new Uint8Array(payloadBytes))).toString("base64");
+      events.push(finalizeEvent({ kind: KIND, created_at: Math.floor(Date.now() / 1000), tags: [["t", tag], ["s", String(i)]], content }, sk));
+    }
+    acks = Object.fromEntries(relays.map((r) => [r, 0]));
+    resumeFrom = 0;
+    // Durably journal the pre-signed public cohort BEFORE any network I/O. sk never leaves this scope.
+    await checkpointArtifactAtomically(journalPath, JSON.stringify({ kind: KIND, pubkey: pk, tag, relays, eventCount, payloadBytes, events, ackedThrough: -1, acks }, null, 2) + "\n");
   }
 
-  const sk = generateSecretKey();
-  const pk = getPublicKey(sk);
+  const journalOf = (ackedThrough) => JSON.stringify({ kind: KIND, pubkey: pk, tag, relays, eventCount, payloadBytes, events, ackedThrough, acks }, null, 2) + "\n";
 
-  const seed = webcrypto.getRandomValues(new Uint8Array(32));
-  const digest = await webcrypto.subtle.digest("SHA-256", seed);
-  const tag = Buffer.from(digest).toString("hex");
-
-  const pool = new SimplePool();
-  const ids = [];
-  const acks = Object.fromEntries(RELAYS.map((r) => [r, 0]));
-
-  console.log(`publishing ${EVENT_COUNT} events, kind ${KIND}, tag ${tag.slice(0, 12)}…`);
-
-  for (let i = 0; i < EVENT_COUNT; i++) {
-    const content = Buffer.from(
-      webcrypto.getRandomValues(new Uint8Array(PAYLOAD_BYTES)),
-    ).toString("base64");
-
-    const event = finalizeEvent(
-      {
-        kind: KIND,
-        created_at: Math.floor(Date.now() / 1000),
-        tags: [["t", tag], ["s", String(i)]],
-        content,
-      },
-      sk,
-    );
-    ids.push(event.id);
-
-    const settled = await Promise.allSettled(pool.publish(RELAYS, event));
-    settled.forEach((res, idx) => {
-      if (res.status === "fulfilled") acks[RELAYS[idx]]++;
-    });
-
-    if ((i + 1) % 10 === 0) console.log(`  ${i + 1}/${EVENT_COUNT}`);
-    await sleep(SPACING_MS);
+  for (let i = resumeFrom; i < events.length; i++) {
+    await publishOne(events[i], i, acks);
+    await checkpointArtifactAtomically(journalPath, journalOf(i));
+    await onProgress?.(i, acks);
+    if (i + 1 < events.length) await sleep(spacingMs);
   }
 
   const manifest = {
@@ -102,22 +159,47 @@ async function publish() {
     kind: KIND,
     pubkey: pk,
     tag,
+    relays,
+    eventCount,
+    payloadBytes,
+    acks,
+    baselines: { ...acks },
+    ids: events.map((e) => e.id),
+  };
+  return { manifest, journalPath };
+}
+
+async function publish() {
+  if (existsSync(MANIFEST)) {
+    console.error(`${MANIFEST} exists. Refusing to republish — that would reset the clock.`);
+    console.error("Delete it deliberately only if you intend to start a new series.");
+    process.exit(1);
+  }
+
+  console.log(`publishing ${EVENT_COUNT} events, kind ${KIND}…`);
+  const pool = new SimplePool();
+  const { manifest, journalPath } = await runJournaledCohort({
+    journalPath: `${MANIFEST}.journal`,
     relays: RELAYS,
     eventCount: EVENT_COUNT,
     payloadBytes: PAYLOAD_BYTES,
-    acks,
-    baselines: { ...acks },
-    ids,
-  };
-  writeFileSync(MANIFEST, JSON.stringify(manifest, null, 2) + "\n");
+    spacingMs: SPACING_MS,
+    publishOne: async (event, _i, acks) => {
+      const settled = await Promise.allSettled(pool.publish(RELAYS, event));
+      settled.forEach((res, idx) => { if (res.status === "fulfilled") acks[RELAYS[idx]]++; });
+    },
+    onProgress: (i) => { if ((i + 1) % 10 === 0) console.log(`  ${i + 1}/${EVENT_COUNT}`); },
+  });
+  await publishArtifactAtomically(MANIFEST, JSON.stringify(manifest, null, 2) + "\n");
 
   console.log("\nACKs at publish time:");
-  for (const r of RELAYS) console.log(`  ${acks[r]}/${EVENT_COUNT}  ${r}`);
+  for (const r of RELAYS) console.log(`  ${manifest.acks[r]}/${EVENT_COUNT}  ${r}`);
   console.log(`\nmanifest written to ${MANIFEST}`);
   console.log("The secret key was NOT saved — it is not needed for read-back and has no value.");
 
   pool.close(RELAYS);
   await writeReportHeader(manifest, REPORT);
+  await unlink(journalPath).catch(() => {});
 }
 
 async function publishSlow() {
@@ -127,67 +209,31 @@ async function publishSlow() {
     process.exit(1);
   }
 
-  const sk = generateSecretKey();
-  const pk = getPublicKey(sk);
-
-  const seed = webcrypto.getRandomValues(new Uint8Array(32));
-  const digest = await webcrypto.subtle.digest("SHA-256", seed);
-  const tag = Buffer.from(digest).toString("hex");
-
-  const pool = new SimplePool();
-  const ids = [];
-  const acks = Object.fromEntries(SLOW_RELAYS.map((r) => [r, 0]));
   const slowCount = 20;
   const slowSpacingMs = 30000;
-
-  console.log(`publishing ${slowCount} events slowly (30s apart) to ${SLOW_RELAYS.length} relays, kind ${KIND}, tag ${tag.slice(0, 12)}…`);
-
-  for (let i = 0; i < slowCount; i++) {
-    const content = Buffer.from(
-      webcrypto.getRandomValues(new Uint8Array(PAYLOAD_BYTES)),
-    ).toString("base64");
-
-    const event = finalizeEvent(
-      {
-        kind: KIND,
-        created_at: Math.floor(Date.now() / 1000),
-        tags: [["t", tag], ["s", String(i)]],
-        content,
-      },
-      sk,
-    );
-    ids.push(event.id);
-
-    const settled = await Promise.allSettled(pool.publish(SLOW_RELAYS, event));
-    settled.forEach((res, idx) => {
-      if (res.status === "fulfilled") acks[SLOW_RELAYS[idx]]++;
-    });
-
-    console.log(`  [${new Date().toISOString().slice(11, 19)}] published ${i + 1}/${slowCount} -> acks: ${SLOW_RELAYS.map((r) => `${r}: ${acks[r]}`).join(", ")}`);
-    if (i + 1 < slowCount) await sleep(slowSpacingMs);
-  }
-
-  const manifest = {
-    publishedAt: Date.now(),
-    publishedAtIso: new Date().toISOString(),
-    kind: KIND,
-    pubkey: pk,
-    tag,
+  console.log(`publishing ${slowCount} events slowly (30s apart) to ${SLOW_RELAYS.length} relays, kind ${KIND}…`);
+  const pool = new SimplePool();
+  const { manifest, journalPath } = await runJournaledCohort({
+    journalPath: `${SLOW_MANIFEST}.journal`,
     relays: SLOW_RELAYS,
     eventCount: slowCount,
     payloadBytes: PAYLOAD_BYTES,
-    acks,
-    baselines: { ...acks },
-    ids,
-  };
-  writeFileSync(SLOW_MANIFEST, JSON.stringify(manifest, null, 2) + "\n");
+    spacingMs: slowSpacingMs,
+    publishOne: async (event, _i, acks) => {
+      const settled = await Promise.allSettled(pool.publish(SLOW_RELAYS, event));
+      settled.forEach((res, idx) => { if (res.status === "fulfilled") acks[SLOW_RELAYS[idx]]++; });
+    },
+    onProgress: (i, acks) => { console.log(`  [${new Date().toISOString().slice(11, 19)}] published ${i + 1}/${slowCount} -> acks: ${SLOW_RELAYS.map((r) => `${r}: ${acks[r]}`).join(", ")}`); },
+  });
+  await publishArtifactAtomically(SLOW_MANIFEST, JSON.stringify(manifest, null, 2) + "\n");
 
   console.log("\nACKs at publish time (slow cohort):");
-  for (const r of SLOW_RELAYS) console.log(`  ${acks[r]}/${slowCount}  ${r}`);
+  for (const r of SLOW_RELAYS) console.log(`  ${manifest.acks[r]}/${slowCount}  ${r}`);
   console.log(`\nmanifest written to ${SLOW_MANIFEST}`);
 
   pool.close(SLOW_RELAYS);
   await writeReportHeader(manifest, SLOW_REPORT);
+  await unlink(journalPath).catch(() => {});
 }
 
 async function publishCurrent() {
@@ -198,68 +244,32 @@ async function publishCurrent() {
   }
 
   const currentRelays = readCurrentRelays();
-  const sk = generateSecretKey();
-  const pk = getPublicKey(sk);
-
-  const seed = webcrypto.getRandomValues(new Uint8Array(32));
-  const digest = await webcrypto.subtle.digest("SHA-256", seed);
-  const tag = Buffer.from(digest).toString("hex");
-
-  const pool = new SimplePool();
-  const ids = [];
-  const acks = Object.fromEntries(currentRelays.map((r) => [r, 0]));
   const currentCount = 20;
   const currentSpacingMs = 30000;
-
-  console.log(`publishing ${currentCount} events slowly (30s apart) to current pool of ${currentRelays.length} relays (${currentRelays.join(", ")}), kind ${KIND}, tag ${tag.slice(0, 12)}…`);
-
-  for (let i = 0; i < currentCount; i++) {
-    const content = Buffer.from(
-      webcrypto.getRandomValues(new Uint8Array(PAYLOAD_BYTES)),
-    ).toString("base64");
-
-    const event = finalizeEvent(
-      {
-        kind: KIND,
-        created_at: Math.floor(Date.now() / 1000),
-        tags: [["t", tag], ["s", String(i)]],
-        content,
-      },
-      sk,
-    );
-    ids.push(event.id);
-
-    const settled = await Promise.allSettled(pool.publish(currentRelays, event));
-    settled.forEach((res, idx) => {
-      if (res.status === "fulfilled") acks[currentRelays[idx]]++;
-    });
-
-    console.log(`  [${new Date().toISOString().slice(11, 19)}] published ${i + 1}/${currentCount} -> acks: ${currentRelays.map((r) => `${r}: ${acks[r]}`).join(", ")}`);
-    if (i + 1 < currentCount) await sleep(currentSpacingMs);
-  }
-
-  const manifest = {
-    publishedAt: Date.now(),
-    publishedAtIso: new Date().toISOString(),
-    kind: KIND,
-    pubkey: pk,
-    tag,
+  console.log(`publishing ${currentCount} events slowly (30s apart) to current pool of ${currentRelays.length} relays (${currentRelays.join(", ")}), kind ${KIND}…`);
+  const pool = new SimplePool();
+  const { manifest, journalPath } = await runJournaledCohort({
+    journalPath: `${CURRENT_MANIFEST}.journal`,
     relays: currentRelays,
     eventCount: currentCount,
     payloadBytes: PAYLOAD_BYTES,
     spacingMs: currentSpacingMs,
-    acks,
-    baselines: { ...acks },
-    ids,
-  };
-  writeFileSync(CURRENT_MANIFEST, JSON.stringify(manifest, null, 2) + "\n");
+    publishOne: async (event, _i, acks) => {
+      const settled = await Promise.allSettled(pool.publish(currentRelays, event));
+      settled.forEach((res, idx) => { if (res.status === "fulfilled") acks[currentRelays[idx]]++; });
+    },
+    onProgress: (i, acks) => { console.log(`  [${new Date().toISOString().slice(11, 19)}] published ${i + 1}/${currentCount} -> acks: ${currentRelays.map((r) => `${r}: ${acks[r]}`).join(", ")}`); },
+  });
+  manifest.spacingMs = currentSpacingMs;
+  await publishArtifactAtomically(CURRENT_MANIFEST, JSON.stringify(manifest, null, 2) + "\n");
 
   console.log("\nACKs at publish time (current pool cohort):");
-  for (const r of currentRelays) console.log(`  ${acks[r]}/${currentCount}  ${r}`);
+  for (const r of currentRelays) console.log(`  ${manifest.acks[r]}/${currentCount}  ${r}`);
   console.log(`\nmanifest written to ${CURRENT_MANIFEST}`);
 
   pool.close(currentRelays);
   await writeReportHeader(manifest, CURRENT_REPORT);
+  await unlink(journalPath).catch(() => {});
 }
 
 async function queryRelay(pool, relay, m, attempts = 3) {
@@ -309,11 +319,19 @@ async function check(manifestPath = MANIFEST, reportPath = REPORT) {
   }
   pool.close(m.relays);
 
-  const date = new Date().toISOString().slice(0, 16).replace("T", " ");
-  const lines = rows
+  const date = new Date().toISOString().slice(0, 16).replace("T", " ");
+  const rowLines = rows
     .map((r) => `| ${date} | ${elapsed} | ${r.relay} | ${r.retention} | ${r.retPct} | ${r.ingest} | ${r.note} |`)
     .join("\n");
-  appendFileSync(reportPath, lines + "\n");
+  // FS-002 (T69): when the current tail of the report is a DIFFERENT table
+  // (e.g. the A13 6-column probe section appended earlier), re-emit the
+  // retention 7-column header before adding new rows so measurements are
+  // never displayed under wrong labels. Original bytes remain an exact prefix.
+  const RETENTION_HEADER = `| date (UTC) | elapsed | relay | retention | ret % | ingest | note |\n|---|---|---|---|---|---|---|`;
+  const currentReport = existsSync(reportPath) ? readFileSync(reportPath, "utf8") : "";
+  const needsHeader = !currentReport.trimEnd().endsWith("|---|---|---|---|---|---|---|") && !currentReport.split(/\r?\n/).slice(-20).some((line) => line.startsWith("| date (UTC) | elapsed | relay |"));
+  const prefix = needsHeader ? `\n${RETENTION_HEADER}\n` : "";
+  appendFileSync(reportPath, prefix + rowLines + "\n");
   console.log(`\nappended ${rows.length} rows to ${reportPath} (elapsed ${elapsed})`);
 }
 
@@ -394,7 +412,7 @@ const HARD_BLOCK_RE = /^(auth-required|blocked):/i;
  *   WARN  ≥1 accepted, but ≥1 rejected with a retryable reason
  *   FAIL  0 accepted, OR any accepted=false with a WoT/policy reason
  */
-async function vet(relay) {
+export async function vet(relay) {
   if (!relay) {
     console.error("usage: node scripts/task0-retention.mjs vet <relay-url>");
     process.exit(1);
@@ -420,7 +438,7 @@ async function vet(relay) {
       if (attempt < 3) await sleep(3000);
       else {
         console.log(`\nVERDICT: FAIL — could not open socket to ${relay}`);
-        return;
+        return "FAIL";
       }
     }
   }
@@ -477,7 +495,15 @@ async function vet(relay) {
   if (socketFail) console.log("  → Socket never opened. Relay unreachable.");
   if (verdict === "WARN") console.log("  → Partial acceptance. Investigate before adding to defaults.");
 
+  return verdict;
 }
+
+export function exitCodeForVerdict(verdict) {
+  if (verdict === "PASS") return 0;
+  if (verdict === "WARN") return 2;
+  return 1;
+}
+
 
 // NIP-11 relay information document — reads limitation.max_message_length (PRD A13).
 async function nip11(relay) {
@@ -499,28 +525,33 @@ async function nip11(relay) {
 async function batch50() {
   const relays = readCurrentRelays();
   const sk = generateSecretKey();
+  const key = await webcrypto.subtle.generateKey({ name: "AES-GCM", length: 256 }, true, ["encrypt", "decrypt"]);
   const seed = webcrypto.getRandomValues(new Uint8Array(32));
   const digest = await webcrypto.subtle.digest("SHA-256", seed);
   const tag = Buffer.from(digest).toString("hex");
 
-  console.log(`A13 batch50: ${EVENT_COUNT} events x ~${PAYLOAD_BYTES} B, kind ${KIND}, tag ${tag.slice(0, 12)}…`);
-  console.log(`relays (${relays.length}): ${relays.join(", ")}`);
-
-  const events = [];
-  for (let i = 0; i < EVENT_COUNT; i++) {
-    const content = Buffer.from(webcrypto.getRandomValues(new Uint8Array(PAYLOAD_BYTES))).toString("base64");
-    events.push(finalizeEvent(
-      { kind: KIND, created_at: Math.floor(Date.now() / 1000), tags: [["t", tag], ["s", String(i)]], content },
-      sk,
-    ));
-  }
-  const message = JSON.stringify(["EVENT", ...events]);
+  // REL-003: one production-shaped event carrying an AES-GCM-encrypted batch
+  // of EVENT_COUNT synthetic ~PAYLOAD_BYTES items — matching the real client's
+  // batching contract (src/relay/sync.ts publishBlob + nostr.ts publish: one
+  // signed event per call, content = the encrypted blob). The pre-fix
+  // version sent EVENT_COUNT separate plaintext events crammed into a single
+  // `["EVENT", e0, e1, ...]` array, which is not a valid NIP-01 client
+  // message and so measured a stimulus the real client never sends.
+  const batchEvents = Array.from({ length: EVENT_COUNT }, (_, i) => ({
+    s: i,
+    content: Buffer.from(webcrypto.getRandomValues(new Uint8Array(PAYLOAD_BYTES))).toString("base64"),
+  }));
+  const event = await buildProductionBatchEvent({ tag, sk, kind: KIND, key, events: batchEvents });
+  const message = JSON.stringify(["EVENT", event]);
   const messageBytes = Buffer.byteLength(message);
-  console.log(`single message size: ${messageBytes} bytes`);
+
+  console.log(`A13 batch50 (corrected production-shaped stimulus): one event, content = AES-GCM(${EVENT_COUNT} items x ~${PAYLOAD_BYTES} B), kind ${KIND}, tag ${tag.slice(0, 12)}…`);
+  console.log(`relays (${relays.length}): ${relays.join(", ")}`);
+  console.log(`single event message size: ${messageBytes} bytes`);
 
   const results = [];
   for (const relay of relays) {
-    const row = { relay, maxMessageLength: null, nip11Error: "", messageBytes, accepted: 0, rejected: [], socketError: "", okCount: 0 };
+    const row = { relay, maxMessageLength: null, nip11Error: "", messageBytes, accepted: false, rejectReason: "", socketError: "", okReceived: false };
 
     try {
       const info = await nip11(relay);
@@ -545,24 +576,20 @@ async function batch50() {
       continue;
     }
 
-    const oks = new Promise((resolve) => {
-      ws.onmessage = (e) => {
-        try {
-          const d = JSON.parse(e.data);
-          if (d[0] === "OK") {
-            row.okCount++;
-            if (d[2]) row.accepted++;
-            else row.rejected.push(String(d[3] ?? ""));
-          } else if (d[0] === "NOTICE") {
-            row.rejected.push(`NOTICE: ${d[1]}`);
-          } else if (d[0] === "AUTH") {
-            row.rejected.push("AUTH challenge received");
-          }
-        } catch {}
-      };
-      resolve();
-    });
-      await oks;
+    ws.onmessage = (e) => {
+      try {
+        const d = JSON.parse(e.data);
+        if (d[0] === "OK" && d[1] === event.id) {
+          row.okReceived = true;
+          if (d[2]) row.accepted = true;
+          else row.rejectReason = String(d[3] ?? "");
+        } else if (d[0] === "NOTICE") {
+          row.rejectReason = `NOTICE: ${d[1]}`;
+        } else if (d[0] === "AUTH") {
+          row.rejectReason = "AUTH challenge received";
+        }
+      } catch {}
+    };
     try {
       ws.send(message);
     } catch (err) {
@@ -573,16 +600,15 @@ async function batch50() {
     results.push(row);
     console.log(`\n${relay}:`);
     console.log(`  NIP-11 max_message_length: ${row.maxMessageLength ?? "—"}${row.nip11Error ? ` (${row.nip11Error})` : ""}`);
-    console.log(`  OK replies: ${row.okCount}/50, accepted: ${row.accepted}/50${row.socketError ? `, socket: ${row.socketError}` : ""}`);
-    for (const reason of row.rejected.slice(0, 5)) console.log(`  reject reason: "${reason}"`);
+    console.log(`  OK reply: ${row.okReceived ? "yes" : "no"}, accepted: ${row.accepted ? "yes" : "no"}${row.socketError ? `, socket: ${row.socketError}` : ""}${row.rejectReason ? `, reason: "${row.rejectReason}"` : ""}`);
   }
 
   const date = new Date().toISOString().slice(0, 16).replace("T", " ");
-  const lines = [``, `## A13 batch publish probe (PRD §12 A13)`, ``, `Measured ${date}: ${EVENT_COUNT} events x ~${PAYLOAD_BYTES} B sent as ONE WebSocket message (${messageBytes} bytes total) to the current default pool. Verbatim rejection text preserved.`, ``, `| relay | NIP-11 max_message_length | message bytes | accepted | OK replies | notes |`, `|---|---|---|---|---|---|`];
+  const lines = [``, `## A13 batch publish probe — corrected production-shaped stimulus (PRD §12 A13)`, ``, `Measured ${date}: ONE signed event whose content is an AES-GCM-encrypted batch of ${EVENT_COUNT} synthetic items (~${PAYLOAD_BYTES} B each), sent as a single valid NIP-01 ["EVENT", event] message (${messageBytes} bytes total) to the current default pool. Supersedes the pre-fix measurement below, which sent an invalid multi-event array and did not measure the real client's actual per-publish-call stimulus; that section is left unmodified as a historical record, not corrected in place. Verbatim rejection text preserved.`, ``, `| relay | NIP-11 max_message_length | message bytes | accepted | OK reply | notes |`, `|---|---|---|---|---|---|`];
   for (const r of results) {
-    const notes = [r.socketError, r.nip11Error, ...r.rejected.map((x) => `reject: "${x}"`)].filter(Boolean).join("; ")
-      || (r.okCount === 0 ? "no OK replies — message dropped without rejection text" : r.accepted === EVENT_COUNT ? "all accepted" : "partial acknowledgement without rejection text");
-    lines.push(`| ${r.relay} | ${r.maxMessageLength ?? "—"} | ${r.messageBytes} | ${r.accepted}/${EVENT_COUNT} | ${r.okCount}/${EVENT_COUNT} | ${notes} |`);
+    const notes = [r.socketError, r.nip11Error, r.rejectReason ? `reject: "${r.rejectReason}"` : ""].filter(Boolean).join("; ")
+      || (!r.okReceived ? "no OK reply — message dropped without rejection text" : r.accepted ? "accepted" : "rejected without reason text");
+    lines.push(`| ${r.relay} | ${r.maxMessageLength ?? "—"} | ${r.messageBytes} | ${r.accepted ? "yes" : "no"} | ${r.okReceived ? "yes" : "no"} | ${notes} |`);
   }
   mkdirSync(".agents", { recursive: true });
   appendFileSync(REPORT, lines.join("\n") + "\n");
@@ -617,21 +643,23 @@ Decision gates — agreed **before** seeing data (see CR-005 Task 3):
   writeFileSync(reportPath, header);
 }
 
-const cmd = process.argv[2];
-if (cmd === "publish") await publish();
-else if (cmd === "check") await check(MANIFEST, REPORT);
-else if (cmd === "probe") await probe(process.argv[3] || "wss://nos.lol");
-else if (cmd === "vet") await vet(process.argv[3]);
-else if (cmd === "publish-slow") await publishSlow();
-else if (cmd === "check-slow") await check(SLOW_MANIFEST, SLOW_REPORT);
-else if (cmd === "publish-current") await publishCurrent();
-else if (cmd === "check-current") await check(CURRENT_MANIFEST, CURRENT_REPORT);
-else if (cmd === "batch50") await batch50();
-else if (cmd === "nip11") {
-  const info = await nip11(process.argv[3] || "wss://nos.lol");
-  console.log(JSON.stringify(info));
-}
-else {
-  console.error("usage: node scripts/task0-retention.mjs <publish|check|probe <relay>|vet <relay>|batch50|nip11 <relay>|publish-slow|check-slow|publish-current|check-current>");
-  process.exit(1);
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  const cmd = process.argv[2];
+  if (cmd === "publish") await publish();
+  else if (cmd === "check") await check(MANIFEST, REPORT);
+  else if (cmd === "probe") await probe(process.argv[3] || "wss://nos.lol");
+  else if (cmd === "vet") process.exitCode = exitCodeForVerdict(await vet(process.argv[3]));
+  else if (cmd === "publish-slow") await publishSlow();
+  else if (cmd === "check-slow") await check(SLOW_MANIFEST, SLOW_REPORT);
+  else if (cmd === "publish-current") await publishCurrent();
+  else if (cmd === "check-current") await check(CURRENT_MANIFEST, CURRENT_REPORT);
+  else if (cmd === "batch50") await batch50();
+  else if (cmd === "nip11") {
+    const info = await nip11(process.argv[3] || "wss://nos.lol");
+    console.log(JSON.stringify(info));
+  }
+  else {
+    console.error("usage: node scripts/task0-retention.mjs <publish|check|probe <relay>|vet <relay>|batch50|nip11 <relay>|publish-slow|check-slow|publish-current|check-current>");
+    process.exit(1);
+  }
 }

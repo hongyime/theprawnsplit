@@ -5,6 +5,7 @@ import {
   contestedClaimPids,
   matchesPayeeClaimSignature,
   verifyConfirmation,
+  verifySettlementVoid,
   voidedEventIds,
 } from "./identity";
 import type {
@@ -13,6 +14,7 @@ import type {
   ExpenseState,
   Financials,
   FoldOptions,
+  HLC,
   Money,
   ParticipantState,
   SettlementState,
@@ -96,7 +98,7 @@ function mergePath(
   return [];
 }
 
-function settlementVoidDecisions(events: Event[]): { voided: Set<string>; anomalies: Anomaly[] } {
+function settlementVoidDecisions(events: Event[], ctx?: VerificationContext): { voided: Set<string>; anomalies: Anomaly[] } {
   const settlementBySid = new Map<string, Extract<Event, { t: "SettlementRecorded" }>>();
   const voided = new Set<string>();
   const anomalies: Anomaly[] = [];
@@ -108,7 +110,12 @@ function settlementVoidDecisions(events: Event[]): { voided: Set<string>; anomal
     if (event.t !== "SettlementVoided") continue;
     const settlement = settlementBySid.get(event.sid);
     if (!settlement) continue;
-    if (event.dev === settlement.dev) {
+    // SEC-002/T47: authorization is a genuine signature from ANY current
+    // group member (design.md §B2), verified via verifySettlementVoid --
+    // the event's own dev string (an unsigned, forgeable attribution) is
+    // NEVER consulted, closing the exact same vulnerability pattern this
+    // finding shares with SEC-001's removed bornConfirmed shortcut.
+    if (ctx && verifySettlementVoid(events, event.sid, event.pid, event.sig, ctx)) {
       voided.add(event.sid);
     } else {
       anomalies.push({
@@ -116,7 +123,7 @@ function settlementVoidDecisions(events: Event[]): { voided: Set<string>; anomal
         sid: event.sid,
         eventId: event.id,
         relatedEventId: settlement.id,
-        message: "SettlementVoided must be emitted by the device that recorded the settlement",
+        message: "SettlementVoided requires a valid signature from a current group member",
       });
     }
   }
@@ -137,11 +144,39 @@ export function fold(events: Event[], opts: FoldOptions, ctx?: VerificationConte
   });
 
   const voided = voidedEventIds(supported);
+
+  // DATA-006/B3: base currency is now versioned, replicated data, not a
+  // silent local-only mutation. GroupCreated.currency is the default; a
+  // BaseCurrencyEstablished event lets any device correct it, but ONLY
+  // before the first ExpenseAdded (by HLC) for this group — once money is
+  // flowing, the currency is permanent. The earliest-by-HLC valid
+  // correction wins; anything after the freeze point, or any additional
+  // correction beyond the first accepted one (covers two devices each
+  // proposing a correction before ever syncing), is quarantined as a
+  // conflicting anomaly rather than silently applied.
+  const groupCreatedEvent = supported.find((event): event is Event & { t: "GroupCreated" } => event.t === "GroupCreated");
+  const firstExpenseHlc = supported
+    .filter((event): event is Event & { t: "ExpenseAdded" } => event.t === "ExpenseAdded")
+    .reduce<HLC | null>((earliest, event) => (!earliest || compareHlc(event.hlc, earliest) < 0 ? event.hlc : earliest), null);
+  const currencyCorrections = supported
+    .filter((event): event is Event & { t: "BaseCurrencyEstablished" } => event.t === "BaseCurrencyEstablished" && !voided.has(event.id))
+    .sort((a, b) => compareHlc(a.hlc, b.hlc));
+  let currency = groupCreatedEvent?.currency ?? "";
+  let currencyAccepted = false;
+  for (const correction of currencyCorrections) {
+    const beforeFirstExpense = !firstExpenseHlc || compareHlc(correction.hlc, firstExpenseHlc) < 0;
+    if (!currencyAccepted && beforeFirstExpense) {
+      currency = correction.currency;
+      currencyAccepted = true;
+    } else {
+      quarantined.push(correction.id);
+    }
+  }
   if (ctx) anomalies.push(...claimAnomalies(supported, ctx));
   const contestedPids = ctx ? contestedClaimPids(supported, ctx) : new Set<string>();
   const mergeEdges = activeMergeEdges(supported);
   const markedDistinct = new Map<string, { eventId: string; a: string; b: string }>();
-  const settlementVoidDecision = settlementVoidDecisions(supported);
+  const settlementVoidDecision = settlementVoidDecisions(supported, ctx);
   anomalies.push(...settlementVoidDecision.anomalies);
   const expenseVoids = new Set<string>();
   const settlementVoids = settlementVoidDecision.voided;
@@ -151,6 +186,24 @@ export function fold(events: Event[], opts: FoldOptions, ctx?: VerificationConte
       const target = supported.find((candidate) => candidate.id === event.targetId);
       if (target?.t === "EventVoided") {
         anomalies.push({ code: "voids-void", eventId: event.id, relatedEventId: target.id, message: "EventVoided cannot be voided" });
+      }
+      // SEC-002/T47: a generic EventVoided must never be usable to clear a
+      // settlement's economic effect -- only the domain-specific signed
+      // SettlementVoided contract (verified above) can do that. This was
+      // already incidentally true (settlementVoidDecisions only ever
+      // consults its own sid-scoped set, never the generic voided set
+      // this loop is building), but that non-effect was an accident of
+      // control flow, not a documented, tested invariant. Flag it
+      // explicitly so a generic void of a settlement-related event id is
+      // always a visible anomaly, never a silent no-op someone could
+      // mistake for a successful cancellation.
+      if (target?.t === "SettlementRecorded" || target?.t === "SettlementConfirmed") {
+        anomalies.push({
+          code: "generic-void-of-settlement-event",
+          eventId: event.id,
+          relatedEventId: target.id,
+          message: "EventVoided cannot cancel a settlement's economic effect -- use a signed SettlementVoided instead",
+        });
       }
     }
     if (event.t === "ParticipantsMarkedDistinct" && !voided.has(event.id)) {
@@ -202,12 +255,27 @@ export function fold(events: Event[], opts: FoldOptions, ctx?: VerificationConte
   }
 
   for (const event of supported) {
-    if (voided.has(event.id)) continue;
+    // SEC-002/T47: SettlementRecorded/SettlementConfirmed/SettlementDisputed
+    // must NEVER be skipped via the generic EventVoided/voided set -- only
+    // the domain-specific signed SettlementVoided contract (verified
+    // separately via settlementVoidDecisions, above) may affect a
+    // settlement's derived state. Without this exemption a bare, unsigned
+    // EventVoided targeting a SettlementRecorded event's own id would make
+    // the settlement vanish from state entirely (never even added to
+    // state.settlements), a MORE severe bypass than the flagged
+    // generic-void-of-settlement-event anomaly alone would prevent.
+    const isSettlementDomainEvent =
+      event.t === "SettlementRecorded" || event.t === "SettlementConfirmed" || event.t === "SettlementDisputed";
+    if (voided.has(event.id) && !isSettlementDomainEvent) continue;
     if (event.t === "ParticipantRenamed") {
       const root = canonical(event.pid);
       const existing = participants.get(root);
-      const shouldReplace = !existing || !("renameHlc" in existing) || true;
-      if (shouldReplace) participants.set(root, { ...(existing ?? { pid: root, canonicalPid: root, devices: [], deactivated: false }), name: event.name });
+      // DEAD-001 (T71): events are sorted by eventSortKey before the fold
+      // loop, so the last ParticipantRenamed always wins. The prior
+      // `!existing || !("renameHlc" in existing) || true` predicate was
+      // unconditionally true and referenced a nonexistent `renameHlc`
+      // property; removed here so the code communicates what it does.
+      participants.set(root, { ...(existing ?? { pid: root, canonicalPid: root, devices: [], deactivated: false }), name: event.name });
     }
     if (event.t === "ParticipantDeactivated") {
       const root = canonical(event.pid);
@@ -249,18 +317,25 @@ export function fold(events: Event[], opts: FoldOptions, ctx?: VerificationConte
       expenses.set(event.xid, next);
     }
     if (event.t === "SettlementRecorded" && !settlementVoids.has(event.sid)) {
+      // SEC-001/T45: a settlement is confirmed ONLY via an explicit,
+      // genuinely signed SettlementConfirmed event (verified below) --
+      // never merely because THIS event's own dev string happens to
+      // match one of the payee's authorised devices. That unsigned
+      // device-matching shortcut ("born confirmed") was this finding's
+      // exact vulnerability: anyone with group write access could set
+      // event.dev to manufacture a trusted-looking confirmed settlement
+      // with zero real signature from the payee.
       const payeeDevices = ctx ? authorisedDevices(supported, event.to, ctx) : new Set<string>();
-      const bornConfirmed = ctx ? payeeDevices.has(event.dev) && !contestedPids.has(event.to) : false;
       const cashUnconfirmable = ctx ? payeeDevices.size === 0 : false;
       settlements.set(event.sid, {
         sid: event.sid,
         from: event.from,
         to: event.to,
         minor: event.minor,
-        confirmed: bornConfirmed,
+        confirmed: false,
         disputed: false,
         contestedConfirmation: false,
-        pending: !bornConfirmed && !cashUnconfirmable,
+        pending: !cashUnconfirmable,
         cashUnconfirmable,
       });
     }
@@ -336,8 +411,16 @@ export function fold(events: Event[], opts: FoldOptions, ctx?: VerificationConte
   }
 
   for (const settlement of settlements.values()) {
-    add(balances, canonical(settlement.to), settlement.minor);
-    add(balances, canonical(settlement.from), -settlement.minor);
+    // LOGIC-001/T48: a settlement DISCHARGES debt, it does not create a
+    // NEW one -- the payer (from, a debtor with a NEGATIVE balance) gains
+    // toward zero, and the payee (to, a creditor with a POSITIVE balance)
+    // loses toward zero. The previous code had these reversed (to gained,
+    // from lost), which DOUBLED the remaining debt instead of settling it:
+    // e.g. bob owes alice 100 (bob=-100, alice=+100); bob pays alice 100;
+    // the old code produced bob=-200, alice=+200 instead of both landing
+    // at zero.
+    add(balances, canonical(settlement.from), settlement.minor);
+    add(balances, canonical(settlement.to), -settlement.minor);
   }
 
   const balanceSum = [...balances.values()].reduce((a, b) => a + b, 0n);
@@ -362,6 +445,7 @@ export function fold(events: Event[], opts: FoldOptions, ctx?: VerificationConte
     anomalies,
     quarantined: [...new Set(quarantined)].sort(),
     frozen: quarantined.length > 0,
+    currency,
   };
 }
 

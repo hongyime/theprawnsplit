@@ -1,13 +1,17 @@
 import { openDB, type DBSchema, type IDBPDatabase } from "idb";
-import type { Event } from "@theprawnsplit/core";
+import { compareHlc, eventCounter, mergeCoverageCounter, parseEvent, type CoverageIntervals, type Event, type HLC } from "@theprawnsplit/core";
 import { bytesToHex } from "@/crypto/bytes";
 import { bigintReplacer, bigintReviver } from "@/lib/money";
 import { inferCurrency, newId } from "@/lib/ids";
 import { createGroupSecret, groupKey, groupTag, secretFromBase64, secretToBase64 } from "@/crypto/group";
 import { mintClaimKey, type ClaimAlg } from "@/crypto/claim";
 import { emptyDurabilityPromptState, normalizeDurabilityPromptState, type DurabilityPromptState } from "@/lib/durability";
+import { validateIdentityKeypair } from "@/lib/identity-backup-validation";
+import { eventFingerprint } from "@/lib/event-fingerprint";
 import type { RelaySettings } from "@/lib/relay-settings";
+import type { EndpointPolicyMap } from "@/relay/endpoint-policy";
 import type { SubgroupPreset } from "@/lib/subgroups";
+import { config } from "@/config";
 
 export interface StoredGroup {
   groupId: string;
@@ -18,6 +22,31 @@ export interface StoredGroup {
   createdAt: number;
   secretB64: string;
   tagHex: string;
+  // DATA-002: absent/undefined means linked (the normal, historical case --
+  // created via createGroup/ensureGroup with a secret that genuinely
+  // derives this tagHex). false means this group's secretB64/tagHex pair
+  // is self-consistent but NOT verified against the original trip this
+  // import came from -- it cannot decrypt or authenticate against that
+  // trip's real relay history until a verified matching seed is attached.
+  linked?: boolean;
+  // The imported file's original tagHex, retained only while linked is
+  // false, so a later attachVerifiedSeed() call can verify a supplied
+  // seed actually corresponds to the SAME trip this group was imported
+  // from, not some unrelated one.
+  sourceTagHex?: string;
+  // CONC-001: a stable-command-identity map from caller-provided commandId
+  // to the counter range reserved for it. Lets a retried command (same
+  // commandId) reuse its ORIGINAL reservation instead of allocating a new,
+  // overlapping range and creating a duplicate logical event. An unused
+  // reservation (command abandoned before appendReservedEvents ever runs)
+  // simply leaves a permanent gap in the counter sequence -- never a
+  // delivered/overwritten event, and deliberately never garbage-collected
+  // since gaps are explicitly tolerated by this finding's fix approach.
+  // LOGIC-002: each reservation also carries the HLC floor computed for
+  // it at reservation time, so a retry (same commandId) returns the
+  // EXACT same floor rather than a freshly-recomputed, later one --
+  // keeping the reservation fully idempotent end to end.
+  reservations?: Record<string, { counters: number[]; hlcFloor: HLC }>;
 }
 
 export interface StoredEvent {
@@ -38,6 +67,13 @@ export interface StoredIdentity {
   claimSkJwk: JsonWebKey;
 }
 
+
+// DATA-007: CoverageIntervals/mergeCoverageCounter live in core (see
+// core/src/transport.ts) since T43 made coverage part of the Event wire
+// format (BaseEvent.coverage) -- both the app's stamping (below) and its
+// consumption (src/lib/sync-coverage.ts) share this exact type/merge
+// semantics with core's own validator.
+
 export interface StoredMeta {
   groupId: string;
   versionVector: Record<string, number>;
@@ -51,7 +87,27 @@ export interface StoredMeta {
   syncFallbackNextId?: string;
   unsyncedSince?: number;
   relaySettings?: RelaySettings;
+  relayPolicy?: EndpointPolicyMap;
   subgroups?: SubgroupPreset[];
+  // LOGIC-002: the highest HLC ever admitted for this group (local commits
+  // AND remote syncs, but never future-buffered/dropped events). Advanced
+  // atomically alongside nextCounter during reservation, and after every
+  // remote admission -- used as a floor so a new local event's wall clock
+  // never falls behind what this device has already observed, protecting
+  // against local clock rollback and a faster peer's events.
+  observedHlc?: HLC;
+  // DATA-007: exact durable coverage, separate from versionVector/
+  // transportVector (which track TRANSPORT PROGRESS -- what counter has
+  // been OBSERVED from each author, including buffered/dropped/conflicted
+  // events that were never actually stored). coverage tracks, per author
+  // device, exactly which counters have a REAL event row durably present
+  // in the "events" store on THIS device -- as sorted, non-overlapping,
+  // inclusive [start, end] intervals, so a gap (a gate/cap/conflict that
+  // skipped one counter while later ones were genuinely admitted) is
+  // represented explicitly rather than erased by a single running max.
+  // Absent (legacy pre-fix data) means "no coverage evidence recorded
+  // yet" -- readers must treat this as unknown, never as full coverage.
+  coverage?: Record<string, CoverageIntervals>;
 }
 
 interface StoredBuffer {
@@ -200,9 +256,15 @@ export function vectorFromEvents(events: Event[]): Record<string, number> {
   return vector;
 }
 
-function withVersionVector(event: Event, current: Record<string, number>): Event {
+function withVersionVector(event: Event, current: Record<string, number>, coverage?: Record<string, CoverageIntervals>): Event {
   const nextVector = { ...current, [event.dev]: Math.max(current[event.dev] ?? 0, counterFromEvents([event])) };
-  return { ...event, vv: nextVector } as Event;
+  // DATA-007: coverage is the STAMPING device's own exact durable-
+  // retention snapshot (never mere transport progress like nextVector),
+  // attached as an additional, optional, unsigned wire field so peers
+  // can tell genuine possession apart from mere observation. Omitted
+  // entirely (not set to undefined) when the caller has none to offer,
+  // matching exactOptionalPropertyTypes and vv's own optional pattern.
+  return { ...event, vv: nextVector, ...(coverage ? { coverage } : {}) } as Event;
 }
 
 async function ensureSecrets(group: Partial<StoredGroup> & Omit<StoredGroup, "secretB64" | "tagHex">): Promise<StoredGroup> {
@@ -215,14 +277,21 @@ async function ensureSecrets(group: Partial<StoredGroup> & Omit<StoredGroup, "se
 
 async function ensureMeta(group: StoredGroup, events: Event[]): Promise<StoredMeta> {
   const database = await db();
-  const existing = await database.get("meta", group.groupId);
+  // CONC-002: read-then-write must be one transaction, not two separate
+  // database.get/database.put calls — otherwise a concurrent field-scoped
+  // writer (e.g. updateMeta committing a settings change) can land in the
+  // gap between this function's read and write, and get silently clobbered
+  // when this function's write lands using its now-stale snapshot.
+  const tx = database.transaction("meta", "readwrite");
+  const existing = await tx.store.get(group.groupId);
   if (existing) {
     const normalized = {
       ...existing,
       durability: normalizeDurabilityPromptState(existing.durability),
       nostrSk: normalizeNostrSecretHex(existing.nostrSk),
     };
-    if (!existing.durability || normalized.nostrSk !== existing.nostrSk) await database.put("meta", normalized);
+    if (!existing.durability || normalized.nostrSk !== existing.nostrSk) await tx.store.put(normalized);
+    await tx.done;
     return normalized;
   }
   const meta: StoredMeta = {
@@ -232,7 +301,8 @@ async function ensureMeta(group: StoredGroup, events: Event[]): Promise<StoredMe
     cursors: {},
     nostrSk: createNostrSecretHex(),
   };
-  await database.put("meta", meta);
+  await tx.store.put(meta);
+  await tx.done;
   return meta;
 }
 
@@ -391,7 +461,29 @@ export async function readGroup(groupId: string): Promise<GroupRecord> {
 
 export async function saveGroup(group: StoredGroup): Promise<void> {
   const database = await db();
-  await database.put("groups", group);
+  // PERF-003: callers (Trip.svelte's renameGroup/setCurrency/commit) routinely
+  // spread the full hydrated GroupRecord and pass it straight through. Only
+  // ever persist the bare StoredGroup shape here, never duplicate the
+  // authoritative events/meta/identity stores into this row.
+  const persisted: StoredGroup = {
+    groupId: group.groupId,
+    name: group.name,
+    currency: group.currency,
+    deviceId: group.deviceId,
+    nextCounter: group.nextCounter,
+    createdAt: group.createdAt,
+    secretB64: group.secretB64,
+    tagHex: group.tagHex,
+  };
+  // DATA-002: linked/sourceTagHex are optional and must only be assigned
+  // when actually present -- exactOptionalPropertyTypes forbids explicit
+  // undefined, and omitting them here (rather than always spreading) is
+  // exactly what would silently "relink" an unlinked group on its next
+  // unrelated save (rename, currency change, commit).
+  if (group.linked !== undefined) persisted.linked = group.linked;
+  if (group.sourceTagHex !== undefined) persisted.sourceTagHex = group.sourceTagHex;
+  if (group.reservations !== undefined) persisted.reservations = group.reservations;
+  await database.put("groups", persisted);
 }
 
 export async function appendEvents(groupId: string, events: Event[]): Promise<GroupRecord> {
@@ -413,23 +505,164 @@ export async function appendEvents(groupId: string, events: Event[]): Promise<Gr
   return readGroup(groupId);
 }
 
+export interface EventReservation {
+  deviceId: string;
+  counters: number[];
+  hlcFloor: HLC;
+}
+
+// LOGIC-002: computes the next observed-HLC floor for a NEW local
+// reservation. Mirrors core/src/hlc.ts's receive() semantics (never move
+// wall time backward; bump ctr when wall doesn't advance) but always
+// stamps THIS device's id, since "current" may be a floor most recently
+// advanced by an observed REMOTE peer's event, not a true local clock.
+function advanceObservedHlc(current: HLC | undefined, deviceId: string, now: number): HLC {
+  if (!current) return { wall: now, ctr: 0, dev: deviceId };
+  const wall = Math.max(now, current.wall);
+  const ctr = wall === current.wall ? current.ctr + 1 : 0;
+  return { wall, ctr, dev: deviceId };
+}
+
+// CONC-001: two-phase event creation. Reserve counters atomically FIRST
+// (fast, transactional, no signing/construction work happens inside this
+// transaction), build and sign the actual events OUTSIDE any transaction
+// (this can take arbitrary time -- e.g. async crypto signing -- without
+// ever holding a transaction open), then insert them via
+// appendReservedEvents (collision-safe, using add() not put()). A retried
+// command (same commandId) reuses its ORIGINAL reservation instead of a
+// fresh, overlapping one -- so retries never duplicate a logical event
+// under two different ids, and two concurrent callers can never receive
+// overlapping counter ranges regardless of how their construction/signing
+// work interleaves afterward.
+//
+// LOGIC-002: also atomically advances the group's persisted observed HLC
+// (StoredMeta.observedHlc) and returns it as hlcFloor, so the built
+// event's wall clock can never fall behind what this device has already
+// observed (its own prior events or synced remote ones).
+export async function reserveEventIds(groupId: string, commandId: string, count: number): Promise<EventReservation> {
+  const database = await db();
+  const tx = database.transaction(["groups", "meta"], "readwrite");
+  const group = await tx.objectStore("groups").get(groupId);
+  if (!group) throw new Error("Group not found");
+  const existing = group.reservations?.[commandId];
+  if (existing) {
+    await tx.done;
+    return { deviceId: group.deviceId, counters: existing.counters, hlcFloor: existing.hlcFloor };
+  }
+  const counters = Array.from({ length: count }, (_, index) => group.nextCounter + index);
+  const meta =
+    (await tx.objectStore("meta").get(groupId)) ??
+    ({ groupId, versionVector: {}, discardVector: {}, cursors: {}, nostrSk: createNostrSecretHex() } satisfies StoredMeta);
+  const hlcFloor = advanceObservedHlc(meta.observedHlc, group.deviceId, Date.now());
+  const nextGroup: StoredGroup = {
+    ...group,
+    nextCounter: group.nextCounter + count,
+    reservations: { ...group.reservations, [commandId]: { counters, hlcFloor } },
+  };
+  await tx.objectStore("groups").put(nextGroup);
+  await tx.objectStore("meta").put({ ...meta, observedHlc: hlcFloor });
+  await tx.done;
+  return { deviceId: group.deviceId, counters, hlcFloor };
+}
+
+// Appends events built from a reservation's counters. Uses add() (not
+// put()) so a genuine id collision -- which reservation should prevent,
+// but this is the defensive backstop -- throws instead of silently
+// overwriting unrelated content. Clears the now-delivered command's
+// reservation entry on success (an unconsumed reservation, e.g. an
+// abandoned command, is left in place forever -- a permanent gap, never
+// re-issued to a different command, and never treated as delivered).
+export async function appendReservedEvents(groupId: string, commandId: string, events: Event[]): Promise<GroupRecord> {
+  const database = await db();
+  const tx = database.transaction(["groups", "events", "meta"], "readwrite");
+  try {
+    const group = await tx.objectStore("groups").get(groupId);
+    if (!group) throw new Error("Group not found");
+    const meta =
+      (await tx.objectStore("meta").get(groupId)) ??
+      ({ groupId, versionVector: {}, discardVector: {}, cursors: {}, nostrSk: createNostrSecretHex() } satisfies StoredMeta);
+    for (const event of events) {
+      // DATA-007: compute the self-inclusive coverage snapshot BEFORE
+      // stamping/storing, so the outgoing event's own .coverage field
+      // already reflects this device's durable retention of THIS event
+      // (trivially true the instant it is admitted) rather than lagging
+      // one event behind. Only committed to meta.coverage AFTER the
+      // add() below actually succeeds -- never for a buffered/dropped/
+      // conflicted/rejected event, and never merely because a counter
+      // was reserved.
+      const nextCoverage = { ...meta.coverage, [event.dev]: mergeCoverageCounter(meta.coverage?.[event.dev] ?? [], eventCounter(event)) };
+      const stamped = withVersionVector(event, meta.versionVector, nextCoverage);
+      await tx.objectStore("events").add({ groupId, eventId: stamped.id, eventJson: encodeEvent(stamped), syncState: "local" });
+      meta.versionVector[stamped.dev] = Math.max(meta.versionVector[stamped.dev] ?? 0, counterFromEvents([stamped]));
+      meta.unsyncedSince ??= Date.now();
+      meta.coverage = nextCoverage;
+    }
+    if (group.reservations && commandId in group.reservations) {
+      const { [commandId]: _removed, ...rest } = group.reservations;
+      await tx.objectStore("groups").put({ ...group, reservations: rest });
+    }
+    await tx.objectStore("meta").put(meta);
+    await tx.done;
+  } catch (err) {
+    // A failed request (e.g. add()'s ConstraintError on a genuine id
+    // collision) aborts the whole transaction automatically; tx.done will
+    // separately reject with that abort once it fires. Await-and-swallow
+    // it here so it never surfaces as an unhandled rejection, then
+    // rethrow the ORIGINAL, more specific error to the caller.
+    await tx.done.catch(() => undefined);
+    throw err;
+  }
+  return readGroup(groupId);
+}
+
 export async function replaceFromExport(exported: TripLedgerExport): Promise<GroupRecord> {
   if (exported.type !== "TripLedgerExport" || exported.version !== 1) throw new Error("Unsupported export");
   const database = await db();
+  const groups = await database.getAll("groups");
+  const tagHex = exported.group.tagHex;
+  const existingByTag = groups.find((candidate) => candidate.tagHex === tagHex);
+  const collidingById = groups.find((candidate) => candidate.groupId === exported.group.groupId && candidate.tagHex !== tagHex);
+  // DATA-001: a local groupId reused by an import file for a DIFFERENT
+  // trip (a stale/corrupted/crafted export) must never be treated as an
+  // update to that unrelated local trip. groupId is only a local primary
+  // key; tagHex is a trip's real cryptographic identity.
+  if (collidingById) throw new Error("Import artifact's group id collides with a different local trip's identity; refusing to overwrite it");
+
+  if (existingByTag) {
+    // DATA-001: the same trip already exists locally (matched by its real
+    // identity, tagHex) — union the imported events into it rather than
+    // deleting and replacing anything. Reuses this group's own secret,
+    // deviceId, outbox and meta (cursors, version vector, durability
+    // state) untouched; upsertRemoteEvents already provides transactional,
+    // content-fingerprint-aware conflict detection (DATA-005) for exactly
+    // this kind of union, so a genuinely conflicting same-id event still
+    // rejects the whole import rather than silently picking a winner.
+    await upsertRemoteEvents(existingByTag.groupId, exported.events);
+    return readGroup(existingByTag.groupId);
+  }
+
+  // No local trip matches this tag at all: create an isolated new local
+  // group. DATA-002: the export never carries a secret (by design), so
+  // there is no way to verify this device actually holds the real trip's
+  // key material. A fresh secret is generated for this NEW group's OWN
+  // identity -- its tagHex is derived FROM that fresh secret, never reused
+  // from the import file, so the stored tag/secret pair is always self-
+  // consistent. The group is marked explicitly unlinked/offline; the
+  // import file's original tag is retained as sourceTagHex so a later
+  // attachVerifiedSeed() call can verify a supplied seed genuinely
+  // corresponds to the SAME trip this import came from.
   const secret = createGroupSecret();
   const group: StoredGroup = {
     ...exported.group,
     secretB64: secretToBase64(secret),
-    tagHex: exported.group.tagHex || (await groupTag(secret)),
+    tagHex: await groupTag(secret),
     deviceId: newId("d"),
     nextCounter: exported.events.length + 1,
+    linked: false,
+    sourceTagHex: tagHex,
   };
   const tx = database.transaction(["groups", "events", "meta"], "readwrite");
   await tx.objectStore("groups").put(group);
-  const index = tx.objectStore("events").index("byGroup");
-  for (const cursor of await index.getAllKeys(group.groupId)) {
-    await tx.objectStore("events").delete(cursor as [string, string]);
-  }
   for (const event of exported.events) {
     await tx.objectStore("events").put({ groupId: group.groupId, eventId: event.id, eventJson: encodeEvent(event), syncState: "local" });
   }
@@ -445,6 +678,28 @@ export async function replaceFromExport(exported: TripLedgerExport): Promise<Gro
   return readGroup(group.groupId);
 }
 
+// DATA-002: upgrades an explicitly unlinked/offline group (created by
+// replaceFromExport when no local trip matched the import's tag) to a
+// fully linked one, once the caller supplies a seed that genuinely
+// corresponds to the SAME trip this group was imported from. Never
+// silently replaces an already-linked group's key material, and never
+// trusts a seed's claimed tagHex without independently deriving it from
+// the seed's own secret first.
+export async function attachVerifiedSeed(groupId: string, seed: Pick<JoinSeed, "secretB64" | "tagHex">): Promise<GroupRecord> {
+  const database = await db();
+  const group = await database.get("groups", groupId);
+  if (!group) throw new Error("Group not found");
+  if (group.linked !== false) throw new Error("This trip already has verified key material; refusing to replace it");
+  const secret = secretFromBase64(seed.secretB64);
+  const derivedTag = await groupTag(secret);
+  if (derivedTag !== seed.tagHex || derivedTag !== group.sourceTagHex) {
+    throw new Error("Provided seed does not match the trip this import came from");
+  }
+  const linked: StoredGroup = { ...group, secretB64: seed.secretB64, tagHex: derivedTag, linked: true };
+  delete linked.sourceTagHex;
+  await saveGroup(linked);
+  return readGroup(groupId);
+}
 export function createExport(group: GroupRecord): TripLedgerExport {
   return {
     type: "TripLedgerExport",
@@ -526,13 +781,16 @@ function assertImportGroup(value: unknown): void {
 
 function assertImportEvents(value: unknown): void {
   if (!Array.isArray(value)) throw new Error("Import artifact is missing events");
+  // DATA-003: delegate to core's full per-variant parser instead of only
+  // checking BaseEvent-shaped fields. A future-schema-version event is
+  // accepted (it round-trips verbatim under quarantine at fold time); any
+  // other parse failure — including a known variant with a malformed
+  // type-specific field, or an HLC that passes typeof==='number' but is
+  // NaN/Infinity/negative — rejects the whole import, matching this
+  // function's existing all-or-nothing contract.
   for (const event of value) {
-    if (!isRecord(event) || typeof event.t !== "string" || typeof event.id !== "string" || typeof event.dev !== "string" || typeof event.v !== "number") {
-      throw new Error("Import artifact contains malformed events");
-    }
-    if (!isRecord(event.hlc) || typeof event.hlc.wall !== "number" || typeof event.hlc.ctr !== "number" || typeof event.hlc.dev !== "string") {
-      throw new Error("Import artifact contains malformed events");
-    }
+    const result = parseEvent(event, { supportedVersion: config.schemaVersion });
+    if (result.kind === "invalid") throw new Error("Import artifact contains malformed events");
   }
 }
 
@@ -576,11 +834,36 @@ export async function restoreIdentityBackup(backup: DeviceIdentityBackup): Promi
   if (!group) throw new Error("Import the matching TripLedgerExport or open the join link before restoring identity");
   if (group.tagHex !== backup.tagHex) throw new Error("Identity backup does not match this trip");
 
-  const tx = database.transaction(["identity"], "readwrite");
+  // DATA-003: prove every candidate keypair actually imports under its
+  // declared algorithm and that claimSkJwk/claimPkJwk correspond to the
+  // same real keypair (not merely record-shaped) BEFORE opening any IDB
+  // transaction — crypto.subtle work is async, and awaiting it inside a
+  // transaction can close the transaction before the write finishes (the
+  // same hazard ensureGroup's own comment documents for group creation).
   for (const identity of backup.identities) {
-    await tx.objectStore("identity").put({ ...identity, groupId: group.groupId });
+    const result = await validateIdentityKeypair(identity);
+    if (!result.ok) throw new Error(`Identity backup contains an invalid keypair (${result.reason})`);
   }
-  await tx.done;
+
+  const tx = database.transaction(["identity"], "readwrite");
+  try {
+    for (const identity of backup.identities) {
+      // Recheck the target identity inside the write transaction: if this
+      // pid's identity was concurrently replaced with different key
+      // material after the async validation above started, do not
+      // silently overwrite it with a backup validated against stale state.
+      const existing = await tx.objectStore("identity").get([group.groupId, identity.pid]);
+      if (existing && (existing.claimPk !== identity.claimPk || existing.alg !== identity.alg)) {
+        throw new Error("Identity backup conflicts with identity material written after validation began");
+      }
+      await tx.objectStore("identity").put({ ...identity, groupId: group.groupId });
+    }
+    await tx.done;
+  } catch (error) {
+    try { tx.abort(); } catch { /* The transaction may already be aborted. */ }
+    await tx.done.catch(() => {});
+    throw error;
+  }
   return readGroup(group.groupId);
 }
 
@@ -660,6 +943,18 @@ export async function dueBufferedEvents(groupId: string, now = Date.now()): Prom
   return rows.filter((row) => row.retryAt <= now).map((row) => decodeEvent(row.eventJson));
 }
 
+// PERF-001: every buffer row's event id for this group, due or not -- used
+// by callers to (a) derive existingBufferedCount (this set's size MINUS
+// however many of those ids they are about to pull out and re-evaluate via
+// dueBufferedEvents, since those are being re-processed, not still held),
+// and (b) exclude a re-delivered not-yet-due id from `incoming` so a
+// redundant re-buffer of the SAME row never double-counts against the cap.
+export async function bufferedEventIds(groupId: string): Promise<Set<string>> {
+  const database = await db();
+  const rows = await database.getAllFromIndex("buffer", "byGroup", groupId);
+  return new Set(rows.map((row) => row.eventId));
+}
+
 export async function putBufferedEvents(groupId: string, events: { event: Event; retryAt: number }[]): Promise<void> {
   if (events.length === 0) return;
   const database = await db();
@@ -684,8 +979,14 @@ export async function updateTransportVectors(
   discardVector: Record<string, number>,
 ): Promise<void> {
   const database = await db();
-  const meta = await database.get("meta", groupId);
-  if (!meta) return;
+  // CONC-002: one transaction, not separate get/put calls (see ensureMeta's
+  // comment for why).
+  const tx = database.transaction("meta", "readwrite");
+  const meta = await tx.store.get(groupId);
+  if (!meta) {
+    await tx.done;
+    return;
+  }
   const mergedVersion = { ...meta.versionVector };
   for (const [dev, counter] of Object.entries(transportVector)) {
     mergedVersion[dev] = Math.max(mergedVersion[dev] ?? 0, counter);
@@ -694,20 +995,73 @@ export async function updateTransportVectors(
   for (const [dev, counter] of Object.entries(discardVector)) {
     mergedDiscard[dev] = Math.max(mergedDiscard[dev] ?? 0, counter);
   }
-  await database.put("meta", { ...meta, versionVector: mergedVersion, discardVector: mergedDiscard, lastSyncAt: Date.now() });
+  await tx.store.put({ ...meta, versionVector: mergedVersion, discardVector: mergedDiscard, lastSyncAt: Date.now() });
+  await tx.done;
+}
+
+// DATA-005: thrown by upsertRemoteEvents when an incoming event shares an id
+// with an already-stored event but has different content. Carries both
+// sides so a caller can log/surface them for explicit reconciliation rather
+// than the batch's cursor/checkpoint silently advancing past the conflict.
+export class EventIdentityConflictError extends Error {
+  constructor(
+    public readonly groupId: string,
+    public readonly eventId: string,
+    public readonly existing: Event,
+    public readonly incoming: Event,
+  ) {
+    super(`Event ${eventId} in group ${groupId} has conflicting content across replicas`);
+    this.name = "EventIdentityConflictError";
+  }
+}
+
+// DATA-005: resolve every conflict check (including the crypto-heavy
+// fingerprint hashes) BEFORE opening any write transaction at all -- NOT
+// merely before issuing any write within an already-open one.
+// crypto.subtle.digest (via eventFingerprint) is a real async operation;
+// awaiting it while an IDB transaction is open can let the transaction
+// auto-deactivate under load (InvalidStateError on the next objectStore()
+// call), the same hazard ensureGroup's own comment documents for crypto
+// work generally. database.get() below uses its own short-lived internal
+// transaction per call, never held open across the fingerprint awaits.
+//
+// Shared by upsertRemoteEvents and (T41/INTR-001) by both sync paths
+// before they build a promoteLedger() call, so the SAME conflict contract
+// applies regardless of which atomic-write path ultimately inserts the
+// returned events.
+export async function resolveIncomingEventConflicts(groupId: string, events: Event[]): Promise<Event[]> {
+  const database = await db();
+  const toInsert: Event[] = [];
+  for (const event of events) {
+    const existingRow = await database.get("events", [groupId, event.id]);
+    if (!existingRow) {
+      toInsert.push(event);
+      continue;
+    }
+    const existingEvent = decodeEvent(existingRow.eventJson);
+    const [existingFingerprint, incomingFingerprint] = await Promise.all([
+      eventFingerprint(existingEvent),
+      eventFingerprint(event),
+    ]);
+    if (existingFingerprint !== incomingFingerprint) {
+      throw new EventIdentityConflictError(groupId, event.id, existingEvent, event);
+    }
+    // Identical content already stored under this id -- a true repeat, not
+    // a conflict. Idempotent no-op, matching this function's existing
+    // "skip an id we already have" contract for the non-conflicting case.
+  }
+  return toInsert;
 }
 
 export async function upsertRemoteEvents(groupId: string, events: Event[], cursorUpdates: Record<string, string> = {}): Promise<number> {
   const database = await db();
+  const toInsert = await resolveIncomingEventConflicts(groupId, events);
   const tx = database.transaction(["events", "meta"], "readwrite");
   let added = 0;
   try {
-    for (const event of events) {
-      const key: [string, string] = [groupId, event.id];
-      if (!(await tx.objectStore("events").get(key))) {
-        await tx.objectStore("events").put({ groupId, eventId: event.id, eventJson: encodeEvent(event), syncState: "confirmed", publishedAt: Date.now() });
-        added += 1;
-      }
+    for (const event of toInsert) {
+      await tx.objectStore("events").put({ groupId, eventId: event.id, eventJson: encodeEvent(event), syncState: "confirmed", publishedAt: Date.now() });
+      added += 1;
     }
     const meta = await tx.objectStore("meta").get(groupId);
     if (meta) {
@@ -715,8 +1069,20 @@ export async function upsertRemoteEvents(groupId: string, events: Event[], curso
       for (const [dev, counter] of Object.entries(vectorFromEvents(events))) {
         mergedVector[dev] = Math.max(mergedVector[dev] ?? 0, counter);
       }
-      await tx.objectStore("meta").put({ ...meta, versionVector: mergedVector,
-        cursors: { ...meta.cursors, ...cursorUpdates }, lastSyncAt: Date.now() });
+      // LOGIC-002: a synced remote event's HLC is a genuinely OBSERVED
+      // clock (this reached admission, unlike a future-buffered or
+      // dropped one) -- advance the persisted floor so this device's
+      // NEXT local event can never sort before it. exactOptionalPropertyTypes
+      // forbids assigning an explicit undefined, so only set the field when
+      // a value (existing or newly observed) actually exists.
+      const nextObservedHlc = toInsert.reduce<HLC | undefined>(
+        (max, event) => (!max || compareHlc(event.hlc, max) > 0 ? event.hlc : max),
+        meta.observedHlc,
+      );
+      const nextMeta: StoredMeta = { ...meta, versionVector: mergedVector,
+        cursors: { ...meta.cursors, ...cursorUpdates }, lastSyncAt: Date.now() };
+      if (nextObservedHlc !== undefined) nextMeta.observedHlc = nextObservedHlc;
+      await tx.objectStore("meta").put(nextMeta);
     }
     await tx.done;
   } catch (error) {
@@ -728,6 +1094,79 @@ export async function upsertRemoteEvents(groupId: string, events: Event[], curso
   return added;
 }
 
+export interface LedgerPromotionInput {
+  admitted: Event[];
+  promotedBufferIds: string[];
+  newlyBuffered: { event: Event; retryAt: number }[];
+  transportVector: Record<string, number>;
+  discardVector: Record<string, number>;
+  cursorUpdates?: Record<string, string>;
+}
+
+// INTR-001: one atomic transaction for admitted event rows, promoted-buffer
+// removal, newly-buffered additions, and vector/cursor/observedHlc
+// metadata -- so a crash or other interruption at ANY point leaves each
+// event either still safely retained in the buffer store or fully admitted
+// into the events store, never removed from the buffer without having
+// been durably admitted (the exact root cause: buffer removal previously
+// committed in its OWN separate transaction, before event insertion and
+// related metadata in LATER separate transactions -- a crash in between
+// could permanently lose the only retained copy of an event that had
+// already been buffered past its originating relay page's cursor).
+export async function promoteLedger(groupId: string, input: LedgerPromotionInput): Promise<GroupRecord> {
+  const database = await db();
+  const tx = database.transaction(["events", "buffer", "meta"], "readwrite");
+  try {
+    for (const eventId of input.promotedBufferIds) {
+      await tx.objectStore("buffer").delete([groupId, eventId]);
+    }
+    for (const { event, retryAt } of input.newlyBuffered) {
+      await tx.objectStore("buffer").put({ groupId, eventId: event.id, eventJson: encodeEvent(event), retryAt });
+    }
+    const meta =
+      (await tx.objectStore("meta").get(groupId)) ??
+      ({ groupId, versionVector: {}, discardVector: {}, cursors: {}, nostrSk: createNostrSecretHex() } satisfies StoredMeta);
+    for (const event of input.admitted) {
+      await tx.objectStore("events").put({ groupId, eventId: event.id, eventJson: encodeEvent(event), syncState: "confirmed", publishedAt: Date.now() });
+      // DATA-007: only an event that was actually admitted into the events
+      // store here earns durable-coverage credit -- never a buffered,
+      // dropped, or fingerprint-conflicted one (those never reach
+      // input.admitted at all; see resolveIncomingEventConflicts).
+      meta.coverage = { ...meta.coverage, [event.dev]: mergeCoverageCounter(meta.coverage?.[event.dev] ?? [], eventCounter(event)) };
+    }
+    const mergedVector = { ...meta.versionVector };
+    for (const [dev, counter] of Object.entries(input.transportVector)) {
+      mergedVector[dev] = Math.max(mergedVector[dev] ?? 0, counter);
+    }
+    const mergedDiscard = { ...meta.discardVector };
+    for (const [dev, counter] of Object.entries(input.discardVector)) {
+      mergedDiscard[dev] = Math.max(mergedDiscard[dev] ?? 0, counter);
+    }
+    // LOGIC-002: an admitted event's HLC is a genuinely observed clock;
+    // exactOptionalPropertyTypes forbids an explicit undefined, so only
+    // set the field when a value (existing or newly observed) exists.
+    const nextObservedHlc = input.admitted.reduce<HLC | undefined>(
+      (max, event) => (!max || compareHlc(event.hlc, max) > 0 ? event.hlc : max),
+      meta.observedHlc,
+    );
+    const nextMeta: StoredMeta = {
+      ...meta,
+      versionVector: mergedVector,
+      discardVector: mergedDiscard,
+      cursors: { ...meta.cursors, ...input.cursorUpdates },
+      lastSyncAt: Date.now(),
+    };
+    if (nextObservedHlc !== undefined) nextMeta.observedHlc = nextObservedHlc;
+    await tx.objectStore("meta").put(nextMeta);
+    await tx.done;
+  } catch (err) {
+    try { tx.abort(); } catch { /* The transaction may already be aborted. */ }
+    await tx.done.catch(() => undefined);
+    throw err;
+  }
+  return readGroup(groupId);
+}
+
 export async function saveMeta(meta: StoredMeta): Promise<void> {
   const database = await db();
   await database.put("meta", meta);
@@ -735,17 +1174,32 @@ export async function saveMeta(meta: StoredMeta): Promise<void> {
 
 export async function markSnapshotPublished(groupId: string, seq: number): Promise<void> {
   const database = await db();
-  const meta = await database.get("meta", groupId);
-  if (!meta) return;
-  await database.put("meta", { ...meta, lastSnapshotSeq: Math.max(meta.lastSnapshotSeq ?? 0, seq), lastSyncAt: Date.now() });
+  // CONC-002: one transaction, not separate get/put calls (see ensureMeta's
+  // comment for why).
+  const tx = database.transaction("meta", "readwrite");
+  const meta = await tx.store.get(groupId);
+  if (!meta) {
+    await tx.done;
+    return;
+  }
+  await tx.store.put({ ...meta, lastSnapshotSeq: Math.max(meta.lastSnapshotSeq ?? 0, seq), lastSyncAt: Date.now() });
+  await tx.done;
 }
 
 export async function ensureClaimIdentity(group: GroupRecord, pid: string): Promise<StoredIdentity> {
   const database = await db();
-  const existing = await database.get("identity", [group.groupId, pid]);
-  if (existing) return existing;
+  // CONC-003: mint the candidate key BEFORE opening any transaction --
+  // mintClaimKey does real async crypto.subtle work, and awaiting unrelated
+  // work inside a transaction can close it before the recheck-and-write
+  // finish (same principle as ensureGroup's own comment above). Then
+  // recheck-and-insert-or-return within ONE transaction so two concurrent
+  // callers can never each persist a DIFFERENT key for the same pid --
+  // whichever transaction commits first wins, and the loser returns that
+  // winner's identity instead of its own now-discarded candidate. Callers
+  // must sign only with the returned identity (already the case for every
+  // caller in Trip.svelte), never with the locally-minted key directly.
   const key = await mintClaimKey();
-  const identity: StoredIdentity = {
+  const candidate: StoredIdentity = {
     groupId: group.groupId,
     pid,
     deviceId: group.deviceId,
@@ -754,8 +1208,15 @@ export async function ensureClaimIdentity(group: GroupRecord, pid: string): Prom
     claimPkJwk: key.publicJwk,
     claimSkJwk: key.privateJwk,
   };
-  await database.put("identity", identity);
-  return identity;
+  const tx = database.transaction("identity", "readwrite");
+  const existing = await tx.store.get([group.groupId, pid]);
+  if (existing) {
+    await tx.done;
+    return existing;
+  }
+  await tx.store.put(candidate);
+  await tx.done;
+  return candidate;
 }
 
 export async function getGroupCrypto(group: GroupRecord): Promise<{ secret: Uint8Array; key: CryptoKey }> {

@@ -3,26 +3,28 @@ import { admitTransportEvents, canonicalState, fold } from "@theprawnsplit/core"
 import { config } from "@/config";
 import {
   dueBufferedEvents,
+  bufferedEventIds,
   getGroupCrypto,
   confirmedEvents,
   markSnapshotPublished,
   markEvents,
   pendingOutboundEventRows,
-  putBufferedEvents,
+  promoteLedger,
   readGroup,
-  removeBufferedEvents,
+  resolveIncomingEventConflicts,
   updateMeta,
   updateTransportVectors,
-  upsertRemoteEvents,
   vectorFromEvents,
   type GroupRecord,
 } from "@/db/repo";
 import { decryptEnvelope, encryptEnvelope, encryptEvents, type SnapshotEnvelope } from "@/crypto/envelope";
 import { relayWriteProof } from "@/crypto/group";
 import { normalizeRelaySettings } from "@/lib/relay-settings";
+import { eventFingerprint } from "@/lib/event-fingerprint";
 import { HttpRelay } from "./http";
 import { NostrRelay } from "./nostr";
 import { classifyRelayIssue, isDuplicateRelayAck } from "./diagnostics";
+import { applyDiagnosticToPolicy, isEndpointAvailable, markEndpointSuccess, resetEndpointPolicy, type EndpointPolicyMap } from "./endpoint-policy";
 import { BATCH_SAFETY_MARGIN_BYTES, fitCountWithinLimit, projectBatchSize, resolveMessageLimit } from "./batch-limits";
 import { fetchMaxMessageLength } from "./nip11";
 import type { Relay, SyncResult } from "./types";
@@ -49,6 +51,20 @@ export function publishQuorumReached(ackCount: number, ackQuorum = config.ackQuo
   return ackCount >= ackQuorum;
 }
 
+// REL-002: a reset is explicit -- never triggered automatically by the mere
+// passage of time, a later successful-looking retry, or a relay-settings
+// change. Clears a demoted/backed-off endpoint's accumulated policy back to
+// a clean slate WITHOUT touching the user-configured endpoint list itself;
+// pass no endpointKey to reset every tracked endpoint for this group at once.
+export async function resetRelayEndpoint(groupId: string, endpointKey?: string): Promise<void> {
+  await updateMeta(groupId, (meta) => {
+    if (!endpointKey) return { ...meta, relayPolicy: {} };
+    const relayPolicy = { ...(meta.relayPolicy ?? {}) };
+    relayPolicy[endpointKey] = resetEndpointPolicy();
+    return { ...meta, relayPolicy };
+  });
+}
+
 export function relayFetchPlans(group: GroupRecord, relayName: string): RelayFetchPlan[] {
   if (group.events.length === 0) {
     return [{ cursorKey: `${relayName}:topic`, opts: { limit: FETCH_LIMIT } }];
@@ -61,20 +77,69 @@ export function relayFetchPlans(group: GroupRecord, relayName: string): RelayFet
   return [{ cursorKey, opts: fetchOpts(group.meta.cursors[cursorKey]) }];
 }
 
-export function createRelays(group: GroupRecord): Relay[] {
+export function createRelays(group: GroupRecord, now = Date.now()): Relay[] {
   const relaySettings = normalizeRelaySettings(group.meta.relaySettings, {
     operatedEndpoint: config.relayEndpoint,
     nostrRelays: config.nostrRelays,
   });
   group.meta.relaySettings = relaySettings;
+  const policy = group.meta.relayPolicy ?? {};
   const relays: Relay[] = [];
-  if (relaySettings.useOperated) relays.push(new HttpRelay(relaySettings.operatedEndpoint));
+  // REL-002: a backed-off/dropped operated endpoint is simply not
+  // instantiated this cycle -- exactly like the existing useOperated=false
+  // toggle already causes -- so every downstream quorum computation (which
+  // already derives its expectations purely from relays.length) adapts
+  // correctly with zero changes to that logic.
+  if (relaySettings.useOperated && isEndpointAvailable(policy["operated"], now)) {
+    relays.push(new HttpRelay(relaySettings.operatedEndpoint));
+  }
   if (relaySettings.nostrRelays.length > 0) {
     const nostr = new NostrRelay(group.meta.nostrSk, relaySettings.nostrRelays);
     group.meta.nostrSk = nostr.secretHex();
+    // Individual URLs are skipped INSIDE NostrRelay itself (see nostr.ts) so
+    // one bad Nostr endpoint never suppresses the others sharing this adapter.
+    nostr.policy = policy;
     relays.push(nostr);
   }
   return relays;
+}
+
+// REL-002: folds ack outcomes from ONE publish attempt into an updated
+// per-endpoint policy map. "operated" is keyed directly by HttpRelay's own
+// adapter name (there is exactly one operated endpoint); Nostr endpoints are
+// keyed by their OWN individual URL via the NostrRelay instance's
+// lastOutcomes(), so one bad Nostr endpoint's diagnostic never touches the
+// policy entry for any other URL sharing the same adapter.
+function updatePolicyFromAcks(
+  relays: Relay[],
+  acks: ({ relay: string; ack: Awaited<ReturnType<Relay["publish"]>> } | { relay: string; reason: unknown })[],
+  policy: EndpointPolicyMap,
+  operation: "publish" | "snapshot",
+  now: number,
+): EndpointPolicyMap {
+  let updated = policy;
+  for (const ack of acks) {
+    if (ack.relay === "operated") {
+      if ("ack" in ack && (ack.ack.ok || isDuplicateRelayAck(ack.ack.reason))) {
+        updated = { ...updated, operated: markEndpointSuccess(updated.operated) };
+      } else {
+        const reason = "reason" in ack
+          ? (ack.reason instanceof Error ? ack.reason.message : String(ack.reason))
+          : ack.ack.reason ?? "unknown";
+        const diagnostic = classifyRelayIssue({ relay: "operated", operation, reason });
+        updated = { ...updated, operated: applyDiagnosticToPolicy(updated.operated, diagnostic, now) };
+      }
+    } else if (ack.relay === "nostr") {
+      const nostrRelay = relays.find((relay): relay is NostrRelay => relay instanceof NostrRelay);
+      if (!nostrRelay) continue;
+      for (const [url, outcome] of nostrRelay.lastOutcomes()) {
+        updated = outcome.ok
+          ? { ...updated, [url]: markEndpointSuccess(updated[url]) }
+          : { ...updated, [url]: applyDiagnosticToPolicy(updated[url], classifyRelayIssue({ relay: url, operation, reason: outcome.reason ?? "unknown" }), now) };
+      }
+    }
+  }
+  return updated;
 }
 
 export interface SyncOnceOptions {
@@ -100,7 +165,18 @@ export function syncOnce(groupId: string, relayOverride?: Relay[], opts: SyncOnc
 
 async function runSyncCycle(groupId: string, relayOverride: Relay[] | undefined, opts: SyncOnceOptions): Promise<SyncResult> {
   const group = await readGroup(groupId);
+  // DATA-002: an explicitly unlinked/offline group's secret/tag pair is
+  // self-consistent but NOT verified against any real trip's relay
+  // history — publishing to it would either fail outright or, worse,
+  // silently claim a tag no peer actually shares. Local reads/writes and
+  // export/import stay fully available; only network sync is gated.
+  if (group.linked === false) {
+    const result = emptySyncResult();
+    result.errors.push("This trip was imported without a verified join link and stays offline-only until one is provided.");
+    return result;
+  }
   const relays = relayOverride ?? createRelays(group);
+  let relayPolicy: EndpointPolicyMap = group.meta.relayPolicy ?? {};
   const deadline = syncNetworkBudget(opts.networkBudgetMs);
   try {
     if (!relayOverride) await updateMeta(groupId, (meta) => ({ ...meta, nostrSk: group.meta.nostrSk,
@@ -180,6 +256,8 @@ async function runSyncCycle(groupId: string, relayOverride: Relay[] | undefined,
           if (diagnostic.severity !== "info") result.errors.push(ack.ack.reason);
         }
       }
+      relayPolicy = updatePolicyFromAcks(relays, acks, relayPolicy, "publish", Date.now());
+      if (!relayOverride) await updateMeta(groupId, (meta) => ({ ...meta, relayPolicy }));
       // Exclude relays that are definitively unconfigured (e.g. operated relay without
       // Upstash credentials) from the effective quorum. Those relays cannot store data
       // regardless of event content, so requiring their ACK would leave events permanently
@@ -205,6 +283,7 @@ async function runSyncCycle(groupId: string, relayOverride: Relay[] | undefined,
           if (deadline.signal.aborted) break;
           const singleBlob = await publishBlob([row.event]);
           const singleAcks = await collectAcks(singleBlob);
+          relayPolicy = updatePolicyFromAcks(relays, singleAcks, relayPolicy, "publish", Date.now());
           if (publishQuorumReached(countOk(singleAcks), ackQuorum)) {
             await markEvents(groupId, [row.event.id], "published");
             confirmationEligible.add(row.event.id);
@@ -212,7 +291,7 @@ async function runSyncCycle(groupId: string, relayOverride: Relay[] | undefined,
           }
           if (!deadline.signal.aborted) {
             const nextRow = fallbackRows[(index + 1) % fallbackRows.length];
-            if (nextRow) await updateMeta(groupId, (meta) => ({ ...meta, syncFallbackNextId: nextRow.event.id }));
+            if (nextRow) await updateMeta(groupId, (meta) => ({ ...meta, syncFallbackNextId: nextRow.event.id, ...(!relayOverride ? { relayPolicy } : {}) }));
           }
         }
         if (fallbackPublished === 0) {
@@ -236,6 +315,11 @@ async function runSyncCycle(groupId: string, relayOverride: Relay[] | undefined,
     const remoteEvents: Event[] = [];
     const snapshots: SnapshotEnvelope[] = [];
     const readBackCounts = new Map<string, number>();
+    // DATA-005: "legacy confirmation counts only ids" was the exact root
+    // cause — a relay page that echoes back a different body under an id
+    // this device already has locally must never count toward that id's
+    // confirmation. Fingerprint-compare against the local copy first.
+    const localById = new Map(group.events.map((event) => [event.id, event]));
     const cursorUpdates: Record<string, string> = {};
     for (const relayResult of fetched) {
       if ("reason" in relayResult) {
@@ -251,7 +335,14 @@ async function runSyncCycle(groupId: string, relayOverride: Relay[] | undefined,
           const envelope = await decryptEnvelope(key, entry.blob);
           if (envelope.type === "events") {
             remoteEvents.push(...envelope.events);
-            for (const event of envelope.events) readBackCounts.set(event.id, (readBackCounts.get(event.id) ?? 0) + 1);
+            for (const event of envelope.events) {
+              const local = localById.get(event.id);
+              if (local && (await eventFingerprint(local)) !== (await eventFingerprint(event))) {
+                result.errors.push(`event ${event.id} disagrees with a relay readback of the same id; not counted toward confirmation`);
+                continue;
+              }
+              readBackCounts.set(event.id, (readBackCounts.get(event.id) ?? 0) + 1);
+            }
           } else {
             snapshots.push(envelope);
           }
@@ -265,16 +356,27 @@ async function runSyncCycle(groupId: string, relayOverride: Relay[] | undefined,
     if (bestSnapshot && group.events.length === 0) {
       await updateTransportVectors(groupId, bestSnapshot.vv, group.meta.discardVector);
     }
+    const allBufferedIds = await bufferedEventIds(groupId);
     const dueBuffered = await dueBufferedEvents(groupId);
+    const dueBufferedIds = new Set(dueBuffered.map((event) => event.id));
     // Relay pages and a legacy-cursor replay can repeat already stored events.
     // Count each new event once; duplicate delivery must not exhaust admission
     // budgets and cause a later, genuinely new event to be discarded.
     const seenIds = new Set(group.events.map((event) => event.id));
     const incoming = [...dueBuffered, ...remoteEvents].filter((event) => {
       if (seenIds.has(event.id)) return false;
+      // PERF-001: a not-yet-due row already sitting in the buffer must not be
+      // re-evaluated as if it were new -- it is already correctly counted via
+      // existingBufferedCount below; re-processing it here would double-count
+      // the same held row against the buffer cap.
+      if (allBufferedIds.has(event.id) && !dueBufferedIds.has(event.id)) return false;
       seenIds.add(event.id);
       return true;
     });
+    // PERF-001: without this, the buffer cap only ever measured what THIS
+    // call buffers, resetting to zero every batch -- repeated future pages
+    // could grow held-event storage past bufferMaxEvents indefinitely.
+    const existingBufferedCount = Math.max(0, allBufferedIds.size - dueBufferedIds.size);
     const transport = admitTransportEvents(incoming, group.events, group.meta.discardVector, {
       now: Date.now(),
       supportedVersion: config.schemaVersion,
@@ -283,13 +385,9 @@ async function runSyncCycle(groupId: string, relayOverride: Relay[] | undefined,
       capKnownAuthor: config.capKnownAuthor,
       capGroupTotal: config.capGroupTotal,
       bufferMaxEvents: config.driftBufferMax,
+      existingBufferedCount,
     });
-    await removeBufferedEvents(groupId, [
-      ...transport.admitted.map((event) => event.id),
-      ...transport.dropped.map((drop) => drop.event.id),
-    ]);
-    await putBufferedEvents(groupId, transport.buffered);
-    await updateTransportVectors(groupId, transport.transportVector, transport.discardVector);
+    const toInsert = await resolveIncomingEventConflicts(groupId, transport.admitted);
     result.buffered = transport.buffered.length;
     result.dropped = transport.dropped.length;
 
@@ -299,9 +397,20 @@ async function runSyncCycle(groupId: string, relayOverride: Relay[] | undefined,
       await markEvents(groupId, confirmedIds, "confirmed");
       result.confirmed = confirmedIds.length;
     }
-    // Commit the read checkpoint in the same transaction as the received events.
-    // A failed local write must leave the relay page available for the next retry.
-    result.received = await upsertRemoteEvents(groupId, transport.admitted, cursorUpdates);
+    // INTR-001: admitted rows, promoted-buffer removal, newly-buffered
+    // additions and the read checkpoint all commit in the SAME atomic
+    // transaction. A failed local write must leave the relay page
+    // available for the next retry -- it must never advance the cursor
+    // or drop a buffered event without having durably admitted it.
+    await promoteLedger(groupId, {
+      admitted: toInsert,
+      promotedBufferIds: [...transport.admitted.map((event) => event.id), ...transport.dropped.map((drop) => drop.event.id)],
+      newlyBuffered: transport.buffered,
+      transportVector: transport.transportVector,
+      discardVector: transport.discardVector,
+      cursorUpdates,
+    });
+    result.received = toInsert.length;
     const snapshotEvery = Math.max(1, config.snapshotEvery);
     const snapshotEvents = await confirmedEvents(groupId);
     const snapshotSeq = Math.floor(snapshotEvents.length / snapshotEvery) * snapshotEvery;
@@ -335,6 +444,8 @@ async function runSyncCycle(groupId: string, relayOverride: Relay[] | undefined,
           if (diagnostic.severity !== "info") result.errors.push(ack.ack.reason);
         }
       }
+      relayPolicy = updatePolicyFromAcks(relays, acks, relayPolicy, "snapshot", Date.now());
+      if (!relayOverride) await updateMeta(groupId, (meta) => ({ ...meta, relayPolicy }));
       if (publishQuorumReached(ok, Math.max(1, Math.min(relays.length, config.ackQuorum)))) {
         await markSnapshotPublished(groupId, snapshotSeq);
         result.snapshotsPublished = 1;

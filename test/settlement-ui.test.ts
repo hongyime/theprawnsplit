@@ -29,8 +29,9 @@ if (!window.matchMedia) {
   });
 }
 
-const { appendEvents, ensureGroup, resetRepositoryForTests } = await import("@/db/repo");
+const { appendEvents, ensureClaimIdentity, ensureGroup, resetRepositoryForTests } = await import("@/db/repo");
 const { defaultParticipant, makeEvent } = await import("@/lib/events");
+const { signClaim } = await import("@/crypto/claim");
 const { default: App } = await import("@/App.svelte");
 
 let instance: Record<string, unknown> | null = null;
@@ -62,6 +63,23 @@ describe("settlement rows (rendered)", () => {
     factory.nextCounter += 1;
     const bob = defaultParticipant(factory, "Bob");
     factory.nextCounter += 1;
+    const bobPidEarly = (bob as { pid?: string }).pid ?? "";
+    // SEC-002/T47: canVoidRecordedSettlement now requires this device to
+    // hold a genuinely claimed, currently-authorised local identity --
+    // never merely "the device that recorded it". Give bob a real claim
+    // so the Void button's presence reflects legitimate authority, not
+    // an unsigned device-string coincidence.
+    const bobIdentity = await ensureClaimIdentity(group, bobPidEarly);
+    const bobClaimPayload = `${group.tagHex}:${bobPidEarly}:${group.deviceId}:${bobIdentity.claimPk}`;
+    const bobClaimSig = await signClaim(bobIdentity.claimSkJwk, bobIdentity.alg, bobClaimPayload);
+    const bobClaim = makeEvent(factory, "ParticipantClaimed", {
+      pid: bobPidEarly,
+      deviceId: group.deviceId,
+      claimPk: bobIdentity.claimPk,
+      alg: bobIdentity.alg,
+      sig: bobClaimSig,
+    });
+    factory.nextCounter += 1;
     const alicePid = (alice as { pid?: string }).pid ?? "";
     const bobPid = (bob as { pid?: string }).pid ?? "";
     const expense = makeEvent(factory, "ExpenseAdded", {
@@ -80,7 +98,7 @@ describe("settlement rows (rendered)", () => {
     });
     factory.nextCounter += 1;
     const settlement = makeEvent(factory, "SettlementRecorded", { sid: "s1", from: bobPid, to: alicePid, minor: 1000n });
-    await appendEvents(group.groupId, [alice, bob, expense, settlement]);
+    await appendEvents(group.groupId, [alice, bob, bobClaim, expense, settlement]);
 
     renderApp();
     await screen.findByText("Your Trips", {}, { timeout: 15000 });

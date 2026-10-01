@@ -272,12 +272,12 @@ The Phase column is scope planning (§15), not delivery status — STATUS.md own
 |---|---|---|
 | REQ-SET-01 | Settlement uses greedy net-balance matching, guaranteeing ≤ n−1 transfers | 1 |
 | REQ-SET-02 | The app MUST NOT initiate, process, or hold money | 1 |
-| REQ-SET-03 | `SettlementRecorded` moves the balance immediately | 1 |
-| REQ-SET-04 | Settlements are marked pending until confirmed by a device claiming the payee participant | 4 |
-| REQ-SET-05 | A settlement recorded by a device claiming the payee is born confirmed — **only if that claim is uncontested** (see REQ-SET-09) | 4 |
+| REQ-SET-03 | `SettlementRecorded` moves the balance immediately: the payer (`from`, a debtor) balance MUST increase by `minor` and the payee (`to`, a creditor) balance MUST decrease by `minor` -- this DISCHARGES the debt rather than doubling it. **Worked example:** Alice pays 100 for lunch split evenly with Bob, so `balance[alice] = +50` (owed) and `balance[bob] = -50` (owing). Bob then records `SettlementRecorded{from: bob, to: alice, minor: 50}` for the suggested transfer amount. Applying it: `balance[bob] += 50 -> 0`, `balance[alice] -= 50 -> 0`. Both land at zero, matching REQ-MON-15's zero-sum invariant. A partial payment of only 20 instead reduces the debt to `balance[bob] = -30`, `balance[alice] = +30` -- neither zeroed nor doubled | 1 |
+| REQ-SET-04 | Settlements are marked pending until confirmed by a device holding the payee's own claim identity | 4 |
+| REQ-SET-05 | `SettlementConfirmed` is honoured ONLY from a genuinely signed confirmation by the payee's own claim identity (see REQ-SET-09) -- there is no unsigned "born confirmed" shortcut from a merely-matching device string; that was SEC-001's exact vulnerability, closed at T44/T45 | 4 |
 | REQ-SET-06 | Settlements to shadow payees are marked `cash-unconfirmable` and MUST NOT nag | 4 |
 | REQ-SET-07 | Disputes MUST NOT auto-reverse a balance. Both claims are displayed side by side | 4 |
-| REQ-SET-08 | Reversal requires the original payer to void their own settlement event | 4 |
+| REQ-SET-08 | Reversal requires a signed `SettlementVoided` (`pid`+`sig`, domain payload `groupTag:void-settlement:sid`) authorized by ANY current group member -- not the original payer specifically, not signer-only, not admin-only (owner decision B2, enforced at T47). A generic `EventVoided` or a forged/unauthorised signature never clears a protected settlement | 4 |
 | REQ-SET-09 | `SettlementConfirmed` is honoured only from a device whose claim on the payee is uncontested, i.e. that participant has no active claim anomaly under REQ-ID-07. A confirmation arriving from a contested claim MUST be displayed as contested and MUST NOT clear the pending flag | 4 |
  
 ### 7.4 Sync and relay
@@ -288,7 +288,7 @@ The Phase column is scope planning (§15), not delivery status — STATUS.md own
 | REQ-SYN-02 | Relays are accessed only through the `Relay` interface (§8.4). No relay-specific logic outside adapters | 2 |
 | REQ-SYN-03 | All relay payloads are AES-256-GCM encrypted client-side before transmission | 2 |
 | REQ-SYN-04 | `groupSecret` MUST NOT be transmitted to any relay or to the static host. It lives only in the URL fragment and local storage | 2 |
-| REQ-SYN-05 | Publishing requires an ACK from the **operated relay** (mandatory) **plus ≥1 Nostr relay ACK**. The Nostr pool is published to in full; the operated relay is not optional. Ephemeral-key admission is unreliable across volunteer relays (D-23), so a pure Nostr quorum is not a sufficient durability guarantee | 2 |
+| REQ-SYN-05 | Publishing requires reaching `config.ackQuorum` ACKs across the active relay set (default 2 — operated + ≥1 Nostr in a normally-configured deployment). Relays whose write returns "not configured" are excluded from the effective quorum, so a Nostr-only deployment (no Upstash credentials) meets quorum on Nostr ACKs alone; an operated-only deployment meets quorum on the operated ACK alone. Endpoints in backoff/dropped state (REL-002/T53) are skipped entirely, matching their exclusion from `activeUrls()`. If a batched publish falls short of quorum, per-event fallback publish retries each pending ledger event as its own message (CR-010/A13 mitigation) and keeps only the events that reach quorum on their own. Ephemeral-key admission is unreliable across volunteer relays (D-23), so a pure Nostr quorum is not a strong durability guarantee where an operated relay is available | 2 |
 | REQ-SYN-06 | Events hold one of three states: `local`, `published`, `confirmed`. The outbox retains an event until `confirmed` | 2 |
 | REQ-SYN-07 | `confirmed` requires reading the event back from a subscription distinct from the write. Acknowledgement alone is insufficient | 2 |
 | REQ-SYN-08 | Every published event carries the sender's current version vector | 2 |
@@ -1051,23 +1051,28 @@ Anyone holding `groupSecret` has full read and write access forever. There is:
 - No revocation
 - No way to remove a member
 - No way to delete data already published to relays you do not control
-**Mitigation — Fork & Re-key (resolves Q2).** In-band cryptographic rotation is
-pointless: `groupSecret` is a symmetric root, so an attacker holding it can read any
-rotation event. True rotation requires a new channel. The mechanism is therefore a
-one-tap flow:
- 
+**Mitigation (proposed design, not yet implemented) — Fork & Re-key (resolves
+Q2).** In-band cryptographic rotation is pointless: `groupSecret` is a symmetric
+root, so an attacker holding it can read any rotation event. True rotation
+requires a new channel. The proposed mechanism is a one-tap flow:
+
 ```
 Compromised link → export snapshot → generate new groupSecret
                  → re-seed roster + balances → new share URL
 ```
- 
-The old `groupTag` is abandoned; activity continues on a clean tag. Participants
-re-join via the new link; shadow participants carry over automatically.
- 
-**Caveat the fork does NOT address:** everything already published under the old
-`groupTag` remains on relays outside your control, permanently and undeletably.
-Forking limits the blast radius **forward only**, never backward. The app MUST state
-this at the moment of forking rather than implying the old data is gone.
+
+The old `groupTag` would be abandoned; activity would continue on a clean tag.
+Participants would re-join via the new link; shadow participants would carry
+over automatically. **No fork/re-key action exists in the app today** — there
+is no UI entry point and no implementing code path. Until it ships, a
+compromised link has no in-app remediation beyond the participant simply
+stopping use of the old link.
+
+**Caveat the fork, once built, would not address:** everything already published
+under the old `groupTag` remains on relays outside your control, permanently and
+undeletably. Forking would limit the blast radius **forward only**, never
+backward. Its implementation MUST state this at the moment of forking rather
+than implying the old data is gone.
  
 ### 10.3 No ledger-level event signing in v1
  
@@ -1245,7 +1250,7 @@ from `groupSecret`, while preserving the relay's inability to decrypt ledger con
 | ~~Q9~~ | 2 | **CLOSED.** Transport version vector advances; semantic ledger freezes. REQ-SYN-22. |
 | ~~Q7~~ | 3 | **CLOSED.** Current resolution is transport admission gating: future-dated events are held outside the admitted log until local time catches up. REQ-SYN-24, §9.12, D-20. |
 | ~~Q10~~ | 3 | **CLOSED.** Claim keys: settlement confirmation is signed, additional devices are cryptographically delegated. REQ-SEC-01→07, D-15/D-16. **The v1.2 `mode` field is removed.** |
-| ~~Q11~~ | 3 | **CLOSED.** Active conflict surfacing with Keep/Revert. **Refinement:** "Revert" MUST emit a new `ExpenseEdited`, never un-apply — void is terminal (D-13). |
+| ~~Q11~~ | 3 | **CLOSED.** Financials edits appear as a passive, labelled correction history under each expense (REQ-MON-17). Explicit "Keep" / "Revert" reapply controls are NOT implemented — users edit via the ordinary `editExpense` command, which emits a new `ExpenseEdited`; there is no one-click revert-to-earlier-history action. Void remains terminal (D-13).
 | ~~Q12~~ | 3 | **CLOSED.** Snapshots embed `VV_snap`; receiver initialises to it. **Added:** background raw-history reconciliation, since a malicious snapshot could otherwise advance a vector past events it omitted. REQ-SYN-25/26. |
  
 ### 14.2 Resolved in round 4

@@ -88,13 +88,22 @@ per cycle, walking newest-first history backwards with overlapping second bounda
 valid signatures and a real wire EOSE. A saturated timestamp or interrupted page
 retains its checkpoint and reports incomplete recovery. Daily historical rescans
 also cover late old-timestamp arrivals. Ledger events are deduplicated by ID and
-verified payload; conflicting identities never overwrite local history. Nostr's
-transport signatures/envelopes remain on the original relays; this is event-level
-catch-up, not a claim of a complete archive of every Nostr transport envelope.
-Some snapshots may outlive their underlying events. Full retained-history cutover
-therefore still requires bounded private preservation of the raw signed Nostr
-messages (including snapshots, IDs, signatures and tags), or an explicitly approved
-narrower scope. The current event-recovery bridge does not satisfy that archive gate.
+verified payload; conflicting identities never overwrite local history.
+
+Raw signed Nostr messages (including snapshots, IDs, signatures and tags) are
+retained through the signed-source fragment path (`src/relay/source-archive.ts`).
+Each retained page becomes a set of ≤32 KB `nostr-json-v1` fragments carrying
+the original event id, its SHA-256 hash, total byte count, chunk index/count,
+and per-chunk SHA-256 — every byte is re-verified on read, and a partial or
+altered fragment fails with an "Unverified original history; checkpoint retained"
+error rather than silently admitting garbage. `restoreNostrSource` reassembles
+one complete original object only when every fragment matches on sourceUrl,
+eventId, sha256, totalBytes and count, its own bytes hash to the recorded
+sha256, and the parsed JSON re-verifies as a real signed Nostr event under
+the trip tag. Fragments carry deterministic receipts so `prepareSourcePackets`
+can skip work already covered without re-uploading. This is the archive path
+the earlier event-recovery bridge did not satisfy; it does not by itself prove
+hosted completeness or replace measured cutover evidence.
 
 Unknown offline browsers reconcile when they next open the updated app. They do
 not all need to reconnect before release. Existing custom/disabled operated relay

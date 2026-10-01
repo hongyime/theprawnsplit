@@ -46,6 +46,39 @@ export function formatPercentageInput(part: bigint, total: bigint): string {
   return `${whole}.${fraction}`;
 }
 
+export function formatBasisPoints(basisPoints: bigint): string {
+  const whole = basisPoints / 100n;
+  const fraction = String(basisPoints % 100n).padStart(2, "0");
+  return `${whole}.${fraction}`;
+}
+
+/**
+ * LOGIC-004: allocate exactly 10,000 basis points across `parts` (which are
+ * assumed to sum to `total`) using the largest-remainder method, so the
+ * formatted percentages always sum to exactly 100.00% — unlike formatting
+ * each part's percentage independently via formatPercentageInput, which can
+ * under- or overshoot 100% once more than one share is involved (e.g. three
+ * equal one-cent shares of a three-cent total round to 33.33% each, summing
+ * to 99.99%).
+ */
+export function allocatePercentageBasisPoints(parts: bigint[], total: bigint): bigint[] {
+  if (total <= 0n) return parts.map(() => 0n);
+  const scaled = parts.map((part) => part * 10_000n);
+  const floors = scaled.map((value) => value / total);
+  let remaining = 10_000n - floors.reduce((sum, value) => sum + value, 0n);
+  if (remaining <= 0n) return floors;
+  const byRemainder = scaled
+    .map((value, index) => ({ index, remainder: value % total }))
+    .sort((a, b) => (b.remainder !== a.remainder ? Number(b.remainder - a.remainder) : a.index - b.index));
+  const result = [...floors];
+  for (const { index } of byRemainder) {
+    if (remaining <= 0n) break;
+    result[index] = (result[index] ?? 0n) + 1n;
+    remaining -= 1n;
+  }
+  return result;
+}
+
 export function bigintReplacer(_key: string, value: unknown): unknown {
   if (typeof value === "bigint") return { __bigint: value.toString() };
   return value;

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { admitTransportEvents } from "../src/transport";
+import { admitTransportEvents, mergeCoverageCounter, type CoverageIntervals } from "../src/transport";
 import { base, hlc } from "./helpers";
 import type { Event } from "../src/types";
 
@@ -16,6 +16,16 @@ function event(dev: string, ctr: number, wall = ctr): Event {
   } as never);
 }
 
+function marker(dev: string, ctr: number, wall = ctr): Event {
+  return base("ParticipantAdded", {
+    id: `${dev}:${ctr}`,
+    dev,
+    hlc: hlc(wall, ctr, dev),
+    pid: `p-${dev}`,
+    name: dev,
+  } as never);
+}
+
 describe("REQ-SYN-19/24/27 transport admission", () => {
   it("drops surplus from one author only and advances discardVector", () => {
     const incoming = [event("throwaway", 1), event("throwaway", 2), event("throwaway", 3), event("peer", 1)];
@@ -27,6 +37,7 @@ describe("REQ-SYN-19/24/27 transport admission", () => {
       capKnownAuthor: 1000,
       capGroupTotal: 10_000,
       bufferMaxEvents: 500,
+      existingBufferedCount: 0,
     });
 
     expect(result.admitted.map((e) => e.id)).toEqual(["throwaway:1", "throwaway:2", "peer:1"]);
@@ -44,6 +55,7 @@ describe("REQ-SYN-19/24/27 transport admission", () => {
       capKnownAuthor: 1000,
       capGroupTotal: 10_000,
       bufferMaxEvents: 500,
+      existingBufferedCount: 0,
     });
     expect(first.admitted).toHaveLength(0);
     expect(first.buffered).toEqual([{ event: future, retryAt: 180_000 }]);
@@ -57,6 +69,7 @@ describe("REQ-SYN-19/24/27 transport admission", () => {
       capKnownAuthor: 1000,
       capGroupTotal: 10_000,
       bufferMaxEvents: 500,
+      existingBufferedCount: 0,
     });
     expect(second.admitted.map((e) => e.id)).toEqual(["fast:1"]);
   });
@@ -71,10 +84,54 @@ describe("REQ-SYN-19/24/27 transport admission", () => {
       capKnownAuthor: 1000,
       capGroupTotal: 10_000,
       bufferMaxEvents: 500,
+      existingBufferedCount: 0,
     });
     expect(result.buffered.map((held) => held.event.id)).toEqual(["fast:1"]);
     expect(result.dropped.map((drop) => drop.event.id)).toEqual(["fast:2"]);
     expect(result.discardVector).toEqual({ fast: 2 });
+  });
+
+  it("PERF-001: accounts for rows already retained from earlier cycles, not just what this call buffers", () => {
+    // 2 rows are already sitting in the persistent buffer from a PRIOR cycle
+    // (existingBufferedCount: 2) with a cap of 3 total. Without the fix, this
+    // call's own buffered.length would start back at 0 every time, letting
+    // ALL 3 new future events fit (0 < 3, 1 < 3, 2 < 3) -- growing the TRUE
+    // total to 2 existing + 3 new = 5, past the configured cap of 3.
+    const incoming = [event("fast", 1, 300_000), event("fast", 2, 300_001), event("fast", 3, 300_002)];
+    const result = admitTransportEvents(incoming, [], {}, {
+      now: 0,
+      supportedVersion: 1,
+      maxFutureDriftMs: 120_000,
+      capUnknownAuthor: 50,
+      capKnownAuthor: 1000,
+      capGroupTotal: 10_000,
+      bufferMaxEvents: 3,
+      existingBufferedCount: 2,
+    });
+    // Only 1 more fits (2 existing + 1 new = 3, exactly at the cap); the
+    // other 2 are dropped with reason "buffer-cap" -- proving the SAME cap
+    // now spans across cycles instead of resetting to zero each call.
+    expect(result.buffered.map((held) => held.event.id)).toEqual(["fast:1"]);
+    expect(result.dropped.map((drop) => [drop.event.id, drop.reason])).toEqual([
+      ["fast:2", "buffer-cap"],
+      ["fast:3", "buffer-cap"],
+    ]);
+  });
+
+  it("PERF-001: an existing buffer already AT or OVER the cap defers all new surplus without evicting anything (existing rows are never this function's concern -- it only ever ADDS, never removes)", () => {
+    const incoming = [event("fast", 1, 300_000)];
+    const result = admitTransportEvents(incoming, [], {}, {
+      now: 0,
+      supportedVersion: 1,
+      maxFutureDriftMs: 120_000,
+      capUnknownAuthor: 50,
+      capKnownAuthor: 1000,
+      capGroupTotal: 10_000,
+      bufferMaxEvents: 3,
+      existingBufferedCount: 5,
+    });
+    expect(result.buffered).toEqual([]);
+    expect(result.dropped.map((drop) => [drop.event.id, drop.reason])).toEqual([["fast:1", "buffer-cap"]]);
   });
 
   it("drops surplus over the group-total admission cap without blocking existing events", () => {
@@ -88,6 +145,7 @@ describe("REQ-SYN-19/24/27 transport admission", () => {
       capKnownAuthor: 1000,
       capGroupTotal: 3,
       bufferMaxEvents: 500,
+      existingBufferedCount: 0,
     });
 
     expect(result.admitted.map((e) => e.id)).toEqual(["peer-c:1"]);
@@ -112,6 +170,7 @@ describe("REQ-SYN-19/24/27 transport admission", () => {
       capKnownAuthor: 1000,
       capGroupTotal: 10_000,
       bufferMaxEvents: 500,
+      existingBufferedCount: 0,
     });
 
     expect(result.dropped.map((drop) => [drop.event.dev, drop.reason])).toEqual([
@@ -121,5 +180,100 @@ describe("REQ-SYN-19/24/27 transport admission", () => {
     expect(result.admitted.map((e) => e.id)).toEqual([wellFormed.id]);
     // Malformed events still advance the discard vector so they are never refetched.
     expect(result.discardVector).toEqual({ broken: 2 });
+  });
+});
+
+describe("DATA-004 batch-context author classification", () => {
+  it("treats a brand-new author as known for cap purposes once their own marker appears anywhere in this batch", () => {
+    const incoming = [event("newdev", 1), event("newdev", 2), marker("newdev", 3), event("newdev", 4), event("newdev", 5)];
+    const result = admitTransportEvents(incoming, [], {}, {
+      now: 10,
+      supportedVersion: 1,
+      maxFutureDriftMs: 120_000,
+      capUnknownAuthor: 2,
+      capKnownAuthor: 1000,
+      capGroupTotal: 10_000,
+      bufferMaxEvents: 500,
+      existingBufferedCount: 0,
+    });
+    // Without the fix, only 2 events (capUnknownAuthor) would fit before the
+    // 3rd overflows it, even though this author's own marker (proving they
+    // are legitimate) is IN this same batch — just not first.
+    expect(result.dropped).toEqual([]);
+    expect(result.admitted).toHaveLength(5);
+  });
+
+  it("does not trust a marker event with a malformed HLC as an eligibility signal", () => {
+    const badMarker = marker("faker", 1);
+    if (badMarker.t !== "ParticipantAdded") throw new Error("wrong fixture");
+    badMarker.hlc = { wall: Number.NaN, ctr: 1, dev: "faker" };
+    const incoming = [badMarker, event("faker", 2), event("faker", 3)];
+    const result = admitTransportEvents(incoming, [], {}, {
+      now: 10,
+      supportedVersion: 1,
+      maxFutureDriftMs: 120_000,
+      capUnknownAuthor: 1,
+      capKnownAuthor: 1000,
+      capGroupTotal: 10_000,
+      bufferMaxEvents: 500,
+      existingBufferedCount: 0,
+    });
+    // The malformed marker itself is dropped; the remaining well-formed
+    // events must still be judged under capUnknownAuthor, not
+    // capKnownAuthor — a malformed marker must never grant elevated trust.
+    expect(result.dropped.map((d) => [d.event.id, d.reason])).toEqual([
+      ["faker:1", "malformed"],
+      ["faker:3", "cap"],
+    ]);
+    expect(result.admitted.map((e) => e.id)).toEqual(["faker:2"]);
+  });
+});
+
+// DATA-007: versionVector/transportVector track TRANSPORT PROGRESS -- what
+// counter has been OBSERVED from each author, including buffered/dropped/
+// conflicted events that were never actually stored. coverage is a
+// SEPARATE, exact record of which counters have a REAL event row present,
+// as sorted non-overlapping [start, end] intervals -- so a hole in the
+// middle of an otherwise-covered run is represented explicitly instead of
+// being silently erased by a single running maximum.
+describe("DATA-007 mergeCoverageCounter (pure interval merge)", () => {
+  it("starts a fresh interval from an empty list", () => {
+    expect(mergeCoverageCounter([], 5)).toEqual([[5, 5]]);
+  });
+
+  it("extends an existing interval forward and backward", () => {
+    expect(mergeCoverageCounter([[3, 5]], 6)).toEqual([[3, 6]]);
+    expect(mergeCoverageCounter([[3, 5]], 2)).toEqual([[2, 5]]);
+  });
+
+  it("keeps a non-adjacent counter as its own separate interval, representing a hole explicitly", () => {
+    expect(mergeCoverageCounter([[1, 3]], 6)).toEqual([
+      [1, 3],
+      [6, 6],
+    ]);
+  });
+
+  it("bridges two previously-separate intervals into one when the inserted counter fills the exact gap", () => {
+    expect(
+      mergeCoverageCounter(
+        [
+          [1, 2],
+          [4, 5],
+        ],
+        3,
+      ),
+    ).toEqual([[1, 5]]);
+  });
+
+  it("is idempotent for a counter already covered", () => {
+    const existing: CoverageIntervals = [[1, 5]];
+    expect(mergeCoverageCounter(existing, 3)).toEqual([[1, 5]]);
+  });
+
+  it("never mutates the input array", () => {
+    const existing: CoverageIntervals = [[1, 2]];
+    const frozen = JSON.parse(JSON.stringify(existing));
+    mergeCoverageCounter(existing, 10);
+    expect(existing).toEqual(frozen);
   });
 });

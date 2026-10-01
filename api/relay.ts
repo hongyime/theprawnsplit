@@ -1,5 +1,6 @@
 import { Redis } from "@upstash/redis";
 import { SupabaseRelayStore, validRedisCursor } from "../server/supabase-relay";
+import { createUpstashAdmissionStore, reserveAdmission, type AdmissionStore } from "../server/relay-admission";
 
 export const config = { runtime: "edge" };
 
@@ -7,6 +8,14 @@ const TAG_RE = /^[0-9a-f]{64}$/;
 const WRITE_PROOF_RE = /^[0-9a-f]{64}$/;
 const MAX_BLOB = parseRelayNumericLimit(process.env.RELAY_MAX_BLOB_BYTES, 131_072);
 const MAX_LIMIT = parseRelayNumericLimit(process.env.RELAY_MAX_FETCH_LIMIT, 500);
+// REL-001: Redis xrange's `limit` only bounds row COUNT; a page of legally-sized
+// blobs (up to MAX_BLOB each) can still serialize far past HttpRelay's own
+// boundedText transfer ceiling (src/relay/http.ts, 2_100_000 bytes), causing the
+// client's fetch to throw before the cursor ever advances -- an empty-progress
+// stall that repeats the same oversized page forever. Default kept well below
+// that client ceiling (headroom for JSON/escaping overhead) and well above
+// MAX_BLOB, so a normal page still batches many rows.
+const MAX_PAGE_BYTES = parseRelayNumericLimit(process.env.RELAY_MAX_PAGE_BYTES, 1_500_000);
 
 const streamKey = (tag: string): string => `ts:${tag}`;
 const proofKey = (tag: string): string => `tp:${tag}`;
@@ -44,6 +53,31 @@ export function parseRelayNumericLimit(value: string | undefined, fallback: numb
   return Math.floor(parsed);
 }
 
+// REL-001: bounds a page's SERIALIZED byte size instead of trusting the row
+// count alone. Always keeps at least the first entry (even if it alone
+// exceeds maxBytes) so a page can never make zero progress; every entry after
+// the first is dropped once including it would push the running serialized
+// total (matching the shape the client actually receives: a JSON array with
+// comma-separated elements) past maxBytes. Dropped entries are never lost --
+// simply not serialized this page, so the client's own cursor advancement
+// (based on the last INCLUDED entry) naturally resumes at the first omitted
+// row on its next request.
+export function boundEntriesByBytes<T extends { cursor: string; blob: string; author: string }>(
+  entries: T[],
+  maxBytes: number,
+): T[] {
+  const bounded: T[] = [];
+  let bytes = 2; // "[" + "]"
+  for (const entry of entries) {
+    const separator = bounded.length > 0 ? 1 : 0; // joining comma
+    const size = new TextEncoder().encode(JSON.stringify(entry)).byteLength + separator;
+    if (bounded.length > 0 && bytes + size > maxBytes) break;
+    bytes += size;
+    bounded.push(entry);
+  }
+  return bounded;
+}
+
 function bytesToHex(bytes: Uint8Array): string {
   return [...bytes].map((byte) => byte.toString(16).padStart(2, "0")).join("");
 }
@@ -66,6 +100,22 @@ export async function verifyRelayWriteProof(store: RelayStore, tag: string, writ
   return (await store.get<string>(key)) === commitment;
 }
 
+// SEC-003/B1: rejects with HTTP 429 + Retry-After before any proof/cursor is
+// claimed or any history is written, whenever the owner-approved enrollment,
+// rate or storage budget for this tag/author would be exceeded. Returns null
+// (admit) when the write may proceed.
+export async function checkAdmission(
+  store: AdmissionStore,
+  tag: string,
+  author: string,
+  blobBytes: number,
+): Promise<Response | null> {
+  const decision = await reserveAdmission(store, tag, author, blobBytes);
+  if (decision.admitted) return null;
+  const response = bad("relay resource budget exceeded", 429);
+  response.headers.set("retry-after", String(decision.retryAfterSeconds));
+  return response;
+}
 function parseLimit(value: string | null): number {
   const parsed = Number(value ?? 100);
   if (!Number.isFinite(parsed) || parsed < 1) return 100;
@@ -107,6 +157,13 @@ export default async function handler(req: Request): Promise<Response> {
         return cursor === null ? bad("invalid proof", 403) : json({ cursor });
       }
       const store = redis();
+      const admissionRejected = await checkAdmission(
+        createUpstashAdmissionStore(store),
+        tag,
+        body.author,
+        new TextEncoder().encode(body.blob).byteLength,
+      );
+      if (admissionRejected) return admissionRejected;
       if (!(await verifyRelayWriteProof(store, tag, body.writeProof))) return bad("invalid proof", 403);
 
       const cursor = await store.xadd(streamKey(tag), "*", {
@@ -139,6 +196,7 @@ export default async function handler(req: Request): Promise<Response> {
           : [],
       );
       if (author) entries = entries.filter((entry) => entry.author === author);
+      entries = boundEntriesByBytes(entries, MAX_PAGE_BYTES);
       return json({ entries });
     }
 

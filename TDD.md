@@ -362,12 +362,25 @@ export function receive(local: HLC, remote: HLC, now: number): HLC;
 export type Admission = { ok: true } | { ok: false; reason: "future"; retryAt: number };
 export function admissionGate(e: Event, now: number, maxDriftMs: number): Admission;
  
-// core/src/identity.ts
+// core/src/identity.ts // SEC-001/SEC-002/DATA-003: verification is signature-checked, never key-list-only.
+export interface VerificationContext {                        // built per-refresh from real events
+  groupTag: string;
+  verifySignature(input: SignatureInput): boolean;
+}
 export function buildDSU(events: Event[]): Map<string, string>;   // pid -> canonical
-export function authorisedKeys(events: Event[], pid: string): Set<string>;
+export function authorisedKeys(events: Event[], pid: string, ctx: VerificationContext): Set<string>;
+export function authorisedDevices(events: Event[], pid: string, ctx: VerificationContext): Set<string>;
 export function verifyConfirmation(                                // REQ-SEC-08
-  events: Event[], sid: string, claimSig: string
+  events: Event[], sid: string, claimSig: string, ctx: VerificationContext, claimedPid?: string,
 ): boolean;   // resolves against the LITERAL pre-merge payee pid, never canonical
+export function verifySettlementVoid(                              // SEC-002 (T47)
+  events: Event[], sid: string, pid: string, sig: string, ctx: VerificationContext,
+): boolean;
+export function matchesPayeeClaimSignature(
+  events: Event[], sid: string, claimSig: string, ctx: VerificationContext, claimedPid?: string,
+): boolean;
+export function claimAnomalies(events: Event[], ctx: VerificationContext): Anomaly[];
+export function contestedClaimPids(events: Event[], ctx: VerificationContext): Set<string>;
  
 // core/src/fold.ts
 export interface State {
@@ -395,26 +408,35 @@ eviction, and per-author budget accounting. `fold()` receives only admitted even
 ## 6. IndexedDB schema
  
 ```ts
-// src/db/schema.ts — database "ThePrawnSplit ", version 1
+// src/db/repo.ts — database "ThePrawnSplit", version 2 (schema inlined here since Phase 1;
+// DATA-002/CONC-001/LOGIC-002/DATA-007/REL-002/PERF-003 added fields shown below).
 {
   groups:   { key: groupId,
-              value: { groupId, name, currency, tagHex, secretB64,
-                       state: "ACTIVE" | "ARCHIVED", createdAt } },
- 
+              value: { groupId, name, currency, deviceId, nextCounter, createdAt,
+                       secretB64, tagHex,
+                       linked?, sourceTagHex?,                        // DATA-002 (T30/T31)
+                       reservations? } },                             // CONC-001+LOGIC-002 (T38)
+
   events:   { key: [groupId, eventId],
               indexes: { byGroup: [groupId],
-                         byDevCtr: [groupId, dev, ctr],
-                         bySync:   [groupId, syncState] },   // local|published|confirmed
-              value: { groupId, eventId, event, syncState, publishedAt } },
- 
-  buffer:   { key: [groupId, eventId], value: { event, retryAt } },   // REQ-SYN-24
- 
+                         bySync:   [groupId, syncState] },            // local|published|confirmed
+              value: { groupId, eventId, eventJson, syncState, publishedAt? } },
+
+  buffer:   { key: [groupId, eventId], value: { eventJson, retryAt } },   // REQ-SYN-24 / PERF-001
+
   identity: { key: [groupId, pid],
-              value: { pid, deviceId, claimPkJwk, claimSkJwk, alg } },  // REQ-SEC-01
- 
+              indexes: { byGroup: [groupId] },
+              value: { pid, deviceId, claimPk, claimPkJwk, claimSkJwk, alg } },  // REQ-SEC-01 / DATA-003
+
   meta:     { key: groupId,
-              value: { versionVector, discardVector, cursors,          // REQ-SYN-27
-                       lastSnapshotSeq, nostrSkHex } }
+              value: { groupId, versionVector, discardVector, cursors,   // REQ-SYN-27
+                       nostrSk, durability?, lastSnapshotSeq?, lastSyncAt?,
+                       lastSyncError?, syncFallbackNextId?, unsyncedSince?,
+                       relaySettings?,
+                       relayPolicy?,                                   // REL-002 (T53)
+                       subgroups?,
+                       observedHlc?,                                   // LOGIC-002 (T38)
+                       coverage? } }                                   // DATA-007 (T42/T43)
 }
 ```
  
@@ -460,10 +482,11 @@ async function pickAlg(): Promise<"ed25519" | "ecdsa-p256"> {
 Every signed payload begins with `groupTag` (REQ-SEC-04):
  
 ```
-claim:   `${groupTag}:${pid}:${deviceId}:${claimPk}`
-link:    `${groupTag}:link:${pid}:${newDevice}:${newClaimPk}:${nonce}`   // Q13 nonce
-confirm: `${groupTag}:confirm:${sid}`
-```
+claim:    `${groupTag}:${pid}:${deviceId}:${claimPk}`
+link:     `${groupTag}:link:${pid}:${newDevice}:${newClaimPk}:${nonce}`     // Q13 nonce
+reattest: `${groupTag}:reattest:${pid}:${newDevice}:${newClaimPk}`         // ClaimReattested (T44/T45)
+confirm:  `${groupTag}:confirm:${sid}`
+void:     `${groupTag}:void-settlement:${sid}`                             // SettlementVoided sig (T47)
  
 ---
  

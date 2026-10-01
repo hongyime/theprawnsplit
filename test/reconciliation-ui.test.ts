@@ -68,5 +68,8 @@ describe("reconciliation banner (rendered)", () => {
     const notSame = screen.getByRole("button", { name: "Not Same" });
     expect(merge.disabled).toBe(false);
     expect(notSame).toBeTruthy();
+    // FE-004: the reconciliation hint must be visible without expanding the advanced disclosure.
+    expect(merge.closest(".advanced-panel")).toBeNull();
+    expect(notSame).toBeTruthy();
   });
 });

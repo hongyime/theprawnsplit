@@ -30,7 +30,6 @@ describe("protection status UI (rendered)", () => {
     const card = await waitFor(() => { const el = document.querySelector<HTMLButtonElement>(".trip-card"); if (!el) throw new Error("no card"); return el; }, { timeout: 15000 });
     fireEvent.click(card);
     await waitFor(() => { if (!document.querySelector(".app-shell")) throw new Error("no shell"); }, { timeout: 15000 });
-    fireEvent.click(await screen.findByText("Sync, Backup, And Recovery", {}, { timeout: 15000 }));
     await waitFor(() => { if (!document.querySelector(".protection-status")) throw new Error("no prot-status"); }, { timeout: 15000 });
 
     const prot = document.querySelector(".protection-status");
@@ -40,5 +39,10 @@ describe("protection status UI (rendered)", () => {
     // jsdom has no navigator.storage -> persistedStorage=null -> "Storage Unknown"
     expect(prot!.textContent).toContain("Storage Unknown");
     expect(prot!.getAttribute("aria-label")).toBe("Protection Status");
+    // FE-004: the status must be visible without expanding the advanced disclosure.
+    expect(prot!.closest(".advanced-panel")).toBeNull();
+    const advancedDetails = document.querySelector<HTMLDetailsElement>(".advanced-panel");
+    expect(advancedDetails).not.toBeNull();
+    expect(advancedDetails!.open).toBe(false);
   }, 90_000);
 });

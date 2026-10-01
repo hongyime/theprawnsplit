@@ -17,6 +17,9 @@ import {
 } from "@/db/repo";
 import { latestArchiveEvent } from "@/lib/lifecycle";
 import { groupTag } from "@/crypto/group";
+import { mintClaimKey } from "@/crypto/claim";
+
+const identityKeyPair = await mintClaimKey("ecdsa-p256");
 
 function groupWithIdentity(): GroupRecord {
   return {
@@ -58,9 +61,9 @@ function groupWithIdentity(): GroupRecord {
         pid: "p_alice",
         deviceId: "d_test",
         alg: "ecdsa-p256",
-        claimPk: "claim-public",
-        claimPkJwk: { kty: "EC", crv: "P-256", x: "public-x", y: "public-y" },
-        claimSkJwk: { kty: "EC", crv: "P-256", x: "public-x", y: "public-y", d: "private-d" },
+        claimPk: identityKeyPair.publicKey,
+        claimPkJwk: identityKeyPair.publicJwk,
+        claimSkJwk: identityKeyPair.privateJwk,
       },
     ],
   };
@@ -75,7 +78,7 @@ describe("export artifact split", () => {
     expect("identities" in exported).toBe(false);
     expect("secretB64" in exported.group).toBe(false);
     expect(json).not.toContain("claimSk");
-    expect(json).not.toContain("private-d");
+    expect(json).not.toContain(identityKeyPair.privateJwk.d as string);
     expect(json).not.toContain("secret-material");
     expect(json).not.toContain("nostr-secret");
     expect(json).not.toContain("custom-relay.example");
@@ -94,7 +97,7 @@ describe("export artifact split", () => {
     expect("identities" in delta).toBe(false);
     expect("secretB64" in delta.group).toBe(false);
     expect(json).not.toContain("claimSk");
-    expect(json).not.toContain("private-d");
+    expect(json).not.toContain(identityKeyPair.privateJwk.d as string);
     expect(json).not.toContain("secret-material");
     expect(json).not.toContain("nostr-secret");
 
@@ -119,7 +122,7 @@ describe("export artifact split", () => {
     expect(backup.type).toBe("DeviceIdentityBackup");
     expect(backup.identities).toHaveLength(1);
     expect(json).toContain("claimSkJwk");
-    expect(json).toContain("private-d");
+    expect(json).toContain(identityKeyPair.privateJwk.d as string);
   });
 
   it("classifies only supported ledger import artifacts", () => {
@@ -155,6 +158,37 @@ describe("export artifact split", () => {
     );
   });
 
+  it("DATA-003: rejects known-variant events with type-specific malformation the old base-fields-only check could not catch", () => {
+    const exported = createExport(groupWithIdentity());
+    const badExpense = {
+      v: 1, id: "d_test:2", hlc: { wall: 1_787_280_001_000, ctr: 2, dev: "d_test" }, dev: "d_test",
+      t: "ExpenseAdded", xid: "x1", desc: "Lunch", at: 1_787_280_001_000, date: "2024-01-01",
+      financials: { minor: 1000, payers: [], shares: [] }, // minor is a plain number, not a bigint
+    };
+    expect(() => parseExport(stringifyExport({ ...exported, events: [...exported.events, badExpense] } as never))).toThrow(
+      "Import artifact contains malformed events",
+    );
+
+    const badHlc = {
+      v: 1, id: "d_test:3", hlc: { wall: Number.NaN, ctr: 1, dev: "d_test" }, dev: "d_test",
+      t: "ParticipantAdded", pid: "p1", name: "Alice",
+    };
+    expect(() => parseExport(stringifyExport({ ...exported, events: [...exported.events, badHlc] } as never))).toThrow(
+      "Import artifact contains malformed events",
+    );
+  });
+
+  it("DATA-003: round-trips a future-schema-version event verbatim under quarantine instead of rejecting the whole import", () => {
+    const exported = createExport(groupWithIdentity());
+    const futureEvent = {
+      v: 99, id: "d_test:9", hlc: { wall: 1_787_280_009_000, ctr: 9, dev: "d_test" }, dev: "d_test",
+      t: "SomeFutureEventKindThisDeviceCannotYetUnderstand", arbitraryFutureField: { nested: true },
+    };
+    const withFuture = { ...exported, events: [...exported.events, futureEvent] };
+    expect(() => parseExport(stringifyExport(withFuture as never))).not.toThrow();
+    expect(parseExport(stringifyExport(withFuture as never))).toEqual(withFuture);
+  });
+
   it("restores identity backup onto a matching recovered trip by tag", async () => {
     const source = groupWithIdentity();
     source.tagHex = await groupTag(new Uint8Array(32));
@@ -174,6 +208,21 @@ describe("export artifact split", () => {
     expect(restored.groupId).toBe(joined.groupId);
     expect(restored.identities).toHaveLength(1);
     expect(restored.identities[0]?.claimSkJwk).toEqual(source.identities[0]?.claimSkJwk);
+  });
+
+  it("DATA-003: rejects a keypair-mismatched identity backup instead of overwriting usable identity material", async () => {
+    const source = groupWithIdentity();
+    source.tagHex = await groupTag(new Uint8Array(32));
+    const otherKeyPair = await mintClaimKey("ecdsa-p256");
+    const backup = createIdentityBackup(source);
+    // Swap in a private key from a DIFFERENT keypair: individually
+    // importable, record-shaped, but does not correspond to claimPk/claimPkJwk.
+    backup.identities = [{ ...backup.identities[0]!, claimSkJwk: otherKeyPair.privateJwk }];
+
+    await resetRepositoryForTests(`export-security-mismatch-${crypto.randomUUID()}`);
+    await ensureGroup({ secretB64: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA", tagHex: source.tagHex, name: "Trip", currency: "USD" });
+
+    await expect(restoreIdentityBackup(backup)).rejects.toThrow(/invalid keypair/);
   });
 
   it("reconstructs archived groups with recorded outstanding balances from TripLedgerExport", async () => {

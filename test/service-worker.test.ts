@@ -87,6 +87,64 @@ describe("service worker — shell freshness (CR-003 regression)", () => {
     expect(await res!.text()).toBe("SHELL-CACHED");
   });
 
+  it("serves the working cached shell when navigation receives HTTP 503", async () => {
+    const { listeners, store } = loadSW({ network: () => new Response("UNAVAILABLE", { status: 503 }) });
+    store.set(ORIGIN + "/", new Response("WORKING-SHELL"));
+
+    const response = await dispatchFetch(listeners, ORIGIN + "/", "navigate");
+
+    expect(response?.status).toBe(200);
+    expect(await response?.clone().text()).toBe("WORKING-SHELL");
+    expect(await store.get(ORIGIN + "/")?.clone().text()).toBe("WORKING-SHELL");
+  });
+
+  it("preserves the working shell for offline navigation after an HTTP failure", async () => {
+    let offline = false;
+    const { listeners, store } = loadSW({ network: () => {
+      if (offline) throw new Error("offline");
+      return new Response("UNAVAILABLE", { status: 503 });
+    } });
+    store.set(ORIGIN + "/", new Response("WORKING-SHELL"));
+    await dispatchFetch(listeners, ORIGIN + "/", "navigate");
+    offline = true;
+
+    const response = await dispatchFetch(listeners, ORIGIN + "/", "navigate");
+
+    expect(response?.status).toBe(200);
+    expect(await response?.clone().text()).toBe("WORKING-SHELL");
+  });
+
+  it("returns an unsuccessful navigation response without caching it when no shell exists", async () => {
+    const { listeners, store } = loadSW({ network: () => new Response("UNAVAILABLE", { status: 503 }) });
+
+    const response = await dispatchFetch(listeners, ORIGIN + "/", "navigate");
+
+    expect(response?.status).toBe(503);
+    expect(store.has(ORIGIN + "/")).toBe(false);
+  });
+
+  it("does not cache an unsuccessful hashed-asset response", async () => {
+    const { listeners, store } = loadSW({ network: () => new Response("MISSING", { status: 404 }) });
+    const asset = ORIGIN + "/assets/missing.js";
+
+    const response = await dispatchFetch(listeners, asset);
+
+    expect(response?.status).toBe(404);
+    expect(store.has(asset)).toBe(false);
+  });
+
+  it("recovers an asset previously cached with an unsuccessful status", async () => {
+    const { listeners, store, fetchCalls } = loadSW({ network: () => new Response("RECOVERED-ASSET") });
+    const asset = ORIGIN + "/assets/index-abc123.js";
+    store.set(asset, new Response("OLD-ERROR", { status: 503 }));
+
+    const response = await dispatchFetch(listeners, asset);
+
+    expect(response?.status).toBe(200);
+    expect(await response?.clone().text()).toBe("RECOVERED-ASSET");
+    expect(fetchCalls).toEqual([asset]);
+  });
+
   it("serves hashed assets from cache without touching the network", async () => {
     const { listeners, store, fetchCalls } = loadSW({
       network: () => new Response("FROM-NETWORK"),

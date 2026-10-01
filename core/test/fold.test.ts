@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { canonicalStateBytes } from "../src/canonical";
 import { fold } from "../src/fold";
-import { base, claim, confirm, financials, groupTag, link, sig, verifier } from "./helpers";
+import { base, claim, confirm, financials, groupTag, hlc, link, sig, verifier } from "./helpers";
 
 describe("REQ-MON-15/REQ-SYN-12 fold", () => {
   it("computes zero-sum balances over live admitted events", () => {
@@ -288,7 +288,7 @@ describe("REQ-MON-15/REQ-SYN-12 fold", () => {
     expect(state.anomalies.map((anomaly) => anomaly.code)).not.toContain("contested-settlement-confirmation");
   });
 
-  it("marks settlements recorded by an uncontested payee device born confirmed", () => {
+  it("SEC-001/T45: never marks a settlement confirmed merely because the recording event's dev string matches an authorised payee device -- unsigned attribution is not proof", () => {
     const state = fold(
       [
         claim("alice", "alice-phone", "alice-key"),
@@ -298,9 +298,40 @@ describe("REQ-MON-15/REQ-SYN-12 fold", () => {
       verifier,
     );
 
+    // The OLD bug: a SettlementRecorded event whose dev happens to match
+    // one of alice's authorised devices used to be treated as "born
+    // confirmed" -- with ZERO actual signature proving alice consented.
+    // This is exactly the unsigned-attribution vulnerability SEC-001
+    // describes. It must now show as pending/unconfirmed until a genuine
+    // signed SettlementConfirmed event exists.
+    expect(state.settlements.get("s1")?.confirmed).toBe(false);
+    expect(state.settlements.get("s1")?.pending).toBe(true);
+    expect(state.settlements.get("s1")?.cashUnconfirmable).toBe(false);
+  });
+
+  it("confirms a settlement only via a genuinely signed SettlementConfirmed event, never from the recording event's dev alone", () => {
+    const events = [
+      claim("alice", "alice-phone", "alice-key"),
+      base("SettlementRecorded", { sid: "s1", from: "bob", to: "alice", minor: 100n, dev: "alice-phone" } as never),
+    ];
+    const aliceConfirm = confirm("s1", "alice-key", "alice");
+    if (aliceConfirm.t !== "SettlementConfirmed") throw new Error("test helper returned wrong event type");
+
+    const state = fold([...events, aliceConfirm], { supportedVersion: 1 }, verifier);
+
     expect(state.settlements.get("s1")?.confirmed).toBe(true);
     expect(state.settlements.get("s1")?.pending).toBe(false);
-    expect(state.settlements.get("s1")?.cashUnconfirmable).toBe(false);
+  });
+
+  it("never confirms a settlement from a forged dev attribution when NO genuine SettlementConfirmed signature ever arrives, even across a re-fold of the identical events", () => {
+    const events = [
+      claim("alice", "alice-phone", "alice-key"),
+      base("SettlementRecorded", { sid: "s1", from: "bob", to: "alice", minor: 100n, dev: "attacker-forged-dev" } as never),
+    ];
+
+    const state = fold(events, { supportedVersion: 1 }, verifier);
+    expect(state.settlements.get("s1")?.confirmed).toBe(false);
+    expect(state.settlements.get("s1")?.pending).toBe(true);
   });
 
   it("marks settlements to shadow payees cash-unconfirmable without pending nag state", () => {
@@ -328,40 +359,184 @@ describe("REQ-MON-15/REQ-SYN-12 fold", () => {
 
     expect(state.settlements.get("s1")?.disputed).toBe(true);
     expect(state.settlements.get("s1")?.pending).toBe(true);
-    expect(state.balances.get("alice")).toBe(100n);
-    expect(state.balances.get("bob")).toBe(-100n);
+    // FIXED (T48/LOGIC-001): from (bob, the payer/debtor) gains, to (alice,
+    // the creditor) loses -- discharging the debt, never doubling it.
+    expect(state.balances.get("alice")).toBe(-100n);
+    expect(state.balances.get("bob")).toBe(100n);
   });
 
-  it("allows the recording device to void its own settlement", () => {
+  it("LOGIC-001/T48: a settlement of the exact suggested transfer amount zeroes BOTH original balances, discharging the debt", () => {
     const state = fold(
       [
         base("ParticipantAdded", { pid: "alice", name: "Alice" } as never),
         base("ParticipantAdded", { pid: "bob", name: "Bob" } as never),
-        base("SettlementRecorded", { id: "settle-1", sid: "s1", from: "bob", to: "alice", minor: 100n, dev: "bob-phone" } as never),
-        base("SettlementVoided", { sid: "s1", dev: "bob-phone" } as never),
+        base("ExpenseAdded", {
+          xid: "x1",
+          financials: financials(100n, [["alice", 100n]], [["alice", 50n], ["bob", 50n]]),
+          desc: "Lunch",
+          at: 1,
+          date: "2026-08-21",
+        } as never),
+        // The suggested transfer for this exact imbalance: bob (debtor,
+        // -50) pays alice (creditor, +50) the full 50 owed.
+        base("SettlementRecorded", { sid: "s1", from: "bob", to: "alice", minor: 50n } as never),
       ],
       { supportedVersion: 1 },
+    );
+
+    expect(state.balances.get("alice")).toBe(0n);
+    expect(state.balances.get("bob")).toBe(0n);
+    expect([...state.balances.values()].reduce((a, b) => a + b, 0n)).toBe(0n);
+  });
+
+  it("LOGIC-001/T48: a partial settlement payment reduces the debt without fully discharging it", () => {
+    const state = fold(
+      [
+        base("ParticipantAdded", { pid: "alice", name: "Alice" } as never),
+        base("ParticipantAdded", { pid: "bob", name: "Bob" } as never),
+        base("ExpenseAdded", {
+          xid: "x1",
+          financials: financials(100n, [["alice", 100n]], [["alice", 50n], ["bob", 50n]]),
+          desc: "Lunch",
+          at: 1,
+          date: "2026-08-21",
+        } as never),
+        // bob owes alice 50; pays back only 20 -- a partial payment.
+        base("SettlementRecorded", { sid: "s1", from: "bob", to: "alice", minor: 20n } as never),
+      ],
+      { supportedVersion: 1 },
+    );
+
+    // Debt reduced from 50 to 30 -- neither zeroed nor doubled.
+    expect(state.balances.get("alice")).toBe(30n);
+    expect(state.balances.get("bob")).toBe(-30n);
+    expect([...state.balances.values()].reduce((a, b) => a + b, 0n)).toBe(0n);
+  });
+
+  it("LOGIC-001/T48: a validly authorized SettlementVoided restores the balance to exactly what it was before the settlement, never leaving it doubled or zeroed", () => {
+    const events = [
+      claim("carol", "carol-phone", "carol-key"), // any current group member, per SEC-002/T47
+      base("ParticipantAdded", { pid: "alice", name: "Alice" } as never),
+      base("ParticipantAdded", { pid: "bob", name: "Bob" } as never),
+      base("ExpenseAdded", {
+        xid: "x1",
+        financials: financials(100n, [["alice", 100n]], [["alice", 50n], ["bob", 50n]]),
+        desc: "Lunch",
+        at: 1,
+        date: "2026-08-21",
+      } as never),
+      base("SettlementRecorded", { sid: "s1", from: "bob", to: "alice", minor: 50n } as never),
+    ];
+    const before = fold(events, { supportedVersion: 1 }, verifier);
+    // Confirms the settlement's own effect genuinely applied first (both zero).
+    expect(before.balances.get("alice")).toBe(0n);
+    expect(before.balances.get("bob")).toBe(0n);
+
+    const voidPayload = `${groupTag}:void-settlement:s1`;
+    const after = fold(
+      [...events, base("SettlementVoided", { sid: "s1", pid: "carol", sig: sig("carol-key", voidPayload) } as never)],
+      { supportedVersion: 1 },
+      verifier,
+    );
+
+    // Restored to exactly the pre-settlement expense-only imbalance --
+    // never left at zero (settlement effect never applied) and never
+    // doubled (the old bug's failure mode).
+    expect(after.balances.get("alice")).toBe(50n);
+    expect(after.balances.get("bob")).toBe(-50n);
+    expect([...after.balances.values()].reduce((a, b) => a + b, 0n)).toBe(0n);
+  });
+
+  it("voids a settlement via a genuinely signed SettlementVoided from ANY current group member, not just the original recorder (SEC-002/T47 B2 policy)", () => {
+    const voidPayload = `${groupTag}:void-settlement:s1`;
+    const state = fold(
+      [
+        claim("alice", "alice-phone", "alice-key"),
+        claim("bob", "bob-phone", "bob-key"),
+        claim("carol", "carol-phone", "carol-key"),
+        base("SettlementRecorded", { id: "settle-1", sid: "s1", from: "bob", to: "alice", minor: 100n, dev: "bob-phone" } as never),
+        // carol is neither the payer nor the payee nor the recording
+        // device -- exactly the "any current group member" case B2
+        // approved and this task's acceptance criterion requires an
+        // explicit outcome for.
+        base("SettlementVoided", { sid: "s1", pid: "carol", sig: sig("carol-key", voidPayload) } as never),
+      ],
+      { supportedVersion: 1 },
+      verifier,
     );
 
     expect(state.settlements.has("s1")).toBe(false);
     expect([...state.balances.values()].reduce((a, b) => a + b, 0n)).toBe(0n);
   });
 
-  it("rejects settlement voids from another device", () => {
+  it("rejects a SettlementVoided with a forged signature, regardless of which pid it claims to be from", () => {
     const state = fold(
       [
-        base("ParticipantAdded", { pid: "alice", name: "Alice" } as never),
-        base("ParticipantAdded", { pid: "bob", name: "Bob" } as never),
+        claim("alice", "alice-phone", "alice-key"),
+        claim("bob", "bob-phone", "bob-key"),
         base("SettlementRecorded", { id: "settle-1", sid: "s1", from: "bob", to: "alice", minor: 100n, dev: "bob-phone" } as never),
-        base("SettlementVoided", { id: "void-1", sid: "s1", dev: "alice-phone" } as never),
+        base("SettlementVoided", { id: "void-1", sid: "s1", pid: "bob", sig: "totally-not-a-valid-signature" } as never),
       ],
       { supportedVersion: 1 },
+      verifier,
     );
 
     expect(state.settlements.has("s1")).toBe(true);
     expect(state.anomalies.find((anomaly) => anomaly.code === "unauthorized-settlement-void")?.relatedEventId).toBe("settle-1");
-    expect(state.balances.get("alice")).toBe(100n);
-    expect(state.balances.get("bob")).toBe(-100n);
+    expect(state.balances.get("alice")).toBe(-100n);
+    expect(state.balances.get("bob")).toBe(100n);
+  });
+
+  it("rejects a SettlementVoided from a pid with a contested claim, even with an otherwise valid signature", () => {
+    const state = fold(
+      [
+        claim("alice", "alice-phone", "alice-key"),
+        claim("bob", "bob-phone", "bob-key"),
+        claim("bob", "bob-tablet", "bob-tablet-key"), // unpaired second claim -- contested
+        base("SettlementRecorded", { id: "settle-1", sid: "s1", from: "bob", to: "alice", minor: 100n, dev: "bob-phone" } as never),
+        base("SettlementVoided", { sid: "s1", pid: "bob", sig: sig("bob-key", `${groupTag}:void-settlement:s1`) } as never),
+      ],
+      { supportedVersion: 1 },
+      verifier,
+    );
+
+    expect(state.settlements.has("s1")).toBe(true);
+  });
+
+  it("never voids a settlement when no verification context is available to check the signature at all", () => {
+    const state = fold(
+      [
+        claim("alice", "alice-phone", "alice-key"),
+        claim("bob", "bob-phone", "bob-key"),
+        base("SettlementRecorded", { id: "settle-1", sid: "s1", from: "bob", to: "alice", minor: 100n, dev: "bob-phone" } as never),
+        base("SettlementVoided", { sid: "s1", pid: "bob", sig: sig("bob-key", `${groupTag}:void-settlement:s1`) } as never),
+      ],
+      { supportedVersion: 1 },
+      // no ctx passed -- a signature can never be checked without one.
+    );
+
+    expect(state.settlements.has("s1")).toBe(true);
+  });
+
+  it("flags a generic EventVoided targeting a SettlementRecorded event as a distinct anomaly, never silently cancelling its economic effect (SEC-002/T47)", () => {
+    const state = fold(
+      [
+        claim("alice", "alice-phone", "alice-key"),
+        claim("bob", "bob-phone", "bob-key"),
+        base("SettlementRecorded", { id: "settle-1", sid: "s1", from: "bob", to: "alice", minor: 100n, dev: "bob-phone" } as never),
+        base("EventVoided", { targetId: "settle-1" } as never),
+      ],
+      { supportedVersion: 1 },
+      verifier,
+    );
+
+    // The settlement's economic effect and derived state are UNCHANGED --
+    // a generic void never cancels it, only the signed SettlementVoided
+    // contract can.
+    expect(state.settlements.has("s1")).toBe(true);
+    expect(state.balances.get("alice")).toBe(-100n);
+    expect(state.balances.get("bob")).toBe(100n);
+    expect(state.anomalies.find((anomaly) => anomaly.code === "generic-void-of-settlement-event")?.relatedEventId).toBe("settle-1");
   });
 
   it("surfaces duplicate participant names unless marked distinct", () => {
@@ -494,5 +669,87 @@ describe("REQ-MON-15/REQ-SYN-12 fold", () => {
     );
 
     expect(state.participants.get("alice")?.devices).toEqual(["alice-phone"]);
+  });
+});
+
+describe("DATA-006/B3 base currency contract", () => {
+  it("uses GroupCreated.currency when no correction exists", () => {
+    const state = fold([base("GroupCreated", { name: "Trip", currency: "USD", hlc: hlc(1) } as never)], { supportedVersion: 1 });
+    expect(state.currency).toBe("USD");
+  });
+
+  it("accepts a BaseCurrencyEstablished correction made before the first expense", () => {
+    const state = fold(
+      [
+        base("GroupCreated", { name: "Trip", currency: "USD", hlc: hlc(1) } as never),
+        base("BaseCurrencyEstablished", { currency: "EUR", hlc: hlc(2) } as never),
+        base("ExpenseAdded", {
+          xid: "x1",
+          financials: financials(100n, [["alice", 100n]], [["alice", 100n]]),
+          desc: "Lunch",
+          at: 1,
+          date: "2026-08-21",
+          hlc: hlc(3),
+        } as never),
+      ],
+      { supportedVersion: 1 },
+    );
+    expect(state.currency).toBe("EUR");
+    expect(state.quarantined).toEqual([]);
+  });
+
+  it("quarantines a correction that arrives after the first expense", () => {
+    const state = fold(
+      [
+        base("GroupCreated", { name: "Trip", currency: "USD", hlc: hlc(1) } as never),
+        base("ExpenseAdded", {
+          xid: "x1",
+          financials: financials(100n, [["alice", 100n]], [["alice", 100n]]),
+          desc: "Lunch",
+          at: 1,
+          date: "2026-08-21",
+          hlc: hlc(2),
+        } as never),
+        base("BaseCurrencyEstablished", { id: "late-correction", currency: "EUR", hlc: hlc(3) } as never),
+      ],
+      { supportedVersion: 1 },
+    );
+    expect(state.currency).toBe("USD");
+    expect(state.quarantined).toEqual(["late-correction"]);
+    expect(state.frozen).toBe(true);
+  });
+
+  it("accepts only the earliest of two pre-expense corrections, quarantining the rest", () => {
+    const state = fold(
+      [
+        base("GroupCreated", { name: "Trip", currency: "USD", hlc: hlc(1) } as never),
+        base("BaseCurrencyEstablished", { id: "correction-a", currency: "EUR", hlc: hlc(2, 0, "dev-a") } as never),
+        base("BaseCurrencyEstablished", { id: "correction-b", currency: "GBP", hlc: hlc(2, 0, "dev-b") } as never),
+        base("ExpenseAdded", {
+          xid: "x1",
+          financials: financials(100n, [["alice", 100n]], [["alice", 100n]]),
+          desc: "Lunch",
+          at: 1,
+          date: "2026-08-21",
+          hlc: hlc(3),
+        } as never),
+      ],
+      { supportedVersion: 1 },
+    );
+    expect(state.currency).toBe("EUR");
+    expect(state.quarantined).toEqual(["correction-b"]);
+  });
+
+  it("ignores a voided correction entirely, neither accepting nor quarantining it", () => {
+    const state = fold(
+      [
+        base("GroupCreated", { name: "Trip", currency: "USD", hlc: hlc(1) } as never),
+        base("BaseCurrencyEstablished", { id: "voided-correction", currency: "EUR", hlc: hlc(2) } as never),
+        base("EventVoided", { targetId: "voided-correction", hlc: hlc(3) } as never),
+      ],
+      { supportedVersion: 1 },
+    );
+    expect(state.currency).toBe("USD");
+    expect(state.quarantined).toEqual([]);
   });
 });

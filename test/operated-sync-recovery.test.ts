@@ -85,11 +85,49 @@ describe("operated relay recovery through the real HTTP adapter and API", () => 
     expect(received.events.filter((event) => event.id === initialEvent.id)).toHaveLength(1);
   });
 
+  it("reaches a later author across several byte-bounded pages triggered by large legal blobs, with no empty-progress stall", { timeout: 30_000 }, async () => {
+    const { group, key, relay } = await seed("byte-bounded-pages");
+    // Each filler row's blob (~267KB after AES-GCM + base64 expansion of a
+    // ~200KB plaintext event) is legal (well under MAX_BLOB=131072's WRITE-side
+    // cap does not apply to this direct-fixture read-path test) but large enough
+    // that only a handful fit under MAX_PAGE_BYTES (1_500_000) per page --
+    // forcing BYTE-ceiling pagination distinct from the row-COUNT-triggered
+    // scenario above (this uses far fewer than 500 rows).
+    const fillerCount = 12;
+    for (let index = 0; index < fillerCount; index++) {
+      const fillerDeviceId = `filler-${index}`;
+      const filler = defaultParticipant({ deviceId: fillerDeviceId, nextCounter: 1 }, "x".repeat(200_000));
+      await addRow(key, fillerDeviceId, [filler]);
+    }
+    const remote = defaultParticipant({ deviceId: "later-device", nextCounter: 1 }, "Later Member");
+    await addRow(key, remote.dev, [remote]);
+
+    for (let iteration = 0; iteration < fillerCount + 2; iteration++) {
+      await syncOnce(group.groupId, [relay]);
+      const current = await repository.readGroup(group.groupId);
+      if (current.events.some((event) => event.id === remote.id)) break;
+    }
+
+    const final = await repository.readGroup(group.groupId);
+    expect(final.events.filter((event) => event.id === remote.id)).toHaveLength(1);
+    for (let index = 0; index < fillerCount; index++) {
+      const fillerPid = final.events.find((event) => event.dev === `filler-${index}` && event.t === "ParticipantAdded");
+      expect(fillerPid, `filler-${index}'s event must have arrived exactly once`).toBeDefined();
+    }
+    expect(final.events.length).toBe(group.events.length + fillerCount + 1);
+    // The core REL-001 assertion: reaching the last (byte-ceiling-truncated-past)
+    // row required MORE than one request -- proving the server actually split
+    // this legal-but-oversized-in-aggregate row set into multiple pages instead
+    // of serializing everything (or nothing) into a single response that would
+    // have exceeded HttpRelay's own boundedText transfer ceiling and thrown.
+    expect(requests.length).toBeGreaterThan(1);
+  });
+
   it("keeps read cursors unchanged when durable event storage fails", async () => {
     const { group, key, relay } = await seed("failed-storage");
     const remote = makeEvent({ deviceId: group.deviceId, nextCounter: group.nextCounter }, "ParticipantAdded", { pid: "pending", name: "Pending" });
     await addRow(key, remote.dev, [remote]);
-    vi.spyOn(repository, "upsertRemoteEvents").mockRejectedValueOnce(new DOMException("Fixture storage full", "QuotaExceededError"));
+    vi.spyOn(repository, "promoteLedger").mockRejectedValueOnce(new DOMException("Fixture storage full", "QuotaExceededError"));
     await expect(syncOnce(group.groupId, [relay])).rejects.toThrow("Fixture storage full");
     const after = await repository.readGroup(group.groupId);
     expect(after.meta.cursors).toEqual(group.meta.cursors);
@@ -100,7 +138,7 @@ describe("operated relay recovery through the real HTTP adapter and API", () => 
     const { group, key, relay } = await seed("retry-storage");
     const remote = makeEvent({ deviceId: group.deviceId, nextCounter: group.nextCounter }, "ParticipantAdded", { pid: "recover", name: "Recovered" });
     await addRow(key, remote.dev, [remote]);
-    vi.spyOn(repository, "upsertRemoteEvents").mockRejectedValueOnce(new DOMException("Fixture storage full", "QuotaExceededError"));
+    vi.spyOn(repository, "promoteLedger").mockRejectedValueOnce(new DOMException("Fixture storage full", "QuotaExceededError"));
     await expect(syncOnce(group.groupId, [relay])).rejects.toThrow("Fixture storage full");
     await syncOnce(group.groupId, [relay]);
     const after = await repository.readGroup(group.groupId);

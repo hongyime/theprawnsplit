@@ -30,9 +30,27 @@ describe("export prompt UI boundary", () => {
     expect(exportPromptBanner).toContain("on:click={dismissActiveExportPrompt}");
 
     expect(archiveGroup).toContain("const plan = createArchiveTransitionPlan(suggestedSettlements);");
-    expect(archiveGroup).toContain("const archivedExportGroup = groupWithPendingArchiveEvent(group, archiveEvent, f.nextCounter);");
+    expect(archiveGroup).toContain("if (!group || archived || !frozenPolicy.allowSettlementActions) return;");
+    expect(archiveGroup).toContain("const archivedExportGroup = groupWithPendingArchiveEvent(group, archiveEvent, reservation.counters[0]!);");
     expect(archiveGroup).toContain('if (action === "download-export")');
     expect(archiveGroup).toContain("downloadExport(undefined, archivedExportGroup);");
     expect(archiveGroup).not.toContain("activeExportPrompt");
+  });
+
+  it("exposes permanent manual Export and Share Delta actions outside the transient prompt/overdue/empty branches (FE-001)", () => {
+    const source = appSource();
+    const syncStrip = source.match(/<section class="sync-strip">([\s\S]*?)\n {8}<\/section>/)?.[1] ?? "";
+
+    expect(syncStrip).toContain('on:click={() => downloadExport()}');
+    expect(syncStrip).toContain("on:click={shareDelta}");
+
+    // T13 (FE-004) deliberately keeps these action buttons inside the
+    // collapsed <details class="advanced-panel"> disclosure (only the
+    // *required status* summary moved outside it) — see tasks.md T13's
+    // Result note. What FE-001 actually requires is that these buttons are
+    // reachable purely from `!needsSetup`, never gated behind a transient
+    // prompt/overdue/empty-state condition.
+    expect(syncStrip).not.toContain("manualFallbackDue");
+    expect(syncStrip).not.toContain("activeExportPrompt");
   });
 });

@@ -34,10 +34,14 @@ describe("currency onboarding", () => {
     expect(currencyOptions()).toContain("ZAR");
 
     const source = readFileSync(join(process.cwd(), "src", "Trip.svelte"), "utf8");
-    expect(source).not.toContain('aria-label="Trip Currency"');
-    expect(source).not.toContain('aria-label="Trip currency"');
+    // T60 (STRUCT-001): the Expense Currency select moved to
+    // src/trip/ExpensePanel.svelte; the Main Currency select stays in Trip.svelte.
+    const expensePanel = readFileSync(join(process.cwd(), "src", "trip", "ExpensePanel.svelte"), "utf8");
+    const combined = `${source}\n${expensePanel}`;
+    expect(combined).not.toContain('aria-label="Trip Currency"');
+    expect(combined).not.toContain('aria-label="Trip currency"');
     expect(source).toContain('aria-label="Main Currency"');
-    expect(source).toContain('aria-label="Expense Currency"');
-    expect(source).not.toContain('aria-label="Currency"');
+    expect(expensePanel).toContain('aria-label="Expense Currency"');
+    expect(combined).not.toContain('aria-label="Currency"');
   });
 });

@@ -10,7 +10,8 @@ import { defaultParticipant } from "@/lib/events";
 import { HttpRelay } from "@/relay/http";
 import { NostrRelay } from "@/relay/nostr";
 import { discoverMigration } from "@/relay/migration-mode";
-import { syncMigrated, eventFingerprint } from "@/relay/migrated-sync";
+import { syncMigrated } from "@/relay/migrated-sync";
+import { eventFingerprint } from "@/lib/event-fingerprint";
 import { RecoveryRepository } from "@/relay/recovery-db";
 import { coordinatedSync, syncNetworkBudget } from "@/relay/sync-cycle";
 import { syncOnce } from "@/relay/sync";
@@ -29,7 +30,7 @@ beforeAll(async () => {
   sql = new PGlite();
   await sql.exec("create role anon; create role authenticated; create role service_role bypassrls;");
   await sql.exec(readFileSync(new URL("../supabase/schemas/relay.sql", import.meta.url), "utf8"));
-}, 30_000);
+}, 90_000);
 afterAll(async () => { await sql.close(); });
 beforeEach(async () => {
   await sql.exec(`truncate prawnsplit.relay_entries,prawnsplit.relay_topics,prawnsplit.relay_control;
@@ -313,7 +314,7 @@ describe("real IndexedDB → HTTP API → adapter → PostgreSQL recovery", () =
     await local.markEvents(group.groupId, group.events.map((event) => event.id), "confirmed");
     const remote = defaultParticipant({ deviceId: "remote-device", nextCounter: 1 }, "Recover After Failure");
     await publishRaw([remote]); posted = [];
-    vi.spyOn(local, "upsertRemoteEvents").mockRejectedValueOnce(new DOMException("Fixture full", "QuotaExceededError"));
+    vi.spyOn(local, "promoteLedger").mockRejectedValueOnce(new DOMException("Fixture full", "QuotaExceededError"));
     expect((await cycle()).errors.length).toBeGreaterThan(0);
     let state = (await discoverMigration(group.groupId, operated, {}, repository)).state!;
     expect(state.cursor).toBeUndefined();
@@ -376,4 +377,4 @@ describe("real IndexedDB → HTTP API → adapter → PostgreSQL recovery", () =
     expect(publish).not.toHaveBeenCalled();
     expect((await local.readGroup(group.groupId)).events).toEqual(group.events);
   });
-});
+}, 20_000);

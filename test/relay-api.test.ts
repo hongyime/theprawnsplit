@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
-import handler, { isValidWriteProof, parseRelayNumericLimit, verifyRelayWriteProof, writeProofCommitment } from "../api/relay";
+import handler, { boundEntriesByBytes, checkAdmission, isValidWriteProof, parseRelayNumericLimit, verifyRelayWriteProof, writeProofCommitment } from "../api/relay";
 
 const tag = "a".repeat(64);
 const proof = "b".repeat(64);
@@ -38,6 +38,34 @@ describe("operated relay API", () => {
     expect(parseRelayNumericLimit("0", 500)).toBe(500);
     expect(parseRelayNumericLimit("-1", 500)).toBe(500);
     expect(parseRelayNumericLimit("42.9", 500)).toBe(42);
+  });
+
+  it("boundEntriesByBytes keeps every entry when the total serialized size fits", () => {
+    const entries = [
+      { cursor: "1-1", author: "a", blob: "short" },
+      { cursor: "1-2", author: "b", blob: "also-short" },
+    ];
+    expect(boundEntriesByBytes(entries, 10_000)).toEqual(entries);
+  });
+
+  it("boundEntriesByBytes drops trailing entries once the next one would exceed the byte ceiling, keeping earlier entries whole", () => {
+    const entries = [
+      { cursor: "1-1", author: "a", blob: "x".repeat(100) },
+      { cursor: "1-2", author: "a", blob: "x".repeat(100) },
+      { cursor: "1-3", author: "a", blob: "x".repeat(100) },
+    ];
+    const singleEntryBytes = new TextEncoder().encode(JSON.stringify(entries[0])).byteLength;
+    const bounded = boundEntriesByBytes(entries, singleEntryBytes + 10);
+    expect(bounded).toEqual([entries[0]]);
+  });
+
+  it("boundEntriesByBytes always returns at least the first entry, even if it alone exceeds the byte ceiling (no empty-progress stall)", () => {
+    const entries = [{ cursor: "1-1", author: "a", blob: "x".repeat(200_000) }];
+    expect(boundEntriesByBytes(entries, 10)).toEqual(entries);
+  });
+
+  it("boundEntriesByBytes returns an empty array for an empty input", () => {
+    expect(boundEntriesByBytes([], 10_000)).toEqual([]);
   });
 
   it("rejects malformed relay requests before touching storage", async () => {
@@ -115,5 +143,29 @@ describe("operated relay API", () => {
 
     expect(response.status).toBe(405);
     await expect(body(response)).resolves.toEqual({ error: "method not allowed" });
+  });
+
+  it("checkAdmission returns null (admit) when the budget allows the write", async () => {
+    const store: import("../server/relay-admission").AdmissionStore = {
+      async reserveSetSlot() { return "added"; },
+      async releaseSetSlot() {},
+      async incrby() { return 1; },
+      async decrby() {},
+    };
+    await expect(checkAdmission(store, tag, "device-a", 100)).resolves.toBeNull();
+  });
+
+  it("checkAdmission returns a 429 with a Retry-After header when the budget is exceeded, and does not throw", async () => {
+    const store: import("../server/relay-admission").AdmissionStore = {
+      async reserveSetSlot() { return "rejected"; },
+      async releaseSetSlot() {},
+      async incrby() { return 1; },
+      async decrby() {},
+    };
+    const response = await checkAdmission(store, tag, "device-a", 100);
+    expect(response).not.toBeNull();
+    expect(response!.status).toBe(429);
+    expect(response!.headers.get("retry-after")).toBe("60");
+    await expect(body(response!)).resolves.toEqual({ error: "relay resource budget exceeded" });
   });
 });

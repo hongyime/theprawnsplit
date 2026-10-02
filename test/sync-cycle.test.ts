@@ -164,7 +164,7 @@ it("does not mark a snapshot published without any relay acknowledgement", async
 
 it("clears the cycle timer after success before its time limit expires", async () => {
   await resetRepositoryForTests(`successful-cycle-cleanup-${crypto.randomUUID()}`);
-  const group = await createGroup("Synthetic Timer Cleanup", "SGD");
+  const group = await createGroup("Synthetic timer cleanup", "SGD");
   vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
   const entries: RelayEntry[] = [];
   const relay: Relay = { name: "fixture", async publish(_tag, author, blob) {

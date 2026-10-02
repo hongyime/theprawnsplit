@@ -72,10 +72,10 @@ async function settle() {
 
 describe("selected trip lifetime", () => {
   it("reports a local storage failure without mislabelling a valid join link", async () => {
-    vi.spyOn(repo, "ensureGroup").mockRejectedValueOnce(new Error("Fixture Local Storage Is Full"));
+    vi.spyOn(repo, "ensureGroup").mockRejectedValueOnce(new Error("Fixture local storage is full"));
     window.history.replaceState(null, "", buildJoinLink(window.location.href, repo.createJoinSeed(groups[1]!)));
     window.dispatchEvent(new HashChangeEvent("hashchange"));
-    expect(await screen.findByRole("alert")).toHaveProperty("textContent", "Fixture Local Storage Is Full");
+    expect(await screen.findByRole("alert")).toHaveProperty("textContent", "Fixture local storage is full");
     expect(await repo.listGroups()).toHaveLength(2);
   });
 
@@ -87,8 +87,8 @@ describe("selected trip lifetime", () => {
       await paused; return createIdentity(...args);
     });
     await select(1);
-    fireEvent.input(screen.getByPlaceholderText("e.g. John Smith"), { target: { value: "Fixture Delayed Claim" } });
-    fireEvent.click(screen.getByRole("button", { name: "Create My Spot" }));
+    fireEvent.input(screen.getByPlaceholderText("e.g. John Smith"), { target: { value: "Fixture delayed claim" } });
+    fireEvent.click(screen.getByRole("button", { name: "Create my spot" }));
     await waitFor(() => expect(identity).toHaveBeenCalledTimes(1));
     fireEvent.click(screen.getByTitle("All Trips")); await screen.findByText("Your Trips"); await select(0);
     const preserved = await repo.readGroup(groups[0]!.groupId);
@@ -97,7 +97,7 @@ describe("selected trip lifetime", () => {
     const after = await repo.readGroup(groups[0]!.groupId);
     expect(after.events).toEqual(preserved.events);
     expect(after.identities).toEqual(preserved.identities);
-    expect(document.body.textContent).not.toContain("Fixture Delayed Claim");
+    expect(document.body.textContent).not.toContain("Fixture delayed claim");
   });
 
   it("ignores an older navigation read when a newer join link has opened", async () => {
@@ -128,10 +128,10 @@ describe("selected trip lifetime", () => {
 
   it("does not carry an old trip's sync error or form state into another trip", async () => {
     await select(1); await startSync();
-    fireEvent.input(screen.getByPlaceholderText("e.g. John Smith"), { target: { value: "Old Fixture Name" } });
+    fireEvent.input(screen.getByPlaceholderText("e.g. John Smith"), { target: { value: "Old fixture name" } });
     fireEvent.click(screen.getByTitle("All Trips")); await screen.findByText("Your Trips"); await select(0);
-    fail(new Error("Fixture Old Trip Failure")); await settle();
-    expect(document.body.textContent).not.toContain("Fixture Old Trip Failure");
+    fail(new Error("Fixture old trip failure")); await settle();
+    expect(document.body.textContent).not.toContain("Fixture old trip failure");
     expect((screen.getByPlaceholderText("e.g. John Smith") as HTMLInputElement).value).toBe("");
   });
 

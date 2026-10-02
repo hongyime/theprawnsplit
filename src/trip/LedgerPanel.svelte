@@ -32,7 +32,7 @@
       <div>
         <strong>{expense.desc}</strong>
         <span>{expense.date}</span>
-        <span class="sync-coverage" class:ok-coverage={coverage === "Everyone Has This"}>{coverage}</span>
+        <span class="sync-coverage" class:ok-coverage={coverage === "Everyone has this"}>{coverage}</span>
         <span class="payer-summary">{payerSummary(expense.financials.payers)}</span>
         {#if expense.financials.rate}<span class="payer-summary">{rateSummary(expense.financials.rate)}</span>{/if}
         {#if expense.financialHistory.length > 1}
@@ -53,5 +53,5 @@
       </div>
     </div>
   {/each}
-  {#if expenses.length === 0}<p class="hint">No Expenses Yet.</p>{/if}
+  {#if expenses.length === 0}<p class="hint">No expenses yet.</p>{/if}
 </section>

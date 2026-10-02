@@ -41,7 +41,7 @@ describe("participant claim UI boundary (rendered)", () => {
 
     const body = document.body.textContent ?? "";
     const unclaimedIdx = body.indexOf("Unclaimed");
-    const addInput = document.querySelector('input[placeholder="Add Shadow Participant"]');
+    const addInput = document.querySelector('input[placeholder="Add shadow participant"]');
     const addIdx = addInput ? body.length : -1; // input placeholder isn't in textContent; use presence instead
     expect(unclaimedIdx).toBeGreaterThanOrEqual(0);
     expect(addInput).not.toBeNull(); // create-new input exists (comes after Unclaimed in DOM order)

@@ -13,19 +13,23 @@
 </script>
 <button {type} class="neo-btn {className}" {disabled} on:click={onclick}><slot /></button>
 <style>
+  /* The coral stamp: reserved for the one primary action on a screen. */
   .neo-btn {
-    border: 2px solid var(--neo-border);
-    box-shadow: 3px 3px 0 var(--neo-border);
-    background: var(--neo-bg);
-    color: var(--neo-fg);
+    border: 1.5px solid var(--coral);
+    background: var(--coral);
+    color: #fff;
+    font-family: var(--font-mono);
     font-weight: 600;
-    cursor: pointer;
-    padding: 8px 16px;
-    font-family: inherit;
-    border-radius: 0;
+    letter-spacing: 0.04em;
+    border-radius: var(--radius);
+    box-shadow: none;
   }
-  .neo-btn:active {
-    box-shadow: 0 0 0;
-    transform: translate(2px, 2px);
+  .neo-btn:not(:disabled):hover {
+    transform: translate(-1px, -1px);
+    box-shadow: 3px 3px 0 var(--ink);
+  }
+  .neo-btn:not(:disabled):active {
+    transform: translate(1px, 1px);
+    box-shadow: none;
   }
 </style>

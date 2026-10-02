@@ -384,15 +384,15 @@ export async function ensureGroup(seed?: JoinSeed): Promise<GroupRecord> {
       !/^[a-f0-9]{64}$/.test(seed.tagHex) ||
       (seed.name !== undefined && typeof seed.name !== "string") ||
       (seed.currency !== undefined && typeof seed.currency !== "string"))) {
-    throw new Error("Join Link Is Malformed.");
+    throw new Error("Join link is malformed.");
   }
   const deviceId = newId("d");
   const secret = seed ? secretFromBase64(seed.secretB64) : createGroupSecret();
-  if (secret.length !== 32) throw new Error("Join Secret Is Invalid.");
+  if (secret.length !== 32) throw new Error("Join secret is invalid.");
   // Finish cryptography before opening the IDB transaction: awaiting unrelated
   // work inside it can close the transaction before the lookup and write finish.
   const tagHex = await groupTag(secret);
-  if (seed && seed.tagHex !== tagHex) throw new Error("Join Secret Does Not Match This Trip.");
+  if (seed && seed.tagHex !== tagHex) throw new Error("Join secret does not match this trip.");
   const group: StoredGroup = {
     groupId: newId("g"),
     name: seed?.name?.trim() || "Trip",
@@ -420,7 +420,7 @@ export async function ensureGroup(seed?: JoinSeed): Promise<GroupRecord> {
   if (existing) {
     await tx.done;
     if (seed && secretToBase64(secretFromBase64(existing.secretB64)) !== group.secretB64) {
-      throw new Error("Stored Trip Secret Does Not Match The Join Link.");
+      throw new Error("Stored trip secret does not match the join link.");
     }
     return readGroup(existing.groupId);
   }

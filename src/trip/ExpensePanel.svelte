@@ -64,7 +64,7 @@
         {/each}
       </select>
       {#if normalizeCurrency(expenseCurrency || currency) !== currency}
-        <input bind:value={exchangeRate} inputmode="decimal" placeholder={`1 ${normalizeCurrency(expenseCurrency)} To ${currency}`} aria-label="Exchange Rate To Group Currency" disabled={archived} on:input={() => (showExpenseHint = true)} />
+        <input bind:value={exchangeRate} inputmode="decimal" placeholder={`1 ${normalizeCurrency(expenseCurrency)} To ${currency}`} aria-label="Exchange rate to group currency" disabled={archived} on:input={() => (showExpenseHint = true)} />
       {/if}
     </div>
     <div class="segmented payer-mode" aria-label="Payer Mode">

@@ -37,7 +37,7 @@
       if (encoded === null) return null;
       let seed;
       try { seed = decodeJoinSeed(encoded); }
-      catch { throw new Error("Join Link Is Malformed."); }
+      catch { throw new Error("Join link is malformed."); }
       return ensureGroup(seed);
     }, encoded !== null, params.get("recovery") === "evicted" ? "evicted" : "first-join");
   }
@@ -52,18 +52,18 @@
 
 {#if error}<p class="error" role="alert">{error}</p>{/if}
 {#if loading}
-  <main class="center">Loading Local Ledger...</main>
+  <main class="center">Loading local ledger...</main>
 {:else if !selection && storedGroups.length === 0}
   <main class="landing-screen">
     <NeoCard class="landing-content">
       <img src="/favicon.svg" alt="The Prawn Split" class="landing-logo" width="64" height="64" />
       <h1>The Prawn Split</h1>
       <p class="tagline">
-        Split Trip Costs With Friends.<br />
-        No Accounts. No Ads. Works Offline.
+        Split trip costs with friends.<br />
+        No accounts. No ads. Works offline.
       </p>
-      <NeoButton class="landing-btn" onclick={startNewTrip}>Start A New Trip</NeoButton>
-      <p class="hint-note">Got A Link From A Friend? Just Open It.</p>
+      <NeoButton class="landing-btn" onclick={startNewTrip}>Start a new trip</NeoButton>
+      <p class="hint-note">Got a link from a friend? Just open it.</p>
     </NeoCard>
   </main>
 {:else if !selection && storedGroups.length > 0}
@@ -75,7 +75,7 @@
       </div>
       <div class="trips-header">
         <h2>Your Trips</h2>
-        <NeoButton onclick={startNewTrip}>+ Start A New Trip</NeoButton>
+        <NeoButton onclick={startNewTrip}>+ Start a new trip</NeoButton>
       </div>
       <div class="trips-list" role="list">
         {#each storedGroups as g}

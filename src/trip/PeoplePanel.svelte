@@ -41,13 +41,13 @@
   {#if participants.length === 0}
     <div class="empty">
       {#if recoveryActive}
-        <p>Waiting For Recovered Trip Data.</p>
+        <p>Waiting for recovered trip data.</p>
         <button type="button" disabled={syncing} on:click={runSync}><Icon name="refresh-ccw" size={17} /> Retry Sync</button>
       {:else}
-        <p>Add People To Start A Trip Ledger.</p>
+        <p>Add people to start a trip ledger.</p>
         <div class="empty-actions">
           <button type="button" on:click={() => participantNameInput?.focus()}><Icon name="users" size={17} /> Add People</button>
-          <button type="button" on:click={() => downloadExport()}><Icon name="download" size={17} /> Share Trip File</button>
+          <button type="button" on:click={() => downloadExport()}><Icon name="download" size={17} /> Share trip file</button>
         </div>
       {/if}
     </div>
@@ -121,10 +121,10 @@
     {/if}
   {/if}
   <form class="row create-person" on:submit|preventDefault={addParticipant}>
-    <input bind:this={participantNameInput} bind:value={participantName} placeholder="Add Shadow Participant" disabled={archived} />
+    <input bind:this={participantNameInput} bind:value={participantName} placeholder="Add shadow participant" disabled={archived} />
     <button type="submit" disabled={joinBlocked || archived}><Icon name="plus" size={17} /> Add</button>
   </form>
   {#if participantNameMatch}
-    <p class="hint duplicate-hint">{matchText(participantNameMatch)} Select The Existing Person Before Creating A New One.</p>
+    <p class="hint duplicate-hint">{matchText(participantNameMatch)} Select the existing person before creating a new one.</p>
   {/if}
 </article>

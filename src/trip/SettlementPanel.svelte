@@ -50,15 +50,19 @@
       <button type="button" class="settle-suggestion" disabled={archived} on:click={() => recordSettlement(transfer.from, transfer.to, formatMinorInput(transfer.minor))}>
         {participantLabel(transfer.from)} Pays {participantLabel(transfer.to)} {formatMinor(transfer.minor, currency)}
       </button>
-    {:else}
-      <p class="settled-note">Nobody owes anybody. Nothing to settle.</p>
     {/each}
-    <div class="form-grid">
-      <select bind:value={settleFrom} disabled={archived}><option value="">From</option>{#each participants as p}<option value={p.pid}>{p.name}</option>{/each}</select>
-      <select bind:value={settleTo} disabled={archived}><option value="">To</option>{#each participants as p}<option value={p.pid}>{p.name}</option>{/each}</select>
-      <input bind:value={settleAmount} inputmode="decimal" placeholder="Amount" disabled={archived} />
-      <button type="button" disabled={!canRecordManualSettlement} on:click={() => recordSettlement(settleFrom, settleTo, settleAmount)}>Record</button>
-    </div>
+    <!-- The suggestions above are the primary path. The manual form handles the
+         general case (partial repayments, cash outside the suggestions) and is
+         tucked behind a disclosure so it never competes with them. -->
+    <details class="manual-settle">
+      <summary>Record a different payment</summary>
+      <div class="form-grid">
+        <select bind:value={settleFrom} disabled={archived}><option value="">From</option>{#each participants as p}<option value={p.pid}>{p.name}</option>{/each}</select>
+        <select bind:value={settleTo} disabled={archived}><option value="">To</option>{#each participants as p}<option value={p.pid}>{p.name}</option>{/each}</select>
+        <input bind:value={settleAmount} inputmode="decimal" placeholder="Amount" disabled={archived} />
+        <button type="button" disabled={!canRecordManualSettlement} on:click={() => recordSettlement(settleFrom, settleTo, settleAmount)}>Record</button>
+      </div>
+    </details>
   {/if}
   {#if settlements.length && frozenPolicy.allowSettlementActions}
     <div class="settlement-list">

@@ -1338,7 +1338,7 @@
     {/if}
     {#if archived}<p class="warning">This trip is archived. The ledger remains readable and exportable. Relay retention is outside this app's control; archiving does not delete relay data.</p>{/if}
     {#if clockSkewWarning}<p class="warning">{clockSkewWarning}</p>{/if}
-    {#if settledView}
+    {#if settledView && expenses.length}
       <section class="prompt-banner settled-banner">
         <div>
           <strong>Balances are settled</strong>
@@ -1544,7 +1544,7 @@
     {/if}
 
     {#if !needsSetup}
-    <section class="grid">
+    <section class="grid" class:grid-empty={expenses.length === 0}>
       <PeoplePanel
         {participants}
         {participantClaimGroups}
@@ -1571,6 +1571,7 @@
         {downloadExport}
       />
 
+      {#if expenses.length}
       <article class="panel balances">
         <h2><Icon name="wallet" size={18} /> Balances</h2>
         <p class="panel-lede">What each person paid, minus their share. Bars to the right are owed money; bars to the left owe it.</p>
@@ -1586,6 +1587,7 @@
           <p class="warning compact-warning">Balances hidden until this app supports every retained event.</p>
         {/if}
       </article>
+      {/if}
 
       <ExpensePanel
         {archived}
@@ -1622,6 +1624,7 @@
         {splitModeLabel}
       />
 
+      {#if expenses.length}
       <SettlementPanel
         {archived}
         {currency}
@@ -1643,6 +1646,7 @@
         {participantLabel}
         {localIdentityForPid}
       />
+      {/if}
 
       <LedgerPanel
         {expenses}

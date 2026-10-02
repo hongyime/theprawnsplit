@@ -503,16 +503,19 @@ textarea {
   background: var(--paper-2);
 }
 
-/* ---------------------------------------------------------------- toast */
+/* Out of flow, bottom-centre, so it never shifts the layout and never covers
+   the masthead controls. z-index sits below the overflow menu (8) and modal (10). */
 .toast {
   overflow-wrap: anywhere;
-  position: sticky;
-  top: 10px;
-  z-index: 6;
+  position: fixed;
+  left: 50%;
+  bottom: 1.25rem;
+  transform: translateX(-50%);
+  z-index: 7;
   width: fit-content;
-  max-width: 100%;
-  margin: 0 0 0 auto;
-  padding: 0.6rem 0.85rem;
+  max-width: min(32rem, calc(100vw - 2rem));
+  margin: 0;
+  padding: 0.65rem 1rem;
   border: 1.5px solid var(--ink);
   border-radius: var(--radius);
   background: var(--ink);
@@ -520,7 +523,13 @@ textarea {
   font-family: var(--font-mono);
   font-size: 0.8rem;
   box-shadow: var(--shadow-stamp);
-  animation: rise 220ms var(--ease-out) both;
+  pointer-events: none;
+  animation: toast-in 240ms var(--ease-out) both;
+}
+
+@keyframes toast-in {
+  from { opacity: 0; transform: translate(-50%, 8px); }
+  to { opacity: 1; transform: translate(-50%, 0); }
 }
 
 /* ---------------------------------------------------------------- layout utils */
@@ -1099,6 +1108,14 @@ textarea {
   align-items: start;
 }
 
+/* Empty trip: Balances and Settle are not rendered, so collapse their rows.
+   Ledger moves up beside People; the expense form stays in the right rail. */
+.grid.grid-empty {
+  grid-template-areas:
+    "ledger ledger people"
+    "ledger ledger expense";
+}
+
 .panel {
   padding: 0.9rem 0 0;
   border-top: 2px solid var(--ink);
@@ -1237,6 +1254,44 @@ textarea {
 
 .settle-suggestion:not(:disabled):hover {
   background: var(--paper);
+}
+
+.manual-settle {
+  margin-top: 0.5rem;
+}
+
+.manual-settle > summary {
+  list-style: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-height: 2rem;
+  color: var(--ink-3);
+  font-family: var(--font-mono);
+  font-size: 0.74rem;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+}
+
+.manual-settle > summary::-webkit-details-marker {
+  display: none;
+}
+
+.manual-settle > summary::before {
+  content: "+";
+  font-size: 0.95rem;
+}
+
+.manual-settle[open] > summary::before {
+  content: "−";
+}
+
+.manual-settle[open] > summary {
+  color: var(--ink);
+}
+
+.manual-settle > .form-grid {
+  margin-top: 0.5rem;
 }
 
 .settlements .form-grid {
@@ -1712,6 +1767,14 @@ textarea {
   font-size: 1.05rem;
 }
 
+.empty p.hint {
+  font-family: var(--font-display);
+  font-size: 0.95rem;
+  line-height: 1.5;
+  max-width: 44ch;
+  color: var(--ink-3);
+}
+
 .empty-actions {
   display: flex;
   flex-wrap: wrap;
@@ -1907,16 +1970,6 @@ textarea {
   max-width: 48ch;
 }
 
-.settled-note {
-  margin: 0.25rem 0 0.5rem;
-  padding: 0.75rem 0.9rem;
-  border: 1.5px dashed var(--sea);
-  border-radius: var(--radius);
-  color: var(--sea-ink);
-  font-size: 1rem;
-  font-variation-settings: "opsz" 18, "SOFT" 40, "WONK" 0;
-}
-
 .share-caution {
   margin: 0.6rem 0 0;
   padding: 0.6rem 0.75rem;
@@ -2071,6 +2124,13 @@ textarea {
     gap: 18px;
   }
 
+  .grid.grid-empty {
+    grid-template-areas:
+      "people"
+      "expense"
+      "ledger";
+  }
+
   .relay-settings-panel {
     grid-template-columns: 1fr;
   }
@@ -2146,11 +2206,6 @@ textarea {
   .settlements .form-grid > input,
   .settlements .form-grid > button {
     grid-column: auto;
-  }
-
-  .toast {
-    width: 100%;
-    margin-left: 0;
   }
 
   .landing-content {

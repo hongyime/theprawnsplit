@@ -53,5 +53,10 @@
       </div>
     </div>
   {/each}
-  {#if expenses.length === 0}<p class="hint">No expenses yet.</p>{/if}
+  {#if expenses.length === 0}
+    <div class="empty">
+      <p>Nothing on the bill yet.</p>
+      <p class="hint">Add the first expense on the right. Balances and who-owes-whom appear here once there is something to split.</p>
+    </div>
+  {/if}
 </section>

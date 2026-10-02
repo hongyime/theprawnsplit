@@ -1744,38 +1744,96 @@ textarea {
 }
 
 /* ---------------------------------------------------------------- landing */
+/* The landing IS a receipt: a sheet with a torn bottom edge, the title set
+   enormous at Fraunces' largest optical size, one coral word, mono footer. */
 .landing-screen {
   min-height: 100vh;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 1.5rem 1rem;
+  padding: 2rem 1rem 3rem;
+  background:
+    radial-gradient(60% 50% at 50% 0%, var(--paper-2) 0%, transparent 70%),
+    var(--paper);
 }
 
 .landing-content {
+  position: relative;
   width: 100%;
-  max-width: 26rem;
+  max-width: 30rem;
   margin: 0 auto;
-  text-align: center;
+  padding: 2.25rem 2.25rem 2.75rem !important;
+  text-align: left;
   display: flex;
   flex-direction: column;
+  align-items: stretch;
+  border-bottom: 0 !important;
+  box-shadow: none !important;
+  filter: drop-shadow(5px 5px 0 var(--ink));
+  animation: rise 700ms var(--ease-out) both;
+  /* ruled paper */
+  background:
+    repeating-linear-gradient(180deg, transparent 0 31px, var(--rule-soft) 31px 32px) 0 1.1rem,
+    var(--paper) !important;
+}
+
+/* torn bottom edge, drawn with the page's own paper colour so it reads as a cut */
+.landing-content::after {
+  content: "";
+  position: absolute;
+  left: -1.5px;
+  right: -1.5px;
+  bottom: -6px;
+  height: 7px;
+  background: var(--paper);
+  clip-path: polygon(
+    0 100%, 0 0, 3% 90%, 6% 10%, 9% 95%, 12% 20%, 15% 100%, 18% 15%, 21% 85%, 24% 5%,
+    27% 95%, 30% 25%, 33% 90%, 36% 10%, 39% 100%, 42% 20%, 45% 80%, 48% 0, 51% 90%,
+    54% 15%, 57% 100%, 60% 10%, 63% 85%, 66% 25%, 69% 95%, 72% 5%, 75% 90%, 78% 20%,
+    81% 100%, 84% 10%, 87% 85%, 90% 0, 93% 95%, 96% 15%, 100% 100%
+  );
+}
+
+@media (prefers-color-scheme: dark) {
+  .landing-content { filter: drop-shadow(5px 5px 0 var(--ink-3)); }
+}
+
+.landing-receipt-head {
+  display: flex;
   align-items: center;
-  animation: rise 600ms var(--ease-out) both;
+  justify-content: space-between;
+  gap: 1rem;
+  padding-bottom: 1rem;
+  margin-bottom: 1.5rem;
+  border-bottom: 1.5px solid var(--ink);
+  animation: fade-in 500ms var(--ease-out) 150ms both;
+}
+
+.landing-receipt-head .receipt-kicker {
+  margin: 0;
+  color: var(--ink-3);
 }
 
 .landing-logo {
-  width: 64px;
-  height: 64px;
-  margin-bottom: 1.25rem;
+  width: 44px;
+  height: 44px;
+  margin: 0;
 }
 
 .landing-content h1 {
-  margin: 0 0 0.6rem;
-  font-size: clamp(2.4rem, 7vw, 3.4rem);
-  font-weight: 500;
-  letter-spacing: -0.03em;
-  line-height: 0.98;
-  font-variation-settings: "opsz" 144, "SOFT" 70, "WONK" 1;
+  margin: 0 0 1rem -0.05em;
+  font-size: clamp(3.4rem, 13vw, 5.6rem);
+  font-weight: 400;
+  letter-spacing: -0.045em;
+  line-height: 0.88;
+  font-variation-settings: "opsz" 144, "SOFT" 100, "WONK" 1;
+  animation: rise 700ms var(--ease-out) 250ms both;
+}
+
+.landing-content h1 em {
+  font-style: normal;
+  color: var(--coral);
+  font-variation-settings: "opsz" 144, "SOFT" 100, "WONK" 1, "wght" 550;
 }
 
 .tagline {
@@ -1783,14 +1841,17 @@ textarea {
   color: var(--ink-2);
   font-size: 1.05rem;
   line-height: 1.5;
+  max-width: 24rem;
+  animation: rise 600ms var(--ease-out) 400ms both;
 }
 
 .landing-btn {
   width: 100%;
-  min-height: 3.1rem;
+  min-height: 3.3rem;
   font-size: 0.9rem;
   font-weight: 600;
-  margin-bottom: 1.25rem;
+  margin-bottom: 1rem;
+  animation: rise 600ms var(--ease-out) 520ms both;
 }
 
 .hint-note {
@@ -1798,6 +1859,72 @@ textarea {
   color: var(--ink-3);
   font-size: 0.74rem;
   letter-spacing: 0.02em;
+  text-align: center;
+  animation: fade-in 500ms var(--ease-out) 640ms both;
+}
+
+/* till footer: three facts, set like line items */
+.landing-footer {
+  display: grid;
+  gap: 0;
+  margin: 2rem 0 0;
+  padding-top: 0.5rem;
+  border-top: 1px dashed var(--rule);
+  animation: fade-in 600ms var(--ease-out) 760ms both;
+}
+
+.landing-footer div {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.5rem 0;
+  border-bottom: 1px dotted var(--rule-soft);
+  font-family: var(--font-mono);
+  font-size: 0.74rem;
+  letter-spacing: 0.02em;
+}
+
+.landing-footer div:last-child {
+  border-bottom: 0;
+}
+
+.landing-footer dt {
+  color: var(--ink-3);
+}
+
+.landing-footer dd {
+  margin: 0;
+  color: var(--ink);
+  text-align: right;
+}
+
+/* ---------------------------------------------------------------- panel ledes & notes */
+.panel-lede {
+  margin: -0.35rem 0 0.9rem;
+  color: var(--ink-3);
+  font-size: 0.82rem;
+  line-height: 1.45;
+  max-width: 48ch;
+}
+
+.settled-note {
+  margin: 0.25rem 0 0.5rem;
+  padding: 0.75rem 0.9rem;
+  border: 1.5px dashed var(--sea);
+  border-radius: var(--radius);
+  color: var(--sea-ink);
+  font-size: 1rem;
+  font-variation-settings: "opsz" 18, "SOFT" 40, "WONK" 0;
+}
+
+.share-caution {
+  margin: 0.6rem 0 0;
+  padding: 0.6rem 0.75rem;
+  border-left: 3px solid var(--amber);
+  background: var(--amber-wash);
+  color: var(--amber-ink);
+  font-size: 0.85rem;
+  line-height: 1.45;
 }
 
 /* ---------------------------------------------------------------- trip list */
@@ -2024,5 +2151,18 @@ textarea {
   .toast {
     width: 100%;
     margin-left: 0;
+  }
+
+  .landing-content {
+    padding: 1.75rem 1.25rem 2.25rem !important;
+  }
+
+  .landing-footer div {
+    flex-direction: column;
+    gap: 0.15rem;
+  }
+
+  .landing-footer dd {
+    text-align: left;
   }
 }

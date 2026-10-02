@@ -993,7 +993,7 @@
       await refreshCounts();
       await refreshDurabilityPrompts();
       const relayIssues = result.diagnostics.filter((diagnostic) => diagnostic.severity !== "info").length;
-      syncStatus = `${result.published} Published, ${result.confirmed} Confirmed, ${result.received} Received, ${result.buffered} Buffered, ${result.dropped} Dropped, ${result.snapshotsSeen} Snapshots Seen, ${result.snapshotsPublished} Snapshots Published${relayIssues ? `; ${relayIssues} Relay Issue${relayIssues === 1 ? "" : "s"}.` : result.errors.length ? `; ${result.errors[0]}` : "."}`;
+      syncStatus = `${result.published} published, ${result.confirmed} confirmed, ${result.received} received, ${result.buffered} buffered, ${result.dropped} dropped, ${result.snapshotsSeen} snapshots seen, ${result.snapshotsPublished} snapshots published${relayIssues ? `; ${relayIssues} relay issue${relayIssues === 1 ? "" : "s"}.` : result.errors.length ? `; ${result.errors[0]}` : "."}`;
     } catch (err) {
       if (disposed) return;
       syncStatus = "Sync failed. Manual Export/Import is still available.";
@@ -1006,8 +1006,8 @@
   function recoveryMessage(): string {
     if (!recoveryAttempted || syncing) {
       return recoveryMode === "evicted"
-        ? "This device looks empty. Recovering from Relays before showing anything stale."
-        : "Recovering from Relays before rendering an empty ledger.";
+        ? "This device looks empty. Recovering from relays before showing anything stale."
+        : "Recovering from relays before rendering an empty ledger.";
     }
     if (!lastSyncResult) {
       return recoveryMode === "evicted"
@@ -1018,7 +1018,7 @@
     if (lastSyncResult.snapshotsSeen > 0) {
       return "A relay snapshot was found. Raw event history is still reconciling.";
     }
-    if (lastSyncResult.errors.length > 0) return `Relay Recovery Failed: ${lastSyncResult.errors[0]}`;
+    if (lastSyncResult.errors.length > 0) return `Relay recovery failed: ${lastSyncResult.errors[0]}`;
     return recoveryMode === "evicted"
       ? "No raw events were recovered yet. Import is the fastest way back onto this trip."
       : "No raw events were recovered yet. Import A TripLedgerExport Or retry sync.";
@@ -1336,7 +1336,7 @@
         </NeoCard>
       </section>
     {/if}
-    {#if archived}<p class="warning">This trip is archived. The ledger remains readable and exportable. Relay retention is outside this app's Control; Archiving does not delete Relay data.</p>{/if}
+    {#if archived}<p class="warning">This trip is archived. The ledger remains readable and exportable. Relay retention is outside this app's control; archiving does not delete relay data.</p>{/if}
     {#if clockSkewWarning}<p class="warning">{clockSkewWarning}</p>{/if}
     {#if settledView}
       <section class="prompt-banner settled-banner">
@@ -1573,6 +1573,7 @@
 
       <article class="panel balances">
         <h2><Icon name="wallet" size={18} /> Balances</h2>
+        <p class="panel-lede">What each person paid, minus their share. Bars to the right are owed money; bars to the left owe it.</p>
         {#if frozenPolicy.displayBalances}
           {#each balances as [pid, minor]}
             <div class:positive={minor > 0n} class:negative={minor < 0n} class="balance-row" style="--pct: {balanceScale > 0n ? Number((minor < 0n ? -minor : minor) * 1000n / balanceScale) / 1000 : 0}">
@@ -1696,6 +1697,7 @@
       <div class="modal-backdrop" role="presentation">
         <div class="modal" role="dialog" aria-modal="true" aria-label="Join QR Code" use:dialogLifecycle={{ onEscape: () => (joinQrDataUrl = "") }}>
           <h2>Join QR</h2>
+          <p class="share-caution">Anyone with this code or the link can read and add to this trip. Share it only with your group.</p>
           <img class="join-qr" src={joinQrDataUrl} alt="Join QR Code" />
           <div class="prompt-actions">
             <button type="button" class="secondary" on:click={() => (joinQrDataUrl = "")}>Close</button>

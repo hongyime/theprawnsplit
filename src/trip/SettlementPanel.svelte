@@ -50,6 +50,8 @@
       <button type="button" class="settle-suggestion" disabled={archived} on:click={() => recordSettlement(transfer.from, transfer.to, formatMinorInput(transfer.minor))}>
         {participantLabel(transfer.from)} Pays {participantLabel(transfer.to)} {formatMinor(transfer.minor, currency)}
       </button>
+    {:else}
+      <p class="settled-note">Nobody owes anybody. Nothing to settle.</p>
     {/each}
     <div class="form-grid">
       <select bind:value={settleFrom} disabled={archived}><option value="">From</option>{#each participants as p}<option value={p.pid}>{p.name}</option>{/each}</select>

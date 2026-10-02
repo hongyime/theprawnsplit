@@ -56,14 +56,22 @@
 {:else if !selection && storedGroups.length === 0}
   <main class="landing-screen">
     <NeoCard class="landing-content">
-      <img src="/favicon.svg" alt="The Prawn Split" class="landing-logo" width="64" height="64" />
-      <h1>The Prawn Split</h1>
+      <div class="landing-receipt-head">
+        <img src="/favicon.svg" alt="The Prawn Split" class="landing-logo" width="64" height="64" />
+        <span class="receipt-kicker">Shared trip ledger</span>
+      </div>
+      <h1>The Prawn <em>Split</em></h1>
       <p class="tagline">
         Split trip costs with friends.<br />
         No accounts. No ads. Works offline.
       </p>
       <NeoButton class="landing-btn" onclick={startNewTrip}>Start a new trip</NeoButton>
       <p class="hint-note">Got a link from a friend? Just open it.</p>
+      <dl class="landing-footer" aria-label="How it works">
+        <div><dt>Where your data lives</dt><dd>Only on your devices</dd></div>
+        <div><dt>Who can read it</dt><dd>Only people with the link</dd></div>
+        <div><dt>When it works</dt><dd>Offline, syncs later</dd></div>
+      </dl>
     </NeoCard>
   </main>
 {:else if !selection && storedGroups.length > 0}

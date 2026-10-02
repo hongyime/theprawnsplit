@@ -33,7 +33,9 @@ describe("lifecycle UI boundary (rendered)", () => {
 
     renderApp();
     await openTrip();
-    await screen.findByText("This trip is still active. Adding a new expense will update balances automatically.", {}, { timeout: 15000 });
+    // A brand-new group with no participants shows the setup card (not the grid), and
+    // the 'balances are settled' banner is no longer shown until expenses exist.
+    await screen.findByText("Set up the split before adding bills.", {}, { timeout: 15000 });
 
     // Archive button present and enabled on an active trip.
     const archiveBtn = [...document.querySelectorAll("button")].find((b) => b.getAttribute("title") === "Archive Trip");

@@ -54,7 +54,9 @@ async function countsOf(instance: PGlite) {
   ).rows;
 }
 
-describe("REL-008/T26 baseline migration file", { timeout: 30_000 }, () => {
+// PGlite WASM cold-start plus five real schema round-trips. 30s passes in isolation
+// but trips under full-suite load (same class as NEW-001 / supabase-device-catchup).
+describe("REL-008/T26 baseline migration file", { timeout: 90_000 }, () => {
   it("applies cleanly to a fresh, empty database with no error", async () => {
     db = await freshDb();
     await expect(db.exec(migrationSql)).resolves.not.toThrow();

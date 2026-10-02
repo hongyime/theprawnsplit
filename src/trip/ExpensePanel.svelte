@@ -110,6 +110,9 @@
       {/each}
     </div>
   {/if}
+  <!-- Subgroup presets only make sense with 3+ people (a saved subset of 2 is
+       just 'the other person'). Hidden below that so a small trip's form stays small. -->
+  {#if participants.length >= 3 || subgroupPresets.length}
   <div class="subgroup-tools">
     <div class="row subgroup-save">
       <input bind:value={subgroupName} placeholder="Save Subgroup" disabled={archived} />
@@ -126,6 +129,7 @@
       </div>
     {/if}
   </div>
+  {/if}
   {#if expenseBlockReason && (showExpenseHint || !hasLocalClaim || archived)}<p class="hint action-hint">{expenseBlockReason}</p>{/if}
   {#if amountPreview.ok && sharePreview.ok && sharePreview.remainderPid}<p class="hint">Rounding Remainder Goes To {participantLabel(sharePreview.remainderPid)}.</p>{/if}
   <NeoButton class={!canSaveExpense ? 'blocked' : ''} disabled={!canSaveExpense} onclick={addExpense}><Icon name="plus" size={17} /> Save Expense</NeoButton>

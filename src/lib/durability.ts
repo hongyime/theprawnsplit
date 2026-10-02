@@ -84,8 +84,11 @@ export function shouldPromptPinLink(state: DurabilityPromptState): boolean {
   return state.pinLinkPromptedAt === undefined;
 }
 
+// Prompt only once there is something worth protecting: a claim AND at least one
+// saved expense. A fresh, empty trip has no settlement authority to lose yet, and
+// asking on first load buries the one thing the user came to do.
 export function shouldPromptIdentityBackup(state: DurabilityPromptState, hasLocalClaim: boolean): boolean {
-  return hasLocalClaim && state.identityBackupPromptedAt === undefined;
+  return hasLocalClaim && state.firstExpensePersistRequestedAt !== undefined && state.identityBackupPromptedAt === undefined;
 }
 
 export function shouldPromptFirstZeroExport(state: DurabilityPromptState, allBalancesZero: boolean): boolean {

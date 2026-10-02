@@ -80,10 +80,13 @@ describe("durability prompt policy", () => {
     expect(shouldPromptPinLink(joined.meta.durability!)).toBe(true);
   });
 
-  it("shows the identity-backup prompt only after a local claim until handled", () => {
+  it("shows the identity-backup prompt only after a local claim AND a first saved expense, until handled", () => {
+    const withExpense = { ...emptyDurabilityPromptState(), firstExpensePersistRequestedAt: now };
     expect(shouldPromptIdentityBackup(emptyDurabilityPromptState(), false)).toBe(false);
-    expect(shouldPromptIdentityBackup(emptyDurabilityPromptState(), true)).toBe(true);
-    expect(shouldPromptIdentityBackup({ ...emptyDurabilityPromptState(), identityBackupPromptedAt: now }, true)).toBe(false);
+    // Claimed but nothing saved yet: nothing to protect, do not nag.
+    expect(shouldPromptIdentityBackup(emptyDurabilityPromptState(), true)).toBe(false);
+    expect(shouldPromptIdentityBackup(withExpense, true)).toBe(true);
+    expect(shouldPromptIdentityBackup({ ...withExpense, identityBackupPromptedAt: now }, true)).toBe(false);
   });
 
   it("allows export prompts only for first-zero and seven-day-unprotected returns", () => {

@@ -249,7 +249,7 @@ describe("real IndexedDB → HTTP API → adapter → PostgreSQL recovery", () =
   });
   it("copies previously confirmed device-only history and preserves all keys across a recovery database reopen", async () => {
     const identity = await local.ensureClaimIdentity(group, "fixture-person");
-    const historic = defaultParticipant({ deviceId: "offline-device", nextCounter: 1 }, "Retained Offline Member");
+    const historic = defaultParticipant({ deviceId: "offline-device", nextCounter: 1 }, "Retained offline member");
     await local.appendEvents(group.groupId, [historic]);
     await local.markEvents(group.groupId, [...group.events.map((event) => event.id), historic.id], "confirmed");
     const before = await local.readGroup(group.groupId);
@@ -312,7 +312,7 @@ describe("real IndexedDB → HTTP API → adapter → PostgreSQL recovery", () =
 
   it("retains its checkpoint when a local event transaction fails, then recovers the same page", async () => {
     await local.markEvents(group.groupId, group.events.map((event) => event.id), "confirmed");
-    const remote = defaultParticipant({ deviceId: "remote-device", nextCounter: 1 }, "Recover After Failure");
+    const remote = defaultParticipant({ deviceId: "remote-device", nextCounter: 1 }, "Recover after failure");
     await publishRaw([remote]); posted = [];
     vi.spyOn(local, "promoteLedger").mockRejectedValueOnce(new DOMException("Fixture full", "QuotaExceededError"));
     expect((await cycle()).errors.length).toBeGreaterThan(0);
@@ -340,7 +340,7 @@ describe("real IndexedDB → HTTP API → adapter → PostgreSQL recovery", () =
   });
 
   it("recovers duplicated late Nostr events through the actual default sync branch without publishing to Nostr", async () => {
-    const remote = defaultParticipant({ deviceId: "nostr-late-device", nextCounter: 1 }, "Nostr Late Arrival");
+    const remote = defaultParticipant({ deviceId: "nostr-late-device", nextCounter: 1 }, "Nostr late arrival");
     const { key } = await local.getGroupCrypto(group);
     const blob = await encryptEvents(key, [remote, remote]);
     const signed = finalizeEvent({ kind: 1512, created_at: 1, tags: [["t", group.tagHex]], content: blob }, generateSecretKey());

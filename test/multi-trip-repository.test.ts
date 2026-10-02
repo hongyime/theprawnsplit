@@ -18,10 +18,10 @@ describe("joining a trip alongside existing ledgers", () => {
   });
 
   it("joins a previously unseen seed and preserves every existing ledger", async () => {
-    const donor = await createGroup("Fixture Shared Trip", "EUR");
+    const donor = await createGroup("Fixture shared trip", "EUR");
     const seed = createJoinSeed(donor);
     await resetRepositoryForTests(`trip-receiver-${crypto.randomUUID()}`);
-    const local = [await createGroup("Fixture Local One", "USD"), await createGroup("Fixture Local Two", "SGD")];
+    const local = [await createGroup("Fixture local one", "USD"), await createGroup("Fixture local two", "SGD")];
     const before = await Promise.all(local.map(g => readGroup(g.groupId)));
     const joined = await ensureGroup(seed);
     expect(joined.tagHex).toBe(seed.tagHex);

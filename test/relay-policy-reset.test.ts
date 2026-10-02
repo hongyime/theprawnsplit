@@ -33,7 +33,7 @@ describe("REL-002 explicit relay policy reset (never silently resurrected)", () 
 
   it("clears every tracked endpoint's policy when no specific endpoint is named", async () => {
     await resetRepositoryForTests(`rel-002-reset-all-${crypto.randomUUID()}`);
-    const group = await createGroup("Synthetic Reset All", "SGD");
+    const group = await createGroup("Synthetic reset all", "SGD");
     await updateMeta(group.groupId, (meta) => ({
       ...meta,
       relayPolicy: {

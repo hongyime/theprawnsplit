@@ -127,7 +127,7 @@
   let settleAmount = "";
   let importText = "";
   let joinQrDataUrl = "";
-  let syncStatus = "Not Synced Yet.";
+  let syncStatus = "Not synced yet.";
   let syncing = false;
   export let joiningFromLink = false;
   let recoveryAttempted = false;
@@ -187,9 +187,9 @@
   $: recoveryActive = Boolean(joiningFromLink && joinBlocked);
   $: canSaveExpense = canAppendExpense({ archived, hasLocalClaim, description: expenseDesc, amountOk: amountPreview.ok, sharesOk: sharePreview.ok, payersOk: payerPreview.ok });
   $: {
-    if (archived) expenseBlockReason = "This Trip Is Archived.";
-    else if (!hasLocalClaim) expenseBlockReason = participants.length === 0 ? "Add And Claim Yourself First." : "Claim Yourself Before Saving Expenses.";
-    else if (!expenseDesc.trim()) expenseBlockReason = "Add A Short Description.";
+    if (archived) expenseBlockReason = "This trip is archived.";
+    else if (!hasLocalClaim) expenseBlockReason = participants.length === 0 ? "Add and claim yourself first." : "Claim yourself before saving expenses.";
+    else if (!expenseDesc.trim()) expenseBlockReason = "Add a short description.";
     else if (!amountPreview.ok) expenseBlockReason = amountPreview.message;
     else if (!payerPreview.ok) expenseBlockReason = payerPreview.message;
     else if (!sharePreview.ok) expenseBlockReason = sharePreview.message;
@@ -298,7 +298,7 @@
     const match = findParticipantNameMatch(name, participants);
     if (match) {
       selectedPids = { ...selectedPids, [match.pid]: true };
-      error = `${match.name} Already Exists. Claim That Person Or Resolve The Duplicate Before Adding Another Record.`;
+      error = `${match.name} already exists. Claim that person or resolve the duplicate before adding another record.`;
       return;
     }
     await commitReserved(1, (f) => [defaultParticipant(f, name)]);
@@ -325,14 +325,14 @@
     ]);
     selectedPids = { ...selectedPids, [event.pid]: true };
     payerPid = event.pid;
-    showToast(`${name} Is Ready. Add The First Expense.`);
+    showToast(`${name} is ready. Add the first expense.`);
   }
 
   function requestClaimParticipant(pid: string): void {
     if (!group || localClaimPids.has(pid) || archived) return;
     const participant = participants.find((p) => p.pid === pid);
     if (!participant || participant.devices.length > 0) {
-      error = "This Participant Already Has A Claiming Device. Phase 2 Does Not Self-Authorise Extra Devices.";
+      error = "This participant already has a claiming device. Phase 2 does not self-authorise extra devices.";
       return;
     }
     claimCandidatePid = pid;
@@ -342,7 +342,7 @@
     if (!group || localClaimPids.has(pid) || archived) return;
     const participant = participants.find((p) => p.pid === pid);
     if (!participant || participant.devices.length > 0) {
-      error = "This Participant Already Has A Claiming Device. Phase 2 Does Not Self-Authorise Extra Devices.";
+      error = "This participant already has a claiming device. Phase 2 does not self-authorise extra devices.";
       claimCandidatePid = "";
       return;
     }
@@ -358,7 +358,7 @@
       }),
     ]);
     claimCandidatePid = "";
-    if (!options.quiet) showToast(`${participantLabel(pid)} Claimed On This Device.`);
+    if (!options.quiet) showToast(`${participantLabel(pid)} claimed on this device.`);
   }
 
   async function requestDeviceLink(pid: string): Promise<void> {
@@ -368,9 +368,9 @@
     const text = JSON.stringify(request, null, 2);
     try {
       await navigator.clipboard.writeText(text);
-      syncStatus = "Device Link Request Copied.";
+      syncStatus = "Device link request copied.";
     } catch {
-      if (!disposed) window.prompt("Copy Device Link Request", text);
+      if (!disposed) window.prompt("Copy device link request", text);
     }
     group = await readGroup(tripId);
     await refreshState();
@@ -378,10 +378,10 @@
 
   async function acceptDeviceLinkRequest(request: DeviceLinkRequest): Promise<void> {
     if (!group || archived) return;
-    if (request.tagHex !== group.tagHex) throw new Error("Device Link Request Does Not Match This Trip");
-    if (isDeviceLinkReplay(group.events, request)) throw new Error("Device Link Request Was Already Used");
+    if (request.tagHex !== group.tagHex) throw new Error("Device link request does not match this trip");
+    if (isDeviceLinkReplay(group.events, request)) throw new Error("Device link request was already used");
     const signer = localIdentityForPid(request.pid);
-    if (!signer) throw new Error(`Claim ${participantLabel(request.pid)} On This Device Before Authorising Another Device`);
+    if (!signer) throw new Error(`Claim ${participantLabel(request.pid)} on this device before authorising another device`);
     const sig = await signClaim(signer.claimSkJwk, signer.alg, linkPayload(request));
     await commitReserved(1, (f) => [
       makeEvent(f, "DeviceLinked", {
@@ -394,7 +394,7 @@
         sig,
       }),
     ]);
-    syncStatus = `Device Linked For ${participantLabel(request.pid)}.`;
+    syncStatus = `Device linked for ${participantLabel(request.pid)}.`;
   }
 
   async function mergeParticipants(from: string, into: string): Promise<void> {
@@ -409,7 +409,7 @@
 
   async function deactivateParticipant(pid: string): Promise<void> {
     if (!group || archived) return;
-    const ok = window.confirm(`${participantLabel(pid)} Will Be Removed From Default New-Expense Split Selections. Historical Balances And Settlements Stay Unchanged.`);
+    const ok = window.confirm(`${participantLabel(pid)} will be removed from default new-expense split selections. Historical balances and settlements stay unchanged.`);
     if (!ok) return;
     await commitReserved(1, (f) => [makeEvent(f, "ParticipantDeactivated", { pid })]);
   }
@@ -423,7 +423,7 @@
     if (!group || archived || localClaimPids.has(pid)) return;
     const claim = firstParticipantClaim(pid);
     if (!claim) return;
-    const ok = window.confirm(`${participantLabel(pid)} Was Claimed By ${shortDevice(claim.deviceId)} On ${formatEventTime(claim.hlc.wall)}. Void This Claim So The Participant Can Be Reclaimed?`);
+    const ok = window.confirm(`${participantLabel(pid)} was claimed by ${shortDevice(claim.deviceId)} on ${formatEventTime(claim.hlc.wall)}. Void this claim so the participant can be reclaimed?`);
     if (!ok) return;
     await voidEvent(claim.id);
   }
@@ -466,7 +466,7 @@
 
   function participantClaimAttribution(pid: string): string {
     const claim = firstParticipantClaim(pid);
-    if (!claim) return "Not Claimed Yet";
+    if (!claim) return "Not claimed yet";
     return claimAttributionText({
       name: participantLabel(pid),
       device: shortDevice(claim.deviceId),
@@ -477,13 +477,13 @@
 
   function participantAddAttribution(pid: string): string {
     const added = participantAddedEvent(pid);
-    if (!added) return "Added By Unknown Device";
-    return `Added By ${shortDevice(added.dev)} On ${formatEventTime(added.hlc.wall)}`;
+    if (!added) return "Added by unknown device";
+    return `Added by ${shortDevice(added.dev)} on ${formatEventTime(added.hlc.wall)}`;
   }
 
   function participantStatusText(pid: string): string {
     const hidden = activeDeactivationEvent(pid);
-    return hidden ? `Hidden From Default Splits Since ${formatEventTime(hidden.hlc.wall)}` : participantAddAttribution(pid);
+    return hidden ? `Hidden from default splits since ${formatEventTime(hidden.hlc.wall)}` : participantAddAttribution(pid);
   }
 
   function claimBalance(pid: string): string {
@@ -491,14 +491,14 @@
   }
 
   function matchText(match: ParticipantNameMatch): string {
-    if (match.kind === "exact") return `${match.name} Already Exists.`;
-    if (match.kind === "prefix") return `${match.name} Looks Like The Same Person.`;
-    return `${match.name} Is Within Two Edits Of This Name.`;
+    if (match.kind === "exact") return `${match.name} already exists.`;
+    if (match.kind === "prefix") return `${match.name} Looks like the same person.`;
+    return `${match.name} is within two edits of this name.`;
   }
 
   function reattestationMessage(eventId?: string): string {
     const claim = participantClaimEvent(eventId);
-    if (!group || !claim) return "Peer Re-Attestation Is Required Before This Device Can Confirm Settlements.";
+    if (!group || !claim) return "Peer Re-Attestation is required before this device can confirm settlements.";
     const status = reattestationStatus({
       events: group.events,
       participants,
@@ -562,27 +562,27 @@
     if (!amount.ok) return { ok: false, message: amount.message };
     const total = amount.baseMinor;
     const pids = currentParticipants.filter((participant) => currentSelectedPids[participant.pid]).map((participant) => participant.pid);
-    if (pids.length === 0) return { ok: false, message: "Select At Least One Participant." };
+    if (pids.length === 0) return { ok: false, message: "Select at least one participant." };
     if (currentSplitMode === "equal") {
       const result = allocatedShares(total, pids.map(() => 1n), salt, pids);
       return result.remainderPid ? { ok: true, shares: result.shares, remainderPid: result.remainderPid } : { ok: true, shares: result.shares };
     }
     if (currentSplitMode === "exact") {
       const shares = pids.map((pid) => ({ pid, minor: parseMinor(currentExactShares[pid] ?? "") ?? -1n }));
-      if (shares.some((share) => share.minor < 0n)) return { ok: false, message: "Every Exact Share Needs An Amount." };
+      if (shares.some((share) => share.minor < 0n)) return { ok: false, message: "Every exact share needs an amount." };
       const sum = shares.reduce((a, b) => a + b.minor, 0n);
-      if (sum !== total) return { ok: false, message: "Exact Shares Must Sum To The Total." };
+      if (sum !== total) return { ok: false, message: "Exact shares must sum to the total." };
       return { ok: true, shares };
     }
     if (currentSplitMode === "shares") {
       const weights = pids.map((pid) => parseShareWeight(currentShareWeights[pid] ?? "0") ?? -1n);
-      if (weights.some((weight) => weight < 0n)) return { ok: false, message: "Share Weights Must Be Whole Numbers." };
-      if (weights.every((weight) => weight === 0n)) return { ok: false, message: "Enter At Least One Share Weight." };
+      if (weights.some((weight) => weight < 0n)) return { ok: false, message: "Share weights must be whole numbers." };
+      if (weights.every((weight) => weight === 0n)) return { ok: false, message: "Enter at least one share weight." };
       const result = allocatedShares(total, weights, salt, pids);
       return result.remainderPid ? { ok: true, shares: result.shares, remainderPid: result.remainderPid } : { ok: true, shares: result.shares };
     }
     const weights = pids.map((pid) => parsePercentageBasisPoints(currentPercentages[pid] ?? "0") ?? -1n);
-    if (weights.some((weight) => weight < 0n)) return { ok: false, message: "Percentages Must Be Valid." };
+    if (weights.some((weight) => weight < 0n)) return { ok: false, message: "Percentages must be valid." };
     if (weights.reduce((a, b) => a + b, 0n) !== 10_000n) return { ok: false, message: "Percentages Must Total 100%." };
     const result = allocatedShares(total, weights, salt, pids);
     return result.remainderPid ? { ok: true, shares: result.shares, remainderPid: result.remainderPid } : { ok: true, shares: result.shares };
@@ -621,19 +621,19 @@
   }
 
   function expenseCoverageLabel(xid: string): string {
-    if (!group) return "Sync Status Unknown";
+    if (!group) return "Sync status unknown";
     const event = [...group.events]
       .filter((candidate) => (candidate.t === "ExpenseAdded" || candidate.t === "ExpenseEdited") && candidate.xid === xid)
       .sort(eventSortKey)
       .at(-1);
-    if (!event) return "Sync Status Unknown";
-    // DATA-007: never claim "Everyone Has This" from legacy vector-only
+    if (!event) return "Sync status unknown";
+    // DATA-007: never claim "Everyone has this" from legacy vector-only
     // evidence -- only from genuine durable-coverage proof. "unknown"
     // (no coverage evidence from some known device at all) is shown
     // distinctly rather than defaulting to either extreme.
     const status = isEventCoveredByEveryKnownDevice(group.events, event);
-    if (status === "covered") return "Everyone Has This";
-    if (status === "not-covered") return "Not Yet On Every Known Device";
+    if (status === "covered") return "Everyone has this";
+    if (status === "not-covered") return "Not yet on every known device";
     return "Coverage Unknown";
   }
 
@@ -669,7 +669,7 @@
     payerAmounts = {};
     draftXid = crypto.randomUUID();
     showExpenseHint = false;
-    showToast("Expense Saved.");
+    showToast("Expense saved.");
   }
 
   async function voidExpense(xid: string): Promise<void> {
@@ -722,7 +722,7 @@
       await commitReserved(1, (f) => [makeEvent(f, "SettlementRecorded", { sid, from, to, minor })]);
     }
     settleAmount = "";
-    showToast("Settlement Recorded.");
+    showToast("Settlement recorded.");
   }
 
   function localIdentityForPid(pid: string) {
@@ -752,7 +752,7 @@
 
   async function disputeSettlement(sid: string): Promise<void> {
     if (!group || archived || !frozenPolicy.allowSettlementActions) return;
-    const note = window.prompt("Dispute Note", "Payment Not Received");
+    const note = window.prompt("Dispute Note", "Payment not received");
     if (note === null) return;
     const trimmed = note.trim();
     await commitReserved(1, (f) => [makeEvent(f, "SettlementDisputed", trimmed ? { sid, note: trimmed } : { sid })]);
@@ -799,7 +799,7 @@
     if (!group) return;
     const events = await pendingOutboundEvents(group.groupId);
     if (events.length === 0) {
-      syncStatus = "No Unsynced Events To Share.";
+      syncStatus = "No unsynced events to share.";
       return;
     }
     const filename = `${group.name || "trip"}-delta.json`;
@@ -813,21 +813,21 @@
     try {
       if (navigator.share && (!navigator.canShare || navigator.canShare(shareData))) {
         await navigator.share(shareData);
-        syncStatus = "Ledger Delta Shared.";
+        syncStatus = "Ledger delta shared.";
       } else {
         downloadJsonFile(filename, contents);
-        syncStatus = "Ledger Delta Downloaded.";
+        syncStatus = "Ledger delta downloaded.";
       }
     } catch (err) {
       if (err instanceof DOMException && err.name === "AbortError") return;
       downloadJsonFile(filename, contents);
-      syncStatus = "Ledger Delta Downloaded.";
+      syncStatus = "Ledger delta downloaded.";
     }
   }
 
   function downloadIdentityBackup(): boolean {
     if (!group || group.identities.length === 0) return false;
-    const ok = window.confirm("This File Contains Your Claim Signing Key. Anyone With It Can Impersonate Your Device For This Trip.");
+    const ok = window.confirm("This file contains your claim signing key. Anyone with it can impersonate your device for this trip.");
     if (!ok) return false;
     const blob = new Blob([stringifyExport(createIdentityBackup(group))], { type: "application/json" });
     const url = URL.createObjectURL(blob);
@@ -881,14 +881,14 @@
     // real trip — sharing a link built from it would never let anyone join
     // the actual trip this was imported from.
     if (group.linked === false) {
-      syncStatus = "This Trip Was Imported Without A Verified Join Link. Ask The Trip Owner For Their Join Link To Connect It.";
+      syncStatus = "This trip was imported without a verified join link. Ask the trip owner for their join link to connect it.";
       return;
     }
     let url: string;
     try {
       url = buildJoinLink(window.location.href, createJoinSeed(group));
     } catch (err) {
-      if (!disposed) syncStatus = err instanceof Error ? err.message : "Failed To Build Join Link.";
+      if (!disposed) syncStatus = err instanceof Error ? err.message : "Failed to build join link.";
       return;
     }
     try {
@@ -900,17 +900,17 @@
         linkCopied = false;
         linkCopiedHandle = undefined;
       }, 2200);
-      syncStatus = "Join Link Copied.";
-      showToast("Join Link Copied.");
+      syncStatus = "Join link copied.";
+      showToast("Join link copied.");
     } catch {
-      if (!disposed) window.prompt("Copy Join Link", url);
+      if (!disposed) window.prompt("Copy join link", url);
     }
   }
 
   async function showJoinQrCode(): Promise<void> {
     if (!group) return;
     if (group.linked === false) {
-      syncStatus = "This Trip Was Imported Without A Verified Join Link. Ask The Trip Owner For Their Join Link To Connect It.";
+      syncStatus = "This trip was imported without a verified join link. Ask the trip owner for their join link to connect it.";
       return;
     }
     try {
@@ -918,7 +918,7 @@
       const QRCode = await import("qrcode");
       joinQrDataUrl = await QRCode.toDataURL(link, { margin: 2, width: 240, errorCorrectionLevel: "M" });
     } catch (err) {
-      syncStatus = err instanceof Error ? err.message : "Failed To Generate QR Code.";
+      syncStatus = err instanceof Error ? err.message : "Failed to generate QR code.";
     }
   }
 
@@ -943,7 +943,7 @@
           return;
         }
         group = imported;
-        syncStatus = artifact.type === "DeviceIdentityBackup" ? "Identity Backup Restored." : artifact.type === "TripLedgerDelta" ? "Ledger Delta Imported." : syncStatus;
+        syncStatus = artifact.type === "DeviceIdentityBackup" ? "Identity backup restored." : artifact.type === "TripLedgerDelta" ? "Ledger delta imported." : syncStatus;
       }
       resetRelaySettingsForm();
       importText = "";
@@ -969,7 +969,7 @@
     if (!group || !groupProfileEditable || expenses.length > 0) return;
     await commitReserved(1, (f) => [makeEvent(f, "BaseCurrencyEstablished", { currency: normalizeCurrency(newCurrency) })]);
     expenseCurrency = state?.currency ?? normalizeCurrency(newCurrency);
-    showToast(`Currency Set To ${state?.currency ?? normalizeCurrency(newCurrency)}.`);
+    showToast(`Currency set to ${state?.currency ?? normalizeCurrency(newCurrency)}.`);
   }
 
   async function runSync(): Promise<void> {
@@ -996,7 +996,7 @@
       syncStatus = `${result.published} Published, ${result.confirmed} Confirmed, ${result.received} Received, ${result.buffered} Buffered, ${result.dropped} Dropped, ${result.snapshotsSeen} Snapshots Seen, ${result.snapshotsPublished} Snapshots Published${relayIssues ? `; ${relayIssues} Relay Issue${relayIssues === 1 ? "" : "s"}.` : result.errors.length ? `; ${result.errors[0]}` : "."}`;
     } catch (err) {
       if (disposed) return;
-      syncStatus = "Sync Failed. Manual Export/Import Is Still Available.";
+      syncStatus = "Sync failed. Manual Export/Import is still available.";
       error = err instanceof Error ? err.message : String(err);
     } finally {
       syncing = false;
@@ -1006,22 +1006,22 @@
   function recoveryMessage(): string {
     if (!recoveryAttempted || syncing) {
       return recoveryMode === "evicted"
-        ? "This Device Looks Empty. Recovering From Relays Before Showing Anything Stale."
-        : "Recovering From Relays Before Rendering An Empty Ledger.";
+        ? "This device looks empty. Recovering from Relays before showing anything stale."
+        : "Recovering from Relays before rendering an empty ledger.";
     }
     if (!lastSyncResult) {
       return recoveryMode === "evicted"
-        ? "Relay Recovery Did Not Complete. Import Your Latest TripLedgerExport To Restore This Device."
-        : "Relay Recovery Did Not Complete. Manual Import Is Available.";
+        ? "Relay recovery did not complete. Import Your Latest TripLedgerExport To restore this device."
+        : "Relay recovery did not complete. Manual import is available.";
     }
-    if (lastSyncResult.received > 0) return "Raw Events Were Recovered. Balances Will Render From The Event Log.";
+    if (lastSyncResult.received > 0) return "Raw events were recovered. Balances will render from the event log.";
     if (lastSyncResult.snapshotsSeen > 0) {
-      return "A Relay Snapshot Was Found. Raw Event History Is Still Reconciling.";
+      return "A relay snapshot was found. Raw event history is still reconciling.";
     }
     if (lastSyncResult.errors.length > 0) return `Relay Recovery Failed: ${lastSyncResult.errors[0]}`;
     return recoveryMode === "evicted"
-      ? "No Raw Events Were Recovered Yet. Import Is The Fastest Way Back Onto This Trip."
-      : "No Raw Events Were Recovered Yet. Import A TripLedgerExport Or Retry Sync.";
+      ? "No raw events were recovered yet. Import is the fastest way back onto this trip."
+      : "No raw events were recovered yet. Import A TripLedgerExport Or retry sync.";
   }
 
   function relayDefaults() {
@@ -1050,12 +1050,12 @@
       relayDefaults(),
     );
     if (relaySettingsTargetCount(nextSettings) === 0) {
-      relaySettingsError = "Keep At Least One Relay Target Enabled.";
+      relaySettingsError = "Keep at least one relay target enabled.";
       return;
     }
     group = { ...group, meta: await updateMeta(group.groupId, (meta) => ({ ...meta, relaySettings: nextSettings })) };
     resetRelaySettingsForm(nextSettings);
-    syncStatus = "Relay Settings Saved.";
+    syncStatus = "Relay settings saved.";
   }
 
   async function resetRelaySettings(): Promise<void> {
@@ -1069,7 +1069,7 @@
       }),
     };
     resetRelaySettingsForm();
-    syncStatus = "Relay Settings Reset.";
+    syncStatus = "Relay settings reset.";
   }
 
   async function saveSubgroupPreset(): Promise<void> {
@@ -1276,7 +1276,7 @@
 </script>
 
 {#if loading}
-  <main class="center">Loading Local Ledger...</main>
+  <main class="center">Loading local ledger...</main>
 {:else if group && state}
   <main class="app-shell">
     <header class="topbar">
@@ -1311,8 +1311,8 @@
       <section class="setup-card" aria-label="Trip Setup">
         <div class="setup-receipt">
           <span class="receipt-kicker">First Receipt</span>
-          <h2>Set Up The Split Before Adding Bills.</h2>
-          <p>Add Yourself First. This Device Will Claim That Person So Expense Saving Unlocks Immediately.</p>
+          <h2>Set up the split before adding bills.</h2>
+          <p>Add yourself first. This device will claim that person so expense saving unlocks immediately.</p>
         </div>
         <NeoCard class="setup-form">
           <label>
@@ -1331,18 +1331,18 @@
             <span>Your Name</span>
             <input bind:value={setupName} placeholder="e.g. John Smith" />
           </label>
-          {#if setupNameMatch}<p class="hint duplicate-hint">{matchText(setupNameMatch)} Use That Person Instead.</p>{/if}
-          <NeoButton class="setup-primary" disabled={!setupName.trim() || Boolean(setupNameMatch)} onclick={completeSetup}>Create My Spot</NeoButton>
+          {#if setupNameMatch}<p class="hint duplicate-hint">{matchText(setupNameMatch)} Use that person instead.</p>{/if}
+          <NeoButton class="setup-primary" disabled={!setupName.trim() || Boolean(setupNameMatch)} onclick={completeSetup}>Create my spot</NeoButton>
         </NeoCard>
       </section>
     {/if}
-    {#if archived}<p class="warning">This Trip Is Archived. The Ledger Remains Readable And Exportable. Relay Retention Is Outside This App's Control; Archiving Does Not Delete Relay Data.</p>{/if}
+    {#if archived}<p class="warning">This trip is archived. The ledger remains readable and exportable. Relay retention is outside this app's Control; Archiving does not delete Relay data.</p>{/if}
     {#if clockSkewWarning}<p class="warning">{clockSkewWarning}</p>{/if}
     {#if settledView}
       <section class="prompt-banner settled-banner">
         <div>
-          <strong>Balances Are Settled</strong>
-          <p>This Trip Is Still Active. Adding A New Expense Will Update Balances Automatically.</p>
+          <strong>Balances are settled</strong>
+          <p>This trip is still active. Adding a new expense will update balances automatically.</p>
         </div>
       </section>
     {/if}
@@ -1354,17 +1354,17 @@
           {#if archivedOutstanding.length}
             <p>{archivedOutstanding.join(" · ")}</p>
           {:else}
-            <p>Archived With All Balances Zero.</p>
+            <p>Archived with all balances zero.</p>
           {/if}
         </div>
       </section>
     {/if}
     {#if frozenPolicy.message}<p class="warning">{frozenPolicy.message}</p>{/if}
     {#if manualFallbackDue}
-      <section class="prompt-banner important manual-fallback-banner" aria-label="Manual Sharing Fallback">
+      <section class="prompt-banner important manual-fallback-banner" aria-label="Manual sharing fallback">
         <div>
-          <strong>Relay Confirmation Pending</strong>
-          <p>Use Manual Sharing Now So Another Device Can Catch Up Without Waiting For Relay Quorum.</p>
+          <strong>Relay confirmation pending</strong>
+          <p>Use manual sharing now so another device can catch up without waiting for relay quorum.</p>
         </div>
         <div class="prompt-actions">
           <button type="button" on:click={shareDelta}><Icon name="share" size={17} /> Share Delta</button>
@@ -1376,8 +1376,8 @@
     {#if showPinLinkPrompt}
       <section class="prompt-banner">
         <div>
-          <strong>Pin The Trip Link</strong>
-          <p>Keep The Join Link In Your Group Chat So A Wiped Device Can Recover Before Showing An Empty Ledger.</p>
+          <strong>Pin the trip link</strong>
+          <p>Keep the join link in your group chat so a wiped device can recover before showing an empty ledger.</p>
         </div>
         <div class="prompt-actions">
           <button type="button" on:click={() => markPinLinkPromptHandled(true)}><Icon name="link" size={17} /> Copy Link</button>
@@ -1388,8 +1388,8 @@
     {#if showIdentityBackupPrompt && hasLocalClaim}
       <section class="prompt-banner important">
         <div>
-          <strong>Back Up This Device Identity</strong>
-          <p>This File Grants Impersonation Power For This Trip. It Is Separate From The Shareable Trip Export And Restores Settlement Authority If This Browser Loses Storage.</p>
+          <strong>Back up this device identity</strong>
+          <p>This file grants impersonation power for this trip. It is separate from the shareable trip export and restores settlement authority if this browser loses storage.</p>
         </div>
         <div class="prompt-actions">
           <button type="button" on:click={downloadPromptIdentityBackup}><Icon name="key-round" size={17} /> Identity Backup</button>
@@ -1400,8 +1400,8 @@
     {#if activeExportPrompt}
       <section class="prompt-banner important">
         <div>
-          <strong>{activeExportPrompt === "first-zero" ? "Balances Are Settled" : "Export A Recovery Copy"}</strong>
-          <p>{activeExportPrompt === "first-zero" ? "All Balances Reached Zero For The First Time." : "This Device Returned After More Than 7 Days Without Protected Storage."}</p>
+          <strong>{activeExportPrompt === "first-zero" ? "Balances are settled" : "Export a recovery copy"}</strong>
+          <p>{activeExportPrompt === "first-zero" ? "All balances reached zero for the first time." : "This device returned after more than 7 days without protected storage."}</p>
         </div>
         <div class="prompt-actions">
           <button type="button" on:click={downloadPromptExport}><Icon name="download" size={17} /> Export</button>
@@ -1412,8 +1412,8 @@
     {#if activeInstallLevel && activeInstallLevel < 3}
       <section class:sticky-install={activeInstallLevel === 2} class="prompt-banner install">
         <div>
-          <strong>{activeInstallLevel === 1 ? "Install For Safer Storage" : "Protect This Trip"}</strong>
-          <p>Use Add To Home Screen To Reduce Browser Storage Eviction Risk.</p>
+          <strong>{activeInstallLevel === 1 ? "Install for safer storage" : "Protect this trip"}</strong>
+          <p>Use Add To Home Screen to reduce browser storage eviction risk.</p>
         </div>
         <div class="prompt-actions">
           <button type="button" class="secondary" on:click={dismissActiveInstallPrompt}>Dismiss</button>
@@ -1423,11 +1423,11 @@
     {#if recoveryActive}
       <section class="recovery-panel">
         <div>
-          <h2>{recoveryMode === "evicted" ? "Device Storage Empty" : "Join Trip"}</h2>
+          <h2>{recoveryMode === "evicted" ? "Device storage empty" : "Join Trip"}</h2>
           <p>{recoveryMessage()}</p>
           <div class="recovery-mode" aria-label="Recovery Mode">
-            <button type="button" class:active={recoveryMode === "first-join"} on:click={() => (recoveryMode = "first-join")}>First Time Here</button>
-            <button type="button" class:active={recoveryMode === "evicted"} on:click={() => (recoveryMode = "evicted")}>Had It Before</button>
+            <button type="button" class:active={recoveryMode === "first-join"} on:click={() => (recoveryMode = "first-join")}>First time here</button>
+            <button type="button" class:active={recoveryMode === "evicted"} on:click={() => (recoveryMode = "evicted")}>Had it before</button>
           </div>
         </div>
         <div class="recovery-actions">
@@ -1458,9 +1458,9 @@
               <div>
                 {#if anomaly.code === "possible-duplicate-participants" && anomaly.pid && anomaly.relatedPid}
                   <strong>{participantLabel(anomaly.pid)} may be the same as {participantLabel(anomaly.relatedPid)}</strong>
-                  <span>Resolve The Duplicate Hint Without Changing Balances Automatically.</span>
+                  <span>Resolve the duplicate hint without changing balances automatically.</span>
                 {:else if anomaly.code === "distinct-participants-merged"}
-                  <strong>People Marked Distinct Are Currently Merged</strong>
+                  <strong>People marked distinct are currently merged</strong>
                   <span>{anomaly.message}</span>
                 {:else if anomaly.code === "unverified-reclaim" && anomaly.pid}
                   <strong>{participantLabel(anomaly.pid)} has an unverified recovered device</strong>
@@ -1495,13 +1495,13 @@
         </section>
       {/if}
       <details class="advanced-panel">
-        <summary><Icon name="settings" size={17} /> Sync, Backup, And Recovery</summary>
-        {#if showInstallHint}<p class="subtle">On iOS, Use Share Then Add To Home Screen For Offline Launch.</p>{/if}
+        <summary><Icon name="settings" size={17} /> Sync, backup, and recovery</summary>
+        {#if showInstallHint}<p class="subtle">On iOS, use Share then Add To Home Screen for offline launch.</p>{/if}
         <section class="sync-strip">
           {#if hasLocalClaim}
             <button type="button" on:click={() => { if (downloadIdentityBackup()) void markIdentityBackupPromptHandled(); }}><Icon name="key-round" size={17} /> Identity Backup</button>
           {:else}
-            <span>Claim A Person Before Adding Expenses.</span>
+            <span>Claim a person before adding expenses.</span>
           {/if}
           <button type="button" class="secondary" on:click={() => downloadExport()}><Icon name="download" size={17} /> Export</button>
           <button type="button" class="secondary" on:click={shareDelta}><Icon name="share" size={17} /> Share Delta</button>
@@ -1511,13 +1511,13 @@
       <section class="relay-settings-panel" aria-label="Relay Settings">
         <div>
           <h2>Relay Settings</h2>
-          <p>{properCase(relayTargetLabel)} Active On This Device.</p>
+          <p>{properCase(relayTargetLabel)} Active on this device.</p>
         </div>
         <label class="relay-toggle">
           <input type="checkbox" bind:checked={relayUseOperated} />
           <span>Operated Relay</span>
         </label>
-        <input bind:value={relayOperatedEndpoint} disabled={!relayUseOperated} placeholder="/api/relay" aria-label="Operated Relay Endpoint" />
+        <input bind:value={relayOperatedEndpoint} disabled={!relayUseOperated} placeholder="/api/relay" aria-label="Operated relay endpoint" />
         <label>
           <span>Nostr Relays</span>
           <textarea bind:value={relayNostrText} rows="4" placeholder="wss://relay.example"></textarea>
@@ -1582,7 +1582,7 @@
             </div>
           {/each}
         {:else}
-          <p class="warning compact-warning">Balances Hidden Until This App Supports Every Retained Event.</p>
+          <p class="warning compact-warning">Balances hidden until this app supports every retained event.</p>
         {/if}
       </article>
 
@@ -1683,9 +1683,9 @@
     {/if}
     {#if activeInstallLevel && activeInstallLevel >= 3}
       <div class="modal-backdrop" role="presentation">
-        <div class="modal" role="dialog" aria-modal="true" aria-label="Protect This Trip" use:dialogLifecycle={{ onEscape: dismissActiveInstallPrompt }}>
-          <h2>{activeInstallLevel === 4 ? "Storage Survived" : "Storage Is Still Best Effort"}</h2>
-          <p>{activeInstallLevel === 4 ? "This Trip Returned After More Than 7 Days. Keep A Fresh Export And Install The App When Possible." : "Install The App So The Browser Can Give This Trip Stronger Storage Protection."}</p>
+        <div class="modal" role="dialog" aria-modal="true" aria-label="Protect this trip" use:dialogLifecycle={{ onEscape: dismissActiveInstallPrompt }}>
+          <h2>{activeInstallLevel === 4 ? "Storage Survived" : "Storage is still best effort"}</h2>
+          <p>{activeInstallLevel === 4 ? "This trip returned after more than 7 days. Keep a fresh export and install the app when possible." : "Install the app so the browser can give this trip stronger storage protection."}</p>
           <div class="prompt-actions">
             <button type="button" class="secondary" on:click={dismissActiveInstallPrompt}>Dismiss</button>
           </div>
@@ -1706,5 +1706,5 @@
     {/if}
   </main>
 {:else}
-  <main class="center">Unable To Open Local Ledger.</main>
+  <main class="center">Unable to open local ledger.</main>
 {/if}

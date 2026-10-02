@@ -56,9 +56,9 @@ describe("eviction recovery panel (rendered)", () => {
     renderApp();
 
     // Evicted heading + both recovery-mode toggles render for real.
-    await screen.findByText("Device Storage Empty", {}, { timeout: 15000 });
-    expect(screen.getByText("Had It Before")).toBeTruthy();
-    expect(screen.getByText("First Time Here")).toBeTruthy();
+    await screen.findByText("Device storage empty", {}, { timeout: 15000 });
+    expect(screen.getByText("Had it before")).toBeTruthy();
+    expect(screen.getByText("First time here")).toBeTruthy();
 
     // Manual JSON import is a primary action in evicted mode.
     const importLinks = screen.getAllByText("Import JSON");
@@ -66,7 +66,7 @@ describe("eviction recovery panel (rendered)", () => {
     expect(importLinks.some((node) => node.closest("button"))).toBe(true);
 
     // The blocked-recovery copy is present while sync cannot recover.
-    expect(screen.getByText("Waiting For Recovered Trip Data.", { exact: true })).toBeTruthy();
-    expect(await screen.findByText("No Raw Events Were Recovered Yet. Import Is The Fastest Way Back Onto This Trip.", { exact: true })).toBeTruthy();
+    expect(screen.getByText("Waiting for recovered trip data.", { exact: true })).toBeTruthy();
+    expect(await screen.findByText("No raw events were recovered yet. Import is the fastest way back onto this trip.", { exact: true })).toBeTruthy();
   });
 }, 60_000);

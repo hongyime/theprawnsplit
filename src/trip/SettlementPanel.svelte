@@ -44,7 +44,7 @@
 <article class="panel settlements">
   <h2><Icon name="refresh-ccw" size={18} /> Settle</h2>
   {#if !frozenPolicy.allowSettlementActions}
-    <p class="warning compact-warning">Settlement Is Frozen Until The Newer Retained Event Can Be Folded.</p>
+    <p class="warning compact-warning">Settlement is frozen until the newer retained event can be folded.</p>
   {:else}
     {#each suggestedSettlements as transfer}
       <button type="button" class="settle-suggestion" disabled={archived} on:click={() => recordSettlement(transfer.from, transfer.to, formatMinorInput(transfer.minor))}>

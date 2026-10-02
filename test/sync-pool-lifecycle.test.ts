@@ -31,7 +31,7 @@ it("releases the Nostr pool created for a complete sync cycle", async () => {
 
 it.each([{ urls: [] }, { urls: ["wss://configured.fixture.invalid"] }])("looks up limits only for the trip's configured relay URLs: %j", async ({ urls }) => {
   await resetRepositoryForTests(`pool-selection-${crypto.randomUUID()}`);
-  const group = await createGroup("Synthetic Relay Selection", "SGD");
+  const group = await createGroup("Synthetic Relay selection", "SGD");
   await updateMeta(group.groupId, meta => ({ ...meta, relaySettings: { useOperated: true, operatedEndpoint: "/api/relay", nostrRelays: urls } }));
   vi.spyOn(SimplePool.prototype, "publish").mockReturnValue([Promise.resolve("fixture accepted")]);
   vi.spyOn(SimplePool.prototype, "querySync").mockResolvedValue([]);

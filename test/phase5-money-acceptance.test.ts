@@ -107,7 +107,7 @@ describe("Phase 5 money acceptance", () => {
     );
     const withExpense = await appendEvents(group.groupId, [added]);
 
-    // Mirror Trip.svelte's editExpense exactly: rescale the retained rows for the
+    // Mirror trip.svelte's editExpense exactly: rescale the retained rows for the
     // new total via editFinancialsForTotal (which preserves `rate` per LOGIC-003's
     // fix approach), then derive the event's schema version from whether the
     // RESULTING financials still carry a rate -- never default to v1 unconditionally.

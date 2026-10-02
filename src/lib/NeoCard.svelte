@@ -7,11 +7,12 @@
 </script>
 <div class="neo-card {className}"><slot /></div>
 <style>
+  /* A sheet of paper laid on the desk: hairline edge, hard stamp shadow. */
   .neo-card {
-    border: 2px solid var(--neo-border);
-    box-shadow: 4px 4px 0 var(--neo-shadow);
-    background: var(--neo-bg);
-    border-radius: 0;
-    padding: 16px;
+    border: 1.5px solid var(--ink);
+    box-shadow: var(--shadow-stamp);
+    background: var(--paper);
+    border-radius: var(--radius);
+    padding: 1.5rem;
   }
 </style>

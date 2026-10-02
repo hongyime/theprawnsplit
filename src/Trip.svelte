@@ -158,6 +158,8 @@
 
   $: participants = state ? [...state.participants.values()].sort((a, b) => a.name.localeCompare(b.name)) : [];
   $: balances = state && group ? [...state.balances.entries()].sort(([a], [b]) => participantLabel(a).localeCompare(participantLabel(b))) : [];
+  // Largest absolute balance, used to scale the proportional bars in the Balances hero.
+  $: balanceScale = balances.reduce((max, [, minor]) => { const abs = minor < 0n ? -minor : minor; return abs > max ? abs : max; }, 0n);
   $: expenses = state ? expenseDisplayRows(state.expenses.values()) : [];
   $: settlements = state ? [...state.settlements.values()] : [];
   $: anomalies = state ? state.anomalies : [];
@@ -1280,14 +1282,19 @@
     <header class="topbar">
       <div>
         <input class="title-input" value={group.name} aria-label="Trip Name" disabled={!groupProfileEditable} on:change={(e) => renameGroup((e.currentTarget as HTMLInputElement).value)} />
-        <div class="subtle">Private Trip Ledger · {unconfirmedCount} Unconfirmed · {topbarSyncLabel}</div>
+        <div class="subtle">{participants.length} {participants.length === 1 ? "Person" : "People"} · {currency} · {expenses.length} {expenses.length === 1 ? "Expense" : "Expenses"} · {unconfirmedCount} Unconfirmed · {topbarSyncLabel}</div>
       </div>
       <div class="header-actions">
-        <button type="button" class="secondary" on:click={showTripList} title="All Trips">Trips</button>
-        <button type="button" class="secondary" on:click={() => (importPanelOpen = !importPanelOpen)} title="Import Recovery JSON"><Icon name="upload" size={18} /> Import</button>
-        <button type="button" class="secondary" on:click={showJoinQrCode} title="Show Join QR"><Icon name="qr-code" size={18} /> QR</button>
         <button type="button" class:copied={linkCopied} on:click={copyJoinLink} title="Copy Join Link"><Icon name="link" size={18} /> {linkCopied ? "Copied" : "Copy Link"}</button>
-        <button type="button" class="secondary" on:click={archived ? unarchiveGroup : archiveGroup} title={archived ? "Unarchive Trip" : "Archive Trip"}><Icon name="archive" size={18} /> {archived ? "Unarchive" : "Archive"}</button>
+        <button type="button" class="secondary" on:click={showJoinQrCode} title="Show Join QR"><Icon name="qr-code" size={18} /> QR</button>
+        <details class="more-menu">
+          <summary aria-label="More Actions" title="More Actions">···</summary>
+          <div role="menu">
+            <button type="button" class="secondary" on:click={showTripList} title="All Trips">Trips</button>
+            <button type="button" class="secondary" on:click={() => (importPanelOpen = !importPanelOpen)} title="Import Recovery JSON"><Icon name="upload" size={18} /> Import</button>
+            <button type="button" class="secondary" on:click={archived ? unarchiveGroup : archiveGroup} title={archived ? "Unarchive Trip" : "Archive Trip"}><Icon name="archive" size={18} /> {archived ? "Unarchive" : "Archive"}</button>
+          </div>
+        </details>
       </div>
     </header>
 
@@ -1568,8 +1575,9 @@
         <h2><Icon name="wallet" size={18} /> Balances</h2>
         {#if frozenPolicy.displayBalances}
           {#each balances as [pid, minor]}
-            <div class:positive={minor > 0n} class:negative={minor < 0n} class="balance-row">
+            <div class:positive={minor > 0n} class:negative={minor < 0n} class="balance-row" style="--pct: {balanceScale > 0n ? Number((minor < 0n ? -minor : minor) * 1000n / balanceScale) / 1000 : 0}">
               <span>{participantLabel(pid)}</span>
+              <span class="balance-bar" aria-hidden="true"></span>
               <strong>{formatMinor(minor, currency)}</strong>
             </div>
           {/each}

@@ -22,8 +22,9 @@ describe("landing and root routing UI (rendered)", () => {
   it("renders the landing screen when no groups exist", async () => {
     await resetRepositoryForTests(`landing-render-${Date.now()}`);
     renderApp();
-    // Landing renders immediately with no groups.
-    await screen.findByText("The Prawn Split", {}, { timeout: 15000 });
+    // Landing renders immediately with no groups. The title is split across
+    // an <em> for the coral word, so match on the heading's full textContent.
+    await screen.findByRole("heading", { level: 1, name: "The Prawn Split" }, { timeout: 15000 });
     expect(document.body.textContent).toContain("Split trip costs with friends.");
     expect(document.body.textContent).toContain("No accounts.");
     expect(screen.getByRole("button", { name: /Start a new trip/i })).toBeTruthy();

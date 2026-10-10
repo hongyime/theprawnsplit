@@ -67,17 +67,20 @@ event creation, reserved IDs, first-expense persistence, and trip lifecycle.
 RecoveryPanel remains presentation-only.
 
 Touch-emulated Playwright QA at 390×844 covered setup, the trip list, More
-Actions, and saving the first expense. Tested visible controls measure at least
-44px, there is no horizontal overflow or browser error, and the expense success
-status stays visible beside the save button after the first-expense layout
-change. Browser scripts/screenshots and disk-backed fixtures stay under the
-system temp directory; existing tests were updated, none were added.
+Actions, and saving the first expense. An independent audit found the setup
+toast could obscure the Trips menu label; opening More Actions now dismisses
+that toast. The follow-up flow confirms the label remains visible, the first
+save status stays beside its action, and there is no horizontal overflow,
+browser error, or failed request. Tested visible controls measure at least
+44px, except a native checkbox inside a larger clickable participant row.
+Browser scripts/screenshots and disk-backed fixtures stay under the system
+temp directory; existing tests were updated, none were added.
 
-Verification passed end to end with npm run build: core 136/136, root
-479/479 across 102 files, relay migration 12/12, money lint, svelte-check
-with 0 errors/warnings, and Vite production build. The task is complete and
-committed locally on main; nothing was pushed. Preserve the
-pre-existing untracked audit artifacts and leave them unstaged.
+Final npm run build passed: core 136/136, root 479/479 across 102 files,
+relay migration 12/12, money lint, svelte-check with 0 errors/warnings, and
+Vite production build. The task is complete and committed locally on main;
+nothing was pushed. Preserve the pre-existing untracked audit artifacts and
+leave them unstaged.
 
 <!-- MOLT_AUTO_START -->
 ## Auto State

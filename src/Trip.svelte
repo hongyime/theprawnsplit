@@ -200,6 +200,16 @@
     }, 2800);
   }
 
+  function dismissToast(): void {
+    toast = "";
+    if (toastHandle) window.clearTimeout(toastHandle);
+    toastHandle = undefined;
+  }
+
+  function handleMoreMenuToggle(event: ToggleEvent & { currentTarget: EventTarget & HTMLDetailsElement }): void {
+    if (event.currentTarget.open) dismissToast();
+  }
+
   function properCase(text: string): string {
     return text.replace(/\b[a-z]/g, (char) => char.toUpperCase());
   }
@@ -1159,7 +1169,7 @@
       <div class="header-actions">
         <button type="button" class:copied={linkCopied} on:click={copyJoinLink} title="Copy Join Link"><Icon name="link" size={18} /> {linkCopied ? "Copied" : "Copy Link"}</button>
         <button type="button" class="secondary" on:click={showJoinQrCode} title="Show Join QR"><Icon name="qr-code" size={18} /> QR</button>
-        <details class="more-menu">
+        <details class="more-menu" on:toggle={handleMoreMenuToggle}>
           <summary aria-label="More Actions" title="More Actions">···</summary>
           <div role="menu">
             <button type="button" class="secondary" on:click={showTripList} title="All Trips">Trips</button>

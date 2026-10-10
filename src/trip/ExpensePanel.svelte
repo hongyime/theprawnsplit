@@ -1,62 +1,156 @@
 <script lang="ts">
-  // T60 (STRUCT-001): expense panel view extracted from Trip.svelte. Controller
-  // (Trip.svelte) retains allocation, storage, and command ownership — this
-  // panel only owns rendering and two-way input binding via `bind:` props.
+  // Expense draft state and preview calculations stay beside this form. Trip
+  // retains shared roster selection, event creation, reserved IDs and commit.
+  import { tick } from "svelte";
   import Icon from "@/lib/Icon.svelte";
   import NeoButton from "@/lib/NeoButton.svelte";
-  import { formatMinor } from "@/lib/money";
-  import { normalizeCurrency } from "@/lib/multicurrency";
-  import type { SplitMode } from "@/lib/money";
-  import type { PayerMode } from "@/lib/payers";
+  import { formatMinor, formatMinorInput, type SplitMode } from "@/lib/money";
+  import { currencyAmountPreview, normalizeCurrency } from "@/lib/multicurrency";
+  import { canAppendExpense } from "@/lib/expense-command";
+  import { buildPayerPreview, type PayerMode } from "@/lib/payers";
+  import { preserveSplitInputs } from "@/lib/split-preservation";
+  import { currencyOptions } from "@/lib/currencies";
+  import { buildSharePreview, type ExpenseDraftPayload, type SharePreview } from "@/trip/expense-draft";
 
   interface Participant { pid: string; name: string }
-  interface SharePreview { ok: true; shares: { pid: string; minor: bigint }[]; remainderPid?: string }
-  interface SharePreviewInvalid { ok: false; message: string }
-  interface AmountPreview { ok: true; baseMinor: bigint; rate?: unknown }
-  interface AmountPreviewInvalid { ok: false; message: string }
   interface SubgroupPreset { id: string; name: string; pids: string[] }
 
   export let archived: boolean;
   export let hasLocalClaim: boolean;
   export let currency: string;
   export let participants: Participant[];
-  export let selectedParticipants: Participant[];
-  export let expenseCurrencyOptions: string[];
+  export let selectedPids: Record<string, boolean>;
   export let subgroupPresets: SubgroupPreset[];
-  export let amountPreview: AmountPreview | AmountPreviewInvalid;
-  export let sharePreview: SharePreview | SharePreviewInvalid;
-  export let expenseBlockReason: string;
-  export let canSaveExpense: boolean;
-
-  export let expenseDesc: string;
-  export let expenseTotal: string;
   export let expenseCurrency: string;
-  export let exchangeRate: string;
-  export let payerMode: PayerMode;
   export let payerPid: string;
   export let payerAmounts: Record<string, string>;
-  export let splitMode: SplitMode;
-  export let exactShares: Record<string, string>;
-  export let shareWeights: Record<string, string>;
-  export let percentages: Record<string, string>;
-  export let subgroupName: string;
-  export let showExpenseHint: boolean;
-
-  export let changePayerMode: (mode: PayerMode) => void;
-  export let changeSplitMode: (mode: SplitMode) => void;
-  export let saveSubgroupPreset: () => void | Promise<void>;
+  export let addExpense: (draft: ExpenseDraftPayload) => void | Promise<void>;
+  export let notify: (message: string) => void;
+  export let saveSubgroupPreset: (name: string, pids: string[]) => void | Promise<void>;
   export let applySubgroup: (id: string) => void;
   export let deleteSubgroup: (id: string) => void | Promise<void>;
-  export let addExpense: () => void | Promise<void>;
   export let participantLabel: (pid: string) => string;
-  export let splitModeLabel: (mode: SplitMode) => string;
+
+  let expenseDesc = "";
+  let expenseTotal = "";
+  let exchangeRate = "";
+  let payerMode: PayerMode = "single";
+  let splitMode: SplitMode = "equal";
+  let exactShares: Record<string, string> = {};
+  let shareWeights: Record<string, string> = {};
+  let percentages: Record<string, string> = {};
+  let subgroupName = "";
+  let showExpenseHint = false;
+  let expenseBlockReason = "";
+  let saveStatus = "";
+  let saveStatusEl: HTMLParagraphElement | undefined;
+  let draftXid = crypto.randomUUID();
+
+  $: selectedParticipants = participants.filter((participant) => selectedPids[participant.pid]);
+  $: participantPids = participants.map((participant) => participant.pid);
+  $: expenseCurrencyOptions = currencyOptions(expenseCurrency || currency);
+  $: amountPreview = currencyAmountPreview({
+    amountText: expenseTotal,
+    currency: expenseCurrency || currency,
+    baseCurrency: currency,
+    rateText: exchangeRate,
+  });
+  $: sharePreview = buildSharePreview(amountPreview, participants, selectedPids, splitMode, exactShares, shareWeights, percentages, draftXid);
+  $: payerPreview = buildPayerPreview(amountPreview.ok ? amountPreview.baseMinor : null, payerMode, payerPid, payerAmounts, participantPids);
+  $: canSaveExpense = canAppendExpense({
+    archived,
+    hasLocalClaim,
+    description: expenseDesc,
+    amountOk: amountPreview.ok,
+    sharesOk: sharePreview.ok,
+    payersOk: payerPreview.ok,
+  });
+  $: {
+    if (archived) expenseBlockReason = "This trip is archived.";
+    else if (!hasLocalClaim) expenseBlockReason = participants.length === 0 ? "Add and claim yourself first." : "Claim yourself before saving expenses.";
+    else if (!expenseDesc.trim()) expenseBlockReason = "Add a short description.";
+    else if (!amountPreview.ok) expenseBlockReason = amountPreview.message;
+    else if (!payerPreview.ok) expenseBlockReason = payerPreview.message;
+    else if (!sharePreview.ok) expenseBlockReason = sharePreview.message;
+    else expenseBlockReason = "";
+  }
+
+  function selectedPidList(): string[] {
+    return selectedParticipants.map((participant) => participant.pid);
+  }
+
+  function splitModeLabel(mode: SplitMode): string {
+    return mode.replace(/\b[a-z]/g, (char) => char.toUpperCase());
+  }
+
+  function changeSplitMode(nextMode: SplitMode): void {
+    if (archived) return;
+    saveStatus = "";
+    const fromMode = splitMode;
+    const preview = sharePreview;
+    const total = amountPreview.ok ? amountPreview.baseMinor : null;
+    splitMode = nextMode;
+    if (!preview.ok || total === null || total === 0n) {
+      for (const participant of selectedParticipants) {
+        shareWeights[participant.pid] ||= "1";
+        percentages[participant.pid] ||= "";
+      }
+      return;
+    }
+    const preserved = preserveSplitInputs({ fromMode, toMode: nextMode, preview, selectedPids: selectedPidList(), total });
+    exactShares = preserved.exactShares;
+    shareWeights = preserved.shareWeights;
+    percentages = preserved.percentages;
+  }
+
+  function changePayerMode(nextMode: PayerMode): void {
+    if (archived) return;
+    saveStatus = "";
+    payerMode = nextMode;
+    if (nextMode === "multiple" && amountPreview.ok && payerPid) {
+      payerAmounts = { ...payerAmounts, [payerPid]: formatMinorInput(amountPreview.baseMinor) };
+    }
+  }
+
+  async function submitExpense(): Promise<void> {
+    if (!sharePreview.ok || !payerPreview.ok || !canSaveExpense || !amountPreview.ok) {
+      showExpenseHint = true;
+      if (expenseBlockReason) notify(expenseBlockReason);
+      return;
+    }
+    saveStatus = "";
+    await addExpense({
+      xid: draftXid,
+      description: expenseDesc.trim(),
+      baseMinor: amountPreview.baseMinor,
+      rate: amountPreview.rate,
+      payers: payerPreview.payers,
+      shares: sharePreview.shares,
+    });
+    saveStatus = "Expense saved.";
+    expenseDesc = "";
+    expenseTotal = "";
+    exchangeRate = "";
+    payerAmounts = {};
+    draftXid = crypto.randomUUID();
+    showExpenseHint = false;
+    await tick();
+    if (window.matchMedia?.("(max-width: 720px)").matches) {
+      saveStatusEl?.scrollIntoView?.({ block: "center" });
+    }
+  }
+
+  async function submitSubgroupPreset(): Promise<void> {
+    await saveSubgroupPreset(subgroupName, selectedPidList());
+    subgroupName = "";
+  }
 </script>
 
 <article class="panel expense">
   <h2><Icon name="receipt-text" size={18} /> Add Expense</h2>
   <div class="form-grid">
-    <input value={expenseDesc} placeholder="Description" disabled={archived} on:input={(e) => { expenseDesc = (e.currentTarget as HTMLInputElement).value; showExpenseHint = true; }} />
-    <input value={expenseTotal} inputmode="decimal" placeholder="Total" disabled={archived} on:input={(e) => { expenseTotal = (e.currentTarget as HTMLInputElement).value; showExpenseHint = true; }} />
+    <input value={expenseDesc} placeholder="Description" disabled={archived} on:input={(e) => { expenseDesc = (e.currentTarget as HTMLInputElement).value; showExpenseHint = true; saveStatus = ""; }} />
+    <input value={expenseTotal} inputmode="decimal" placeholder="Total" disabled={archived} on:input={(e) => { expenseTotal = (e.currentTarget as HTMLInputElement).value; showExpenseHint = true; saveStatus = ""; }} />
     <div class="currency-row">
       <select class="currency" bind:value={expenseCurrency} aria-label="Expense Currency" disabled={archived} on:change={() => (expenseCurrency = normalizeCurrency(expenseCurrency || currency))}>
         {#each expenseCurrencyOptions as code}
@@ -116,7 +210,7 @@
   <div class="subgroup-tools">
     <div class="row subgroup-save">
       <input bind:value={subgroupName} placeholder="Save Subgroup" disabled={archived} />
-      <button type="button" class="secondary" disabled={archived || !subgroupName.trim() || selectedParticipants.length === 0} on:click={saveSubgroupPreset}>Save</button>
+      <button type="button" class="secondary" disabled={archived || !subgroupName.trim() || selectedParticipants.length === 0} on:click={submitSubgroupPreset}>Save</button>
     </div>
     {#if subgroupPresets.length}
       <div class="subgroup-list" aria-label="Subgroups">
@@ -132,5 +226,6 @@
   {/if}
   {#if expenseBlockReason && (showExpenseHint || !hasLocalClaim || archived)}<p class="hint action-hint">{expenseBlockReason}</p>{/if}
   {#if amountPreview.ok && sharePreview.ok && sharePreview.remainderPid}<p class="hint">Rounding Remainder Goes To {participantLabel(sharePreview.remainderPid)}.</p>{/if}
-  <NeoButton class={!canSaveExpense ? 'blocked' : ''} disabled={!canSaveExpense} onclick={addExpense}><Icon name="plus" size={17} /> Save Expense</NeoButton>
+  <NeoButton class={!canSaveExpense ? 'blocked' : ''} disabled={!canSaveExpense} onclick={submitExpense}><Icon name="plus" size={17} /> Save Expense</NeoButton>
+  {#if saveStatus}<p bind:this={saveStatusEl} class="expense-save-status" role="status">{saveStatus}</p>{/if}
 </article>

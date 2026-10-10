@@ -1,0 +1,18 @@
+{
+  "date": "2026-10-10",
+  "task": "Complete the follow-up Trip UI refactor, mobile QA, existing checks, review, and intended local commit.",
+  "branch": "main",
+  "base_head": "6e6b019",
+  "worktree_note": "The worktree already contains the trip list/setup and mobile changes, a presentation-only RecoveryPanel extraction, related existing UI test updates, shared state edits, and unrelated untracked audit artifacts. Preserve all unrelated changes and do not stage audit artifacts.",
+  "constraints": [
+    "Keep trip-lifetime polling, transports, persistence, and signing owned by Trip.svelte.",
+    "Refactor without behavior changes; use existing tests and checks.",
+    "Keep temporary test/browser artifacts under the system temp directory."
+  ],
+  "steps": [
+    "Choose and implement one cohesive Trip.svelte extraction after reviewing dependencies.",
+    "Perform 390px touch-capable mobile QA and record any physical-device limitation.",
+    "Run existing project checks/tests and review the complete intended diff.",
+    "Commit only the intended UI/refactor changes and relevant shared state; do not push."
+  ]
+}

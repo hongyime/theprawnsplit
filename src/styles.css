@@ -1056,15 +1056,15 @@ textarea {
 .setup-receipt h2 {
   max-width: 22rem;
   margin: 0;
-  font-size: clamp(1.9rem, 3.4vw, 2.8rem);
-  line-height: 1.02;
+  font-size: clamp(1.5rem, 2.4vw, 1.9rem);
+  line-height: 1.08;
   letter-spacing: -0.02em;
   font-variation-settings: "opsz" 72, "SOFT" 60, "WONK" 1;
 }
 
 .setup-receipt p {
   max-width: 30rem;
-  margin: 0.9rem 0 0;
+  margin: 0.55rem 0 0;
   color: var(--ink-2);
   line-height: 1.5;
 }
@@ -1087,6 +1087,41 @@ textarea {
   font-weight: 500;
   letter-spacing: 0.08em;
   text-transform: uppercase;
+}
+
+.setup-options {
+  border-top: 1px solid var(--rule);
+  padding-top: 0.45rem;
+}
+
+.setup-options > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 2.5rem;
+  cursor: pointer;
+  color: var(--ink-2);
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+}
+
+.setup-options > summary::-webkit-details-marker {
+  display: none;
+}
+
+.setup-options > summary::after {
+  content: "+";
+  margin-left: 0.75rem;
+  color: var(--coral);
+  font-size: 1rem;
+}
+
+.setup-options[open] > summary::after {
+  content: "−";
+}
+
+.setup-options label {
+  margin-top: 0.35rem;
 }
 
 .setup-primary {
@@ -1638,6 +1673,13 @@ textarea {
   font-weight: 600;
 }
 
+.expense-save-status {
+  margin: 0.4rem 0 0;
+  color: var(--sea);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
 /* ---------------------------------------------------------------- ledger */
 .ledger,
 .import-panel {
@@ -2014,7 +2056,7 @@ textarea {
 .trips-header {
   display: flex;
   justify-content: space-between;
-  align-items: flex-end;
+  align-items: center;
   margin-bottom: 0;
   padding-bottom: 0.75rem;
   border-bottom: 2px solid var(--ink);
@@ -2142,6 +2184,15 @@ textarea {
     padding-top: 16px;
   }
 
+  .app-shell > .toast {
+    position: static;
+    align-self: center;
+    width: fit-content;
+    max-width: 100%;
+    transform: none;
+    animation: none;
+  }
+
   .topbar {
     flex-direction: column;
     align-items: stretch;
@@ -2185,6 +2236,139 @@ textarea {
   .setup-card {
     display: grid;
     grid-template-columns: 1fr;
+    gap: 0.75rem;
+    margin: 0;
+  }
+
+  .setup-receipt {
+    padding: 1rem 1rem 1.25rem;
+  }
+
+  .setup-receipt h2 {
+    max-width: none;
+    font-size: 1.55rem;
+    line-height: 1.1;
+  }
+
+  .setup-receipt p {
+    margin-top: 0.4rem;
+    font-size: 0.88rem;
+  }
+
+  .setup-form {
+    gap: 0.65rem;
+    padding: 1rem;
+  }
+
+  .app-shell .grid button,
+  .app-shell .grid summary,
+  .app-shell .header-actions > button,
+  .app-shell .more-menu > summary,
+  .app-shell .more-menu > div button,
+  .app-shell .recovery-panel button,
+  .app-shell .prompt-actions > button,
+  .app-shell .advanced-panel > summary,
+  .setup-form button,
+  .setup-options > summary,
+  .trips-header > button,
+  .trip-card {
+    min-height: 44px;
+  }
+
+  .app-shell .more-menu > summary {
+    min-width: 44px;
+  }
+
+  .app-shell .advanced-panel .sync-strip > button {
+    min-height: 44px;
+  }
+
+  .app-shell .ledger-row > div > button {
+    min-width: 44px;
+  }
+
+  .app-shell .grid input:not([type="checkbox"]),
+  .app-shell .grid select,
+  .setup-form input,
+  .setup-form select {
+    min-height: 44px;
+  }
+
+  .app-shell .grid .segmented {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .app-shell .grid .segmented button {
+    min-height: 44px;
+    padding-inline: 0.4rem;
+    font-size: 0.74rem;
+  }
+
+  .people-list li {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.4rem;
+    align-items: stretch;
+  }
+
+  .people-list label {
+    width: 100%;
+    min-height: 44px;
+    flex: initial;
+  }
+
+  .person-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    justify-content: stretch;
+    width: 100%;
+    gap: 0.45rem;
+    margin: 0;
+  }
+
+  .person-actions .person-status {
+    grid-column: 1 / -1;
+    display: flex;
+    align-items: center;
+    min-height: 1.25rem;
+  }
+
+  .person-actions > button {
+    width: 100%;
+    min-width: 0;
+    min-height: 44px;
+    white-space: normal;
+    line-height: 1.15;
+  }
+
+  .person-actions > button:only-of-type {
+    grid-column: 1 / -1;
+  }
+
+  .group-list-screen {
+    padding: 1.25rem 0.875rem;
+  }
+
+  .brand-header {
+    margin-bottom: 1.1rem;
+  }
+
+  .trips-header {
+    gap: 0.75rem;
+    padding-bottom: 0.6rem;
+  }
+
+  .trip-card {
+    padding: 0.85rem 0.35rem;
+  }
+
+  .trip-card-info strong {
+    font-size: 1.15rem;
+    line-height: 1.2;
+  }
+
+  .trip-card-info span {
+    font-size: 0.72rem;
   }
 
   .balance-row {

@@ -67,7 +67,7 @@
                 </span>
               </label>
               <span class="person-actions">
-                {participant.deactivated ? "Hidden" : "Shadow"}
+                <span class="person-status">{participant.deactivated ? "Hidden" : "Not claimed"}</span>
                 {#if !archived}
                   <button type="button" on:click={() => requestClaimParticipant(participant.pid)} title="Claim Participant"><Icon name="key-round" size={15} /> Claim</button>
                   {#if hiddenEvent}
@@ -97,10 +97,11 @@
                 </span>
               </label>
               <span class="person-actions">
-                {participant.deactivated ? "Hidden" : `${participant.devices.length} Device`}
-                {#if localClaimPids.has(participant.pid)}
-                  <span>you</span>
-                {:else if !archived}
+                <span class="person-status">
+                  {participant.deactivated ? "Hidden" : `${participant.devices.length} device${participant.devices.length === 1 ? "" : "s"}`}
+                  {#if localClaimPids.has(participant.pid)} · You{/if}
+                </span>
+                {#if !localClaimPids.has(participant.pid) && !archived}
                   <button type="button" class="secondary" on:click={() => requestDeviceLink(participant.pid)} title="Request Device Link"><Icon name="link" size={15} /> Link</button>
                 {/if}
                 {#if !archived}

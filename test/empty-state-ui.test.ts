@@ -29,10 +29,10 @@ describe("empty state UI (rendered)", () => {
     fireEvent.click(card);
     await waitFor(() => { if (!document.querySelector(".app-shell")) throw new Error("no shell"); }, { timeout: 15000 });
 
-    await screen.findByText("Set up the split before adding bills.", {}, { timeout: 15000 });
-    expect(document.body.textContent).toContain("Add yourself first.");
+    await screen.findByText("Add yourself first.", {}, { timeout: 15000 });
+    expect(document.querySelector<HTMLDetailsElement>(".setup-options")?.open).toBe(false);
     const addBtn = await waitFor(() => {
-      const btn = [...document.querySelectorAll<HTMLButtonElement>("button")].find((button) => /Create My Spot/i.test(button.textContent ?? ""));
+      const btn = [...document.querySelectorAll<HTMLButtonElement>("button")].find((button) => /Add Myself/i.test(button.textContent ?? ""));
       if (!btn) throw new Error("no setup submit");
       return btn;
     }, { timeout: 10000 });

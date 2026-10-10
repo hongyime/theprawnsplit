@@ -331,3 +331,12 @@ Machine-specific values in this document use privacy placeholders.
 - 2026-09-27: Prepared reviewed portability/privacy changes on the current default branch with maintenance-only file selection and preserved original workspace state.
 
 - 2026-09-27: CR-018 maintenance review prepared: portable analysis launcher and optional-identity guidance verified with isolated process fixtures and independent mutations. Full local protocol failures and the protected-template boundary remain explicit in the report; exact-head hosted/production checks and direct-main publication are pending. No provider/data operation or test weakening performed.
+- 2026-10-03 02:57:34 +08:00 [PRAWN-E14/claude/stop] branch=main head=0a5145e dirty=6
+- 2026-10-03 09:55:50 +08:00 [PRAWN-E14/claude/stop] branch=main head=0a5145e dirty=6
+- 2026-10-10: Fast-forwarded `main` to `6e6b019`; began mobile touch-target, trip-list and setup simplification, with a presentation-only recovery panel extraction that leaves lifecycle and sync ownership in `Trip.svelte`.
+- 2026-10-10: Deferred the pin-link reminder until first-run setup completes so the setup view presents one direct next step; the reminder remains available as soon as the trip can be shared.
+- 2026-10-10: User prioritized continuing the `Trip.svelte` refactor after the mobile/setup pass. The recovery prompt view is already extracted; next work should identify a cohesive controller responsibility to extract while preserving trip-lifetime ownership in `Trip.svelte`.
+- 2026-10-10: Began the follow-up refactor/mobile QA/check/review/commit task on `main`; preserved the pre-existing dirty audit artifacts and delegated read-only refactor and mobile reviews.
+- 2026-10-10: Chose the expense-draft boundary for the next `Trip.svelte` refactor: `ExpensePanel` will own draft inputs/previews/transitions; `Trip.svelte` retains shared roster, event creation, reserved IDs, persistence prompts, and group lifecycle.
+- 2026-10-10 09:05:08 +08:00 [PRAWN-E14/codex/session-start] branch=main head=6e6b019 dirty=16
+- 2026-10-10: Completed the expense-draft extraction: ExpensePanel owns draft inputs/previews/transitions while Trip retains roster selection, event creation, reserved IDs and first-expense persistence. First-save feedback stays beside the action on mobile. Full npm run build passed (core 136, root 479, relay migration 12, lint, Svelte check and Vite build); 390px touch QA found no overflow or undersized tested targets.

@@ -3,7 +3,7 @@
   import Icon from "@/lib/Icon.svelte";
   import NeoCard from "@/lib/NeoCard.svelte";
   import NeoButton from "@/lib/NeoButton.svelte";
-  import { allocate, eventSortKey, fold, greedySettlement, type Event, type Financials, type VerificationContext, type State } from "@theprawnsplit/core";
+  import { eventSortKey, fold, greedySettlement, type Event, type Financials, type VerificationContext, type State } from "@theprawnsplit/core";
   import {
     appendReservedEvents,
     applyDelta,
@@ -43,10 +43,9 @@
   import { peerClockSkewWarning } from "@/lib/clock-skew";
   import { commonCurrencies, currencyOptions } from "@/lib/currencies";
   import { defaultExpenseDate, defaultParticipant, makeEvent, makeExpenseFinancials, type EventFactory } from "@/lib/events";
-  import { formatMinor, formatMinorInput, parseMinor, parsePercentageBasisPoints, parseShareWeight, type SplitMode } from "@/lib/money";
+  import { formatMinor, formatMinorInput, parseMinor } from "@/lib/money";
   import { isArchivedEventLog } from "@/lib/archive";
   import { createDeviceLinkRequest, isDeviceLinkReplay, linkPayload, parseDeviceLinkRequest, type DeviceLinkRequest } from "@/lib/device-link";
-  import { canAppendExpense } from "@/lib/expense-command";
   import { editFinancialsForTotal } from "@/lib/expense-edit";
   import { expenseDisplayRows } from "@/lib/expense-display";
   import { expenseHistoryRows } from "@/lib/expense-history";
@@ -64,15 +63,13 @@
     shouldPollGroup,
     unarchiveConfirmationText,
   } from "@/lib/lifecycle";
-  import { currencyAmountPreview, normalizeCurrency, type CurrencyAmountResult } from "@/lib/multicurrency";
-  import { buildPayerPreview, type PayerMode } from "@/lib/payers";
+  import { normalizeCurrency } from "@/lib/multicurrency";
   import { claimAttributionText, defaultPayerPid, defaultSplitSelection, findParticipantNameMatch, groupParticipantsForClaim, type ParticipantNameMatch } from "@/lib/participants";
   import { relayDiagnosticActionText } from "@/lib/relay-diagnostics";
   import { normalizeRelaySettings, parseNostrRelayText, relaySettingsTargetCount, type RelaySettings } from "@/lib/relay-settings";
   import { reattestationStatus } from "@/lib/reattestation";
   import { canConfirmSettlement, canRecordSettlement, hasActiveClaimAnomaly } from "@/lib/settlement-command";
   import { canVoidRecordedSettlement, settlementClaimView, usableVoidAuthorityPid } from "@/lib/settlement-history";
-  import { preserveSplitInputs } from "@/lib/split-preservation";
   import { applySubgroupSelection, deleteSubgroupPreset, upsertSubgroupPreset } from "@/lib/subgroups";
   import { isEventCoveredByEveryKnownDevice } from "@/lib/sync-coverage";
   import { syncSurfaceLabels } from "@/lib/sync-labels";
@@ -80,8 +77,10 @@
   import type { SyncResult } from "@/relay/types";
   import ExpensePanel from "@/trip/ExpensePanel.svelte";
   import PeoplePanel from "@/trip/PeoplePanel.svelte";
+  import RecoveryPanel from "@/trip/RecoveryPanel.svelte";
   import SettlementPanel from "@/trip/SettlementPanel.svelte";
   import LedgerPanel from "@/trip/LedgerPanel.svelte";
+  import type { ExpenseDraftPayload } from "@/trip/expense-draft";
 
   export let initialGroup: GroupRecord;
   export let showTripList: () => void;
@@ -99,28 +98,17 @@
   let setupName = "";
   let toast = "";
   let toastHandle: number | undefined;
-  let expenseBlockReason = "";
-  let showExpenseHint = false;
   let importPanelOpen = false;
   let linkCopied = false;
   let linkCopiedHandle: number | undefined;
   let payerPid = "";
-  let payerMode: PayerMode = "single";
   let payerAmounts: Record<string, string> = {};
-  let expenseDesc = "";
   // LOGIC-005 (T55): stable draft identifier reused across every preview call
   // for one draft AND used as the ExpenseAdded xid on commit — so preview
   // allocation matches committed shares AND tied remainders rotate across
   // separate drafts instead of always favouring the same participant. Reset
   // to a fresh UUID after each successful addExpense.
-  let draftXid = crypto.randomUUID();
-  let expenseTotal = "";
   let expenseCurrency = "";
-  let exchangeRate = "";
-  let splitMode: SplitMode = "equal";
-  let exactShares: Record<string, string> = {};
-  let shareWeights: Record<string, string> = {};
-  let percentages: Record<string, string> = {};
   let selectedPids: Record<string, boolean> = {};
   let settleFrom = "";
   let settleTo = "";
@@ -153,7 +141,6 @@
   let relayOperatedEndpoint = "";
   let relayNostrText = "";
   let relaySettingsError = "";
-  let subgroupName = "";
   let participantNameInput: HTMLInputElement | undefined;
 
   $: participants = state ? [...state.participants.values()].sort((a, b) => a.name.localeCompare(b.name)) : [];
@@ -167,17 +154,8 @@
   $: reconciliationAnomalies = anomalies.filter((anomaly) =>
     ["possible-duplicate-participants", "distinct-participants-merged", "unverified-reclaim"].includes(anomaly.code),
   );
-  $: selectedParticipants = participants.filter((p) => selectedPids[p.pid]);
   $: participantPids = participants.map((participant) => participant.pid);
   $: suggestedSettlements = state ? greedySettlement(state.balances) : [];
-  $: amountPreview = currencyAmountPreview({
-    amountText: expenseTotal,
-    currency: expenseCurrency || currency,
-    baseCurrency: currency,
-    rateText: exchangeRate,
-  });
-  $: sharePreview = buildSharePreview(amountPreview, participants, selectedPids, splitMode, exactShares, shareWeights, percentages, draftXid);
-  $: payerPreview = buildPayerPreview(amountPreview.ok ? amountPreview.baseMinor : null, payerMode, payerPid, payerAmounts, participantPids);
   $: localClaimPids = new Set(group?.identities.map((identity) => identity.pid) ?? []);
   $: hasLocalClaim = localClaimPids.size > 0;
   $: needsSetup = Boolean(group && state && participants.length === 0 && !recoveryActive && !archived);
@@ -185,16 +163,6 @@
   $: manualFallbackDue = isManualFallbackDue(group?.meta.unsyncedSince, nowMs);
   $: joinBlocked = Boolean(group && !group.events.some((event) => event.t === "GroupCreated"));
   $: recoveryActive = Boolean(joiningFromLink && joinBlocked);
-  $: canSaveExpense = canAppendExpense({ archived, hasLocalClaim, description: expenseDesc, amountOk: amountPreview.ok, sharesOk: sharePreview.ok, payersOk: payerPreview.ok });
-  $: {
-    if (archived) expenseBlockReason = "This trip is archived.";
-    else if (!hasLocalClaim) expenseBlockReason = participants.length === 0 ? "Add and claim yourself first." : "Claim yourself before saving expenses.";
-    else if (!expenseDesc.trim()) expenseBlockReason = "Add a short description.";
-    else if (!amountPreview.ok) expenseBlockReason = amountPreview.message;
-    else if (!payerPreview.ok) expenseBlockReason = payerPreview.message;
-    else if (!sharePreview.ok) expenseBlockReason = sharePreview.message;
-    else expenseBlockReason = "";
-  }
   $: canRecordManualSettlement = canRecordSettlement({
     archived,
     allowSettlementActions: frozenPolicy.allowSettlementActions,
@@ -221,7 +189,6 @@
   $: participantClaimGroups = groupParticipantsForClaim(participants);
   $: claimCandidate = claimCandidatePid ? participants.find((participant) => participant.pid === claimCandidatePid) : undefined;
   $: groupCurrencyOptions = currencyOptions(currency);
-  $: expenseCurrencyOptions = currencyOptions(expenseCurrency || currency);
 
   function showToast(message: string): void {
     if (disposed) return;
@@ -235,10 +202,6 @@
 
   function properCase(text: string): string {
     return text.replace(/\b[a-z]/g, (char) => char.toUpperCase());
-  }
-
-  function splitModeLabel(mode: SplitMode): string {
-    return properCase(mode);
   }
 
   async function initGroupSession(): Promise<void> {
@@ -537,84 +500,6 @@
     return state?.participants.get(pid)?.name ?? pid;
   }
 
-  function selectedPidList(): string[] {
-    return participants.filter((participant) => selectedPids[participant.pid]).map((participant) => participant.pid);
-  }
-
-  function allocatedShares(total: bigint, weights: bigint[], eventId: string, pids: string[]) {
-    const shares = allocate(total, weights, eventId, pids).map((minor, i) => ({ pid: pids[i]!, minor }));
-    const weightTotal = weights.reduce((a, b) => a + b, 0n);
-    const base = weights.map((weight) => (total * weight) / weightTotal);
-    const remainderPid = shares.find((share, index) => share.minor > (base[index] ?? 0n))?.pid;
-    return remainderPid ? { shares, remainderPid } : { shares };
-  }
-
-  function buildSharePreview(
-    amount: CurrencyAmountResult,
-    currentParticipants: typeof participants,
-    currentSelectedPids: Record<string, boolean>,
-    currentSplitMode: SplitMode,
-    currentExactShares: Record<string, string>,
-    currentShareWeights: Record<string, string>,
-    currentPercentages: Record<string, string>,
-    salt: string,
-  ): { ok: true; shares: { pid: string; minor: bigint }[]; remainderPid?: string } | { ok: false; message: string } {
-    if (!amount.ok) return { ok: false, message: amount.message };
-    const total = amount.baseMinor;
-    const pids = currentParticipants.filter((participant) => currentSelectedPids[participant.pid]).map((participant) => participant.pid);
-    if (pids.length === 0) return { ok: false, message: "Select at least one participant." };
-    if (currentSplitMode === "equal") {
-      const result = allocatedShares(total, pids.map(() => 1n), salt, pids);
-      return result.remainderPid ? { ok: true, shares: result.shares, remainderPid: result.remainderPid } : { ok: true, shares: result.shares };
-    }
-    if (currentSplitMode === "exact") {
-      const shares = pids.map((pid) => ({ pid, minor: parseMinor(currentExactShares[pid] ?? "") ?? -1n }));
-      if (shares.some((share) => share.minor < 0n)) return { ok: false, message: "Every exact share needs an amount." };
-      const sum = shares.reduce((a, b) => a + b.minor, 0n);
-      if (sum !== total) return { ok: false, message: "Exact shares must sum to the total." };
-      return { ok: true, shares };
-    }
-    if (currentSplitMode === "shares") {
-      const weights = pids.map((pid) => parseShareWeight(currentShareWeights[pid] ?? "0") ?? -1n);
-      if (weights.some((weight) => weight < 0n)) return { ok: false, message: "Share weights must be whole numbers." };
-      if (weights.every((weight) => weight === 0n)) return { ok: false, message: "Enter at least one share weight." };
-      const result = allocatedShares(total, weights, salt, pids);
-      return result.remainderPid ? { ok: true, shares: result.shares, remainderPid: result.remainderPid } : { ok: true, shares: result.shares };
-    }
-    const weights = pids.map((pid) => parsePercentageBasisPoints(currentPercentages[pid] ?? "0") ?? -1n);
-    if (weights.some((weight) => weight < 0n)) return { ok: false, message: "Percentages must be valid." };
-    if (weights.reduce((a, b) => a + b, 0n) !== 10_000n) return { ok: false, message: "Percentages Must Total 100%." };
-    const result = allocatedShares(total, weights, salt, pids);
-    return result.remainderPid ? { ok: true, shares: result.shares, remainderPid: result.remainderPid } : { ok: true, shares: result.shares };
-  }
-
-  function changeSplitMode(nextMode: SplitMode): void {
-    if (archived) return;
-    const fromMode = splitMode;
-    const preview = sharePreview;
-    const total = amountPreview.ok ? amountPreview.baseMinor : null;
-    splitMode = nextMode;
-    if (!preview.ok || total === null || total === 0n) {
-      for (const participant of selectedParticipants) {
-        shareWeights[participant.pid] ||= "1";
-        percentages[participant.pid] ||= "";
-      }
-      return;
-    }
-    const preserved = preserveSplitInputs({ fromMode, toMode: nextMode, preview, selectedPids: selectedPidList(), total });
-    exactShares = preserved.exactShares;
-    shareWeights = preserved.shareWeights;
-    percentages = preserved.percentages;
-  }
-
-  function changePayerMode(nextMode: PayerMode): void {
-    if (archived) return;
-    payerMode = nextMode;
-    if (nextMode === "multiple") {
-      if (amountPreview.ok && payerPid) payerAmounts = { ...payerAmounts, [payerPid]: formatMinorInput(amountPreview.baseMinor) };
-    }
-  }
-
   function payerSummary(payers: { pid: string; minor: bigint }[]): string {
     if (payers.length <= 1) return `${participantLabel(payers[0]?.pid ?? "")} Paid`;
     return payers.map((payer) => `${participantLabel(payer.pid)} ${formatMinor(payer.minor, currency)}`).join(" · ");
@@ -642,34 +527,23 @@
     return `${rate.currency} At ${rate.toBase} ${currency}`;
   }
 
-  async function addExpense(): Promise<void> {
-    if (!group || !sharePreview.ok || !payerPreview.ok || !canSaveExpense) {
-      showExpenseHint = true;
-      if (expenseBlockReason) showToast(expenseBlockReason);
-      return;
-    }
-    if (!amountPreview.ok) return;
+  async function addExpense(draft: ExpenseDraftPayload): Promise<void> {
+    if (!group) return;
     const wasFirstExpense = expenses.length === 0;
     const dates = defaultExpenseDate();
-    const financials = makeExpenseFinancials(amountPreview.baseMinor, payerPreview.payers, sharePreview.shares);
-    if (amountPreview.rate) financials.rate = amountPreview.rate;
+    const financials = makeExpenseFinancials(draft.baseMinor, draft.payers, draft.shares);
+    if (draft.rate) financials.rate = draft.rate;
     await commitReserved(1, (f) => [makeEvent(f, "ExpenseAdded", {
-      xid: draftXid,
+      xid: draft.xid,
       financials,
-      desc: expenseDesc.trim(),
+      desc: draft.description,
       ...dates,
-    }, amountPreview.rate ? 2 : 1)]);
+    }, draft.rate ? 2 : 1)]);
     if (wasFirstExpense) {
       await requestStoragePersistenceAfterFirstExpense();
       await markFirstExpensePersistenceRequested();
     }
-    expenseDesc = "";
-    expenseTotal = "";
-    exchangeRate = "";
     payerAmounts = {};
-    draftXid = crypto.randomUUID();
-    showExpenseHint = false;
-    showToast("Expense saved.");
   }
 
   async function voidExpense(xid: string): Promise<void> {
@@ -1072,16 +946,14 @@
     syncStatus = "Relay settings reset.";
   }
 
-  async function saveSubgroupPreset(): Promise<void> {
+  async function saveSubgroupPreset(name: string, pids: string[]): Promise<void> {
     if (!group || archived) return;
-    const pids = selectedPidList();
     const id = crypto.randomUUID();
     const meta = await updateMeta(group.groupId, (current) => ({
       ...current,
-      subgroups: upsertSubgroupPreset(current.subgroups, { id, name: subgroupName, pids }, participantPids),
+      subgroups: upsertSubgroupPreset(current.subgroups, { id, name, pids }, participantPids),
     }));
     group = { ...group, meta };
-    subgroupName = "";
   }
 
   async function deleteSubgroup(id: string): Promise<void> {
@@ -1311,28 +1183,27 @@
       <section class="setup-card" aria-label="Trip Setup">
         <div class="setup-receipt">
           <span class="receipt-kicker">First Receipt</span>
-          <h2>Set up the split before adding bills.</h2>
-          <p>Add yourself first. This device will claim that person so expense saving unlocks immediately.</p>
+          <h2>Add yourself first.</h2>
+          <p>We’ll claim this device so you can record the first expense.</p>
         </div>
         <NeoCard class="setup-form">
-          <label>
-            <span>Trip Name</span>
-            <input value={group.name} disabled={!groupProfileEditable} on:change={(e) => renameGroup((e.currentTarget as HTMLInputElement).value)} />
-          </label>
-          <label>
-            <span>Main Currency</span>
-            <select value={currency} aria-label="Main Currency" disabled={!groupProfileEditable || expenses.length > 0} on:change={(e) => setCurrency((e.currentTarget as HTMLSelectElement).value)}>
-              {#each groupCurrencyOptions as code}
-                <option value={code}>{code}{commonCurrencies.includes(code as typeof commonCurrencies[number]) ? " · Common" : ""}</option>
-              {/each}
-            </select>
-          </label>
           <label>
             <span>Your Name</span>
             <input bind:value={setupName} placeholder="e.g. John Smith" />
           </label>
           {#if setupNameMatch}<p class="hint duplicate-hint">{matchText(setupNameMatch)} Use that person instead.</p>{/if}
-          <NeoButton class="setup-primary" disabled={!setupName.trim() || Boolean(setupNameMatch)} onclick={completeSetup}>Create my spot</NeoButton>
+          <NeoButton class="setup-primary" disabled={!setupName.trim() || Boolean(setupNameMatch)} onclick={completeSetup}>Add myself</NeoButton>
+          <details class="setup-options">
+            <summary>Trip currency · {currency}</summary>
+            <label>
+              <span>Main Currency</span>
+              <select value={currency} aria-label="Main Currency" disabled={!groupProfileEditable || expenses.length > 0} on:change={(e) => setCurrency((e.currentTarget as HTMLSelectElement).value)}>
+                {#each groupCurrencyOptions as code}
+                  <option value={code}>{code}{commonCurrencies.includes(code as typeof commonCurrencies[number]) ? " · Common" : ""}</option>
+                {/each}
+              </select>
+            </label>
+          </details>
         </NeoCard>
       </section>
     {/if}
@@ -1373,7 +1244,7 @@
         </div>
       </section>
     {/if}
-    {#if showPinLinkPrompt}
+    {#if showPinLinkPrompt && !needsSetup}
       <section class="prompt-banner">
         <div>
           <strong>Pin the trip link</strong>
@@ -1421,25 +1292,14 @@
       </section>
     {/if}
     {#if recoveryActive}
-      <section class="recovery-panel">
-        <div>
-          <h2>{recoveryMode === "evicted" ? "Device storage empty" : "Join Trip"}</h2>
-          <p>{recoveryMessage()}</p>
-          <div class="recovery-mode" aria-label="Recovery Mode">
-            <button type="button" class:active={recoveryMode === "first-join"} on:click={() => (recoveryMode = "first-join")}>First time here</button>
-            <button type="button" class:active={recoveryMode === "evicted"} on:click={() => (recoveryMode = "evicted")}>Had it before</button>
-          </div>
-        </div>
-        <div class="recovery-actions">
-          {#if recoveryMode === "evicted"}
-            <button type="button" on:click={() => (importPanelOpen = true)}>Import JSON</button>
-            <button type="button" disabled={syncing} on:click={runSync}><Icon name="refresh-ccw" size={17} /> {syncing ? "Recovering" : "Retry Sync"}</button>
-          {:else}
-            <button type="button" disabled={syncing} on:click={runSync}><Icon name="refresh-ccw" size={17} /> {syncing ? "Recovering" : "Retry Sync"}</button>
-            <button type="button" class="secondary" on:click={() => (importPanelOpen = true)}>Import JSON</button>
-          {/if}
-        </div>
-      </section>
+      <RecoveryPanel
+        mode={recoveryMode}
+        message={recoveryMessage()}
+        {syncing}
+        onModeChange={(mode) => (recoveryMode = mode)}
+        onImport={() => (importPanelOpen = true)}
+        onRetry={runSync}
+      />
     {/if}
     {#if !needsSetup}
       <section class="sync-strip" aria-label="Trip Status">
@@ -1594,34 +1454,17 @@
         {hasLocalClaim}
         {currency}
         {participants}
-        {selectedParticipants}
-        {expenseCurrencyOptions}
+        {selectedPids}
         {subgroupPresets}
-        {amountPreview}
-        {sharePreview}
-        {expenseBlockReason}
-        {canSaveExpense}
-        bind:expenseDesc
-        bind:expenseTotal
         bind:expenseCurrency
-        bind:exchangeRate
-        bind:payerMode
         bind:payerPid
         bind:payerAmounts
-        bind:splitMode
-        bind:exactShares
-        bind:shareWeights
-        bind:percentages
-        bind:subgroupName
-        bind:showExpenseHint
-        {changePayerMode}
-        {changeSplitMode}
+        addExpense={addExpense}
+        notify={showToast}
         {saveSubgroupPreset}
         {applySubgroup}
         {deleteSubgroup}
-        {addExpense}
         {participantLabel}
-        {splitModeLabel}
       />
 
       {#if expenses.length}

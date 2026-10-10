@@ -88,7 +88,7 @@ describe("selected trip lifetime", () => {
     });
     await select(1);
     fireEvent.input(screen.getByPlaceholderText("e.g. John Smith"), { target: { value: "Fixture delayed claim" } });
-    fireEvent.click(screen.getByRole("button", { name: "Create my spot" }));
+    fireEvent.click(screen.getByRole("button", { name: "Add myself" }));
     await waitFor(() => expect(identity).toHaveBeenCalledTimes(1));
     fireEvent.click(screen.getByTitle("All Trips")); await screen.findByText("Your Trips"); await select(0);
     const preserved = await repo.readGroup(groups[0]!.groupId);

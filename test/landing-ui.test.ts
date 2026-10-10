@@ -35,7 +35,7 @@ describe("landing and root routing UI (rendered)", () => {
     await createGroup("My Trip", "USD");
     renderApp();
     await screen.findByText("Your Trips", {}, { timeout: 15000 });
-    expect(screen.getByRole("button", { name: /Start a new trip/i })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /\+ New Trip/i })).toBeTruthy();
   }, 90_000);
 
   it("lists stored groups sorted by newest first", async () => {

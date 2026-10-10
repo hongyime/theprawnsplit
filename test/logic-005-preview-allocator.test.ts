@@ -8,8 +8,8 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { allocate } from "@theprawnsplit/core";
 
-function appSource(): string {
-  return readFileSync(join(process.cwd(), "src", "Trip.svelte"), "utf8");
+function sourceFile(name: string): string {
+  return readFileSync(join(process.cwd(), "src", "trip", name), "utf8");
 }
 
 describe("LOGIC-005: preview allocator salt", () => {
@@ -40,25 +40,26 @@ describe("LOGIC-005: preview allocator salt", () => {
     expect(differs).toBe(true);
   });
 
-  it("wires Trip.svelte so preview shares use a stable draft xid, not the literal 'preview'", () => {
-    const source = appSource();
-    const buildSharePreview = source.match(/function buildSharePreview\(([\s\S]*?)\n  \}/)?.[1] ?? "";
+  it("wires the expense draft so preview shares use a stable xid, not the literal 'preview'", () => {
+    const source = sourceFile("expense-draft.ts");
+    const panel = sourceFile("ExpensePanel.svelte");
+    const buildSharePreview = source.match(/export function buildSharePreview\(([\s\S]*?)\n\}/)?.[1] ?? "";
 
     // Source-shape: none of the four allocatedShares call sites in
     // buildSharePreview may pass the literal "preview" string any more.
     expect(buildSharePreview).not.toMatch(/allocatedShares\([^)]*"preview"/);
-    // The reactive call site must pass draftXid to buildSharePreview.
-    expect(source).toMatch(/buildSharePreview\([^)]*draftXid/);
+    // The panel's reactive call site must pass draftXid to buildSharePreview.
+    expect(panel).toMatch(/buildSharePreview\([^)]*draftXid/);
     // A stable `draftXid` state must exist.
-    expect(source).toMatch(/let draftXid\b/);
+    expect(panel).toMatch(/let draftXid\b/);
   });
 
-  it("wires addExpense to commit the same xid it previewed with", () => {
-    const source = appSource();
-    const addExpense = source.match(/async function addExpense\(\): Promise<void> \{([\s\S]*?)\n  \}/)?.[1] ?? "";
+  it("wires the panel draft xid into the event committed by Trip.svelte", () => {
+    const source = readFileSync(join(process.cwd(), "src", "Trip.svelte"), "utf8");
+    const addExpense = source.match(/async function addExpense\(draft: ExpenseDraftPayload\): Promise<void> \{([\s\S]*?)\n  \}/)?.[1] ?? "";
 
     // ExpenseAdded's xid field must reuse the draft's own xid, not a fresh randomUUID().
-    expect(addExpense).toContain("xid: draftXid");
+    expect(addExpense).toContain("xid: draft.xid");
     expect(addExpense).not.toMatch(/xid: crypto\.randomUUID\(\)/);
   });
 });

@@ -83,14 +83,14 @@
       </div>
       <div class="trips-header">
         <h2>Your Trips</h2>
-        <NeoButton onclick={startNewTrip}>+ Start a new trip</NeoButton>
+        <NeoButton onclick={startNewTrip}>+ New Trip</NeoButton>
       </div>
       <div class="trips-list" role="list">
         {#each storedGroups as g}
           <button type="button" class="trip-card" on:click={() => selectTrip(g.groupId)}>
             <div class="trip-card-info">
               <strong>{g.name || "Trip"}</strong>
-              <span>{g.currency} · Created {new Date(g.createdAt).toLocaleDateString()}</span>
+              <span>{g.currency} · {new Date(g.createdAt).toLocaleDateString()}</span>
             </div>
             <span class="trip-arrow">→</span>
           </button>

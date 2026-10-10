@@ -56,25 +56,39 @@ COMPLETE — 02_EXECUTE cycle done; 68/73 Fixed, 4 Deferred, 1 subsumed,
 
 ## Active work context
 
-Working branch: `maintenance/prawn-ui-20260916`, pushed to
-`origin/maintenance/prawn-ui-20260916`. Not yet merged into `main` via PR
-(compare link: https://github.com/hongyime/theprawnsplit/compare/main...maintenance/prawn-ui-20260916).
-Every task's exact commit hash is recorded in tasks.md/bugfix.md/
-execute_state.json (local-only pipeline artifacts, not git-tracked) and in
-the git log itself. Multiple agents/sessions may be active on this repo
-concurrently — always `git fetch` and check `git log --oneline -5` on both
-`main` and this branch before assuming either is unchanged.
+Working branch: `main`, fast-forwarded from `origin/main` to `6e6b019` on
+2026-10-10. Existing handoff edits and untracked audit artifacts remain
+preserved and unstaged.
+
+Current task: complete the trip list/setup simplification, mobile touch pass,
+and Trip.svelte refactor. Locally, ExpensePanel now owns expense draft inputs,
+previews, and payer/split transitions. Trip.svelte retains roster selection,
+event creation, reserved IDs, first-expense persistence, and trip lifecycle.
+RecoveryPanel remains presentation-only.
+
+Touch-emulated Playwright QA at 390×844 covered setup, the trip list, More
+Actions, and saving the first expense. Tested visible controls measure at least
+44px, there is no horizontal overflow or browser error, and the expense success
+status stays visible beside the save button after the first-expense layout
+change. Browser scripts/screenshots and disk-backed fixtures stay under the
+system temp directory; existing tests were updated, none were added.
+
+Verification passed end to end with npm run build: core 136/136, root
+479/479 across 102 files, relay migration 12/12, money lint, svelte-check
+with 0 errors/warnings, and Vite production build. The task is complete and
+committed locally on main; nothing was pushed. Preserve the
+pre-existing untracked audit artifacts and leave them unstaged.
 
 <!-- MOLT_AUTO_START -->
 ## Auto State
 
-- Updated: 2026-10-01 02:11:55 +08:00
+- Updated: 2026-10-10 09:05:08 +08:00
 - Machine: PRAWN-E14
-- Harness: claude
-- Event: stop
-- Branch: maintenance/prawn-ui-20260916
-- HEAD: b0e46df
-- Dirty files: 9
+- Harness: codex
+- Event: session-start
+- Branch: main
+- HEAD: 6e6b019
+- Dirty files: 16
 - Resume hint: Read .agents/STATE.md, then the latest file in .agents/handoffs/ if present.
 <!-- MOLT_AUTO_END -->
 

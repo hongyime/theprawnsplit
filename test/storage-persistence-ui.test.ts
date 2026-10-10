@@ -1,5 +1,5 @@
 // CR-013 Task 2 — BLOCKED from rendered conversion.
-// Core assertion is function-body ordering within addExpense() and a single-call guard on navigator.storage.persist(). No rendered test can verify internal call ordering.
+// Core assertion is function-body ordering within addExpense(draft) and a single-call guard on navigator.storage.persist(). No rendered test can verify internal call ordering.
 // Evidence for all assertions in this file: source-shape.
 
 import { readFileSync } from "node:fs";
@@ -13,7 +13,7 @@ function appSource(): string {
 describe("storage persistence request boundary", () => {
   it("requests persistent storage only after the first expense is saved", () => {
     const source = appSource();
-    const addExpense = source.match(/async function addExpense\(\): Promise<void> \{([\s\S]*?)\n  \}/)?.[1] ?? "";
+    const addExpense = source.match(/async function addExpense\(draft: ExpenseDraftPayload\): Promise<void> \{([\s\S]*?)\n  \}/)?.[1] ?? "";
     const requestPersistence =
       source.match(/async function requestStoragePersistenceAfterFirstExpense\(\): Promise<void> \{([\s\S]*?)\n  \}/)?.[1] ?? "";
 

@@ -137,3 +137,8 @@ Decision gates — agreed **before** seeing data (see CR-005 Task 3):
 | 2026-10-17 09:46 | 55.8d | wss://offchain.pub | 0/18 | 0% | 18/20 (90%) |  |
 | 2026-10-18 09:58 | 56.9d | wss://relay.damus.io | 0/10 | 0% | 10/20 (50%) |  |
 | 2026-10-18 09:58 | 56.9d | wss://offchain.pub | 0/18 | 0% | 18/20 (90%) |  |
+
+| date (UTC) | elapsed | relay | retention | ret % | ingest | note |
+|---|---|---|---|---|---|---|
+| 2026-10-19 11:21 | 57.9d | wss://relay.damus.io | 0/10 | 0% | 10/20 (50%) |  |
+| 2026-10-19 11:21 | 57.9d | wss://offchain.pub | 0/18 | 0% | 18/20 (90%) |  |

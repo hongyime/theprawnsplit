@@ -346,3 +346,11 @@ Decision gates — agreed **before** seeing data (see CR-005 Task 3):
 | 2026-10-24 09:52 | 62.3d | wss://nostr.mom | 0/20 | 0% | 20/20 (100%) |  |
 | 2026-10-24 09:52 | 62.3d | wss://offchain.pub | 0/19 | 0% | 19/20 (95%) |  |
 | 2026-10-24 09:52 | 62.3d | wss://relay.snort.social | 0/20 | 0% | 20/20 (100%) |  |
+
+| date (UTC) | elapsed | relay | retention | ret % | ingest | note |
+|---|---|---|---|---|---|---|
+| 2026-10-25 10:14 | 63.3d | wss://nos.lol | 0/20 | 0% | 20/20 (100%) |  |
+| 2026-10-25 10:14 | 63.3d | wss://relay.primal.net | 0/20 | 0% | 20/20 (100%) |  |
+| 2026-10-25 10:14 | 63.3d | wss://nostr.mom | 0/20 | 0% | 20/20 (100%) |  |
+| 2026-10-25 10:14 | 63.3d | wss://offchain.pub | 0/19 | 0% | 19/20 (95%) |  |
+| 2026-10-25 10:14 | 63.3d | wss://relay.snort.social | 0/20 | 0% | 20/20 (100%) |  |
